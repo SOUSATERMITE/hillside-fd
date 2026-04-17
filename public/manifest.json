@@ -1,0 +1,13 @@
+{
+  "name": "Hillside Fire Department",
+  "short_name": "Hillside FD",
+  "description": "Sick Tracking and Recall List",
+  "start_url": "/sick",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#b71c1c",
+  "theme_color": "#b71c1c",
+  "icons": [
+    { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

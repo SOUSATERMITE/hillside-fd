@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Admin — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button, input { min-height: 44px; }
+    .tab-active { background: #b71c1c; color: white; }
+    .tab-inactive { background: white; color: #374151; border: 1px solid #d1d5db; }
+    .admin-tab-active { border-bottom: 3px solid #b71c1c; color: #b71c1c; font-weight: 700; }
+    .admin-tab-inactive { color: #6b7280; border-bottom: 3px solid transparent; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex gap-4 text-sm">
+      <a href="/sick" class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/admin" class="nav-active pb-1">Admin</a>
+    </div>
+  </nav>
+
+  <!-- Error Banner -->
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="flex items-center justify-center min-h-[80vh]">
+    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm mx-4">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">🔥</div>
+        <h1 class="text-2xl font-extrabold text-gray-800">Admin Login</h1>
+        <p class="text-gray-500 text-sm mt-1">Hillside Fire Department</p>
+      </div>
+      <input id="passwordInput" type="password" placeholder="Enter admin password"
+        class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+        onkeydown="if(event.key==='Enter') login()">
+      <button onclick="login()" class="w-full bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition">
+        Log In
+      </button>
+      <div id="loginError" class="text-red-600 text-sm text-center mt-3 hidden"></div>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="adminPanel" class="hidden max-w-5xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-extrabold text-gray-800">Admin Panel</h1>
+      <button onclick="logout()" class="text-sm text-gray-500 hover:text-red-700 border border-gray-300 rounded-lg px-3 py-1.5">Log Out</button>
+    </div>
+
+    <!-- Admin Tabs -->
+    <div class="flex gap-0 border-b border-gray-200 mb-6 overflow-x-auto">
+      <button id="adminTab-ff" onclick="switchAdminTab('ff')" class="admin-tab-active px-5 py-3 text-sm whitespace-nowrap">Firefighters</button>
+      <button id="adminTab-positions" onclick="switchAdminTab('positions')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Recall Positions</button>
+      <button id="adminTab-sicklog" onclick="switchAdminTab('sicklog')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Sick Log</button>
+      <button id="adminTab-recalllog" onclick="switchAdminTab('recalllog')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Recall Log</button>
+    </div>
+
+    <!-- TAB: Firefighters -->
+    <div id="tab-ff">
+      <!-- Add Form -->
+      <div class="bg-white rounded-2xl shadow p-5 mb-5">
+        <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Add Firefighter</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <input id="addName" type="text" placeholder="Full name"
+            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          <select id="addRank" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+            <option value="">Rank...</option>
+            <option value="FF">FF</option>
+            <option value="Captain">Captain</option>
+            <option value="DC">DC</option>
+          </select>
+          <select id="addGroup" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+            <option value="">Group...</option>
+            <option value="1">Group 1</option>
+            <option value="2">Group 2</option>
+            <option value="3">Group 3</option>
+            <option value="4">Group 4</option>
+          </select>
+          <button onclick="addFirefighter()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2 transition">
+            Add
+          </button>
+        </div>
+        <div id="addFFResult" class="text-sm font-semibold text-center mt-2"></div>
+      </div>
+
+      <!-- Firefighters Table -->
+      <div class="bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="font-bold text-gray-800">All Firefighters</h2>
+        </div>
+        <div id="ffTableContainer" class="overflow-x-auto">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Recall Positions -->
+    <div id="tab-positions" class="hidden">
+      <div class="flex gap-2 mb-5 flex-wrap">
+        <button id="postab-1" onclick="switchPosGroup(1)" class="tab-active font-semibold px-5 py-2 rounded-xl text-sm transition">Group 1</button>
+        <button id="postab-2" onclick="switchPosGroup(2)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 2</button>
+        <button id="postab-3" onclick="switchPosGroup(3)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 3</button>
+        <button id="postab-4" onclick="switchPosGroup(4)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 4</button>
+      </div>
+      <div id="positionsContent">
+        <div class="text-gray-400 text-sm text-center py-8">Select a group to manage positions.</div>
+      </div>
+    </div>
+
+    <!-- TAB: Sick Log -->
+    <div id="tab-sicklog" class="hidden">
+      <div class="bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="font-bold text-gray-800">Sick Log (last 200)</h2>
+        </div>
+        <div id="sickLogContainer" class="overflow-x-auto">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Recall Log -->
+    <div id="tab-recalllog" class="hidden">
+      <div class="bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+          <h2 class="font-bold text-gray-800">Recall Log (last 200)</h2>
+        </div>
+        <div id="recallLogContainer" class="overflow-x-auto">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = '/.netlify/functions'
+    let adminPw = ''
+    let currentAdminTab = 'ff'
+    let currentPosGroup = 1
+    let positionsData = {}
+    let editingFFId = null
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 6000)
+    }
+
+    function formatEastern(isoString) {
+      if (!isoString) return '—'
+      return new Date(isoString).toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+      })
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '—'
+      return dateStr
+    }
+
+    // ---- AUTH ----
+    async function login() {
+      const pw = document.getElementById('passwordInput').value
+      const errEl = document.getElementById('loginError')
+      if (!pw) { errEl.textContent = 'Please enter a password.'; errEl.classList.remove('hidden'); return }
+
+      try {
+        const res = await fetch(`${API}/admin-login`, {
+          method: 'POST',
+          headers: { 'x-admin-password': pw }
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Incorrect password.'
+          errEl.classList.remove('hidden')
+          return
+        }
+        adminPw = pw
+        sessionStorage.setItem('adminPw', pw)
+        showAdminPanel()
+      } catch (e) {
+        errEl.textContent = 'Network error: ' + e.message
+        errEl.classList.remove('hidden')
+      }
+    }
+
+    function logout() {
+      adminPw = ''
+      sessionStorage.removeItem('adminPw')
+      document.getElementById('adminPanel').classList.add('hidden')
+      document.getElementById('loginScreen').classList.remove('hidden')
+      document.getElementById('passwordInput').value = ''
+    }
+
+    function showAdminPanel() {
+      document.getElementById('loginScreen').classList.add('hidden')
+      document.getElementById('adminPanel').classList.remove('hidden')
+      loadFirefighters()
+    }
+
+    // Check session on load
+    window.addEventListener('load', () => {
+      const saved = sessionStorage.getItem('adminPw')
+      if (saved) {
+        adminPw = saved
+        showAdminPanel()
+      }
+    })
+
+    // ---- ADMIN TABS ----
+    function switchAdminTab(tab) {
+      const tabs = ['ff', 'positions', 'sicklog', 'recalllog']
+      for (const t of tabs) {
+        document.getElementById(`adminTab-${t}`).className = t === tab
+          ? 'admin-tab-active px-5 py-3 text-sm whitespace-nowrap'
+          : 'admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap'
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab)
+      }
+      currentAdminTab = tab
+
+      // Lazy load
+      if (tab === 'sicklog') loadSickLog()
+      if (tab === 'recalllog') loadRecallLog()
+      if (tab === 'positions') loadPositionsGroup(currentPosGroup)
+    }
+
+    // ---- FIREFIGHTERS TAB ----
+    async function loadFirefighters() {
+      try {
+        const res = await fetch(`${API}/admin-firefighters`, {
+          headers: { 'x-admin-password': adminPw }
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const data = await res.json()
+        renderFFTable(data)
+      } catch (e) {
+        showError('Error loading firefighters: ' + e.message)
+        document.getElementById('ffTableContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function renderFFTable(firefighters) {
+      const container = document.getElementById('ffTableContainer')
+      if (firefighters.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No firefighters found.</div>'
+        return
+      }
+
+      const rows = firefighters.map(f => {
+        if (editingFFId === f.id) {
+          return `
+            <tr class="bg-yellow-50">
+              <td class="px-4 py-2">
+                <input id="edit-name-${f.id}" value="${f.name}" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px">
+              </td>
+              <td class="px-4 py-2">
+                <select id="edit-rank-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
+                  <option ${f.rank==='FF'?'selected':''} value="FF">FF</option>
+                  <option ${f.rank==='Captain'?'selected':''} value="Captain">Captain</option>
+                  <option ${f.rank==='DC'?'selected':''} value="DC">DC</option>
+                </select>
+              </td>
+              <td class="px-4 py-2">
+                <select id="edit-group-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
+                  <option ${f.group_number===1?'selected':''} value="1">1</option>
+                  <option ${f.group_number===2?'selected':''} value="2">2</option>
+                  <option ${f.group_number===3?'selected':''} value="3">3</option>
+                  <option ${f.group_number===4?'selected':''} value="4">4</option>
+                </select>
+              </td>
+              <td class="px-4 py-2">${f.active ? '<span class="text-green-600 text-sm font-semibold">Active</span>' : '<span class="text-gray-400 text-sm">Inactive</span>'}</td>
+              <td class="px-4 py-2 flex gap-2">
+                <button onclick="saveEditFF('${f.id}')" class="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Save</button>
+                <button onclick="cancelEditFF()" class="bg-gray-300 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg">Cancel</button>
+              </td>
+            </tr>
+          `
+        }
+        return `
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${f.name}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${f.group_number}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${f.rank}</td>
+            <td class="px-4 py-3">${f.active ? '<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">Active</span>' : '<span class="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-0.5 rounded">Inactive</span>'}</td>
+            <td class="px-4 py-3 flex gap-2 flex-wrap">
+              <button onclick="startEditFF('${f.id}')" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Edit</button>
+              <button onclick="${f.active ? `deactivateFF('${f.id}')` : `activateFF('${f.id}')`}" class="text-white text-xs font-bold px-3 py-1.5 rounded-lg ${f.active ? 'bg-gray-500' : 'bg-green-600'}">
+                ${f.active ? 'Deactivate' : 'Activate'}
+              </button>
+            </td>
+          </tr>
+        `
+      }).join('')
+
+      container.innerHTML = `
+        <table class="w-full text-left min-w-[600px]">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `
+    }
+
+    function startEditFF(id) {
+      editingFFId = id
+      loadFirefighters()
+    }
+
+    function cancelEditFF() {
+      editingFFId = null
+      loadFirefighters()
+    }
+
+    async function saveEditFF(id) {
+      const name = document.getElementById(`edit-name-${id}`).value.trim()
+      const rank = document.getElementById(`edit-rank-${id}`).value
+      const group = parseInt(document.getElementById(`edit-group-${id}`).value, 10)
+
+      if (!name || !rank || !group) { showError('Name, rank, and group are required.'); return }
+
+      try {
+        const res = await fetch(`${API}/admin-firefighters`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+          body: JSON.stringify({ id, name, rank, group_number: group })
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        editingFFId = null
+        loadFirefighters()
+      } catch (e) {
+        showError('Error saving: ' + e.message)
+      }
+    }
+
+    async function deactivateFF(id) {
+      if (!confirm('Deactivate this firefighter?')) return
+      try {
+        const res = await fetch(`${API}/admin-firefighters`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+          body: JSON.stringify({ id })
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        loadFirefighters()
+      } catch (e) {
+        showError('Error deactivating: ' + e.message)
+      }
+    }
+
+    async function activateFF(id) {
+      try {
+        const res = await fetch(`${API}/admin-firefighters`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+          body: JSON.stringify({ id, active: true })
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        loadFirefighters()
+      } catch (e) {
+        showError('Error activating: ' + e.message)
+      }
+    }
+
+    async function addFirefighter() {
+      const name = document.getElementById('addName').value.trim()
+      const rank = document.getElementById('addRank').value
+      const group = parseInt(document.getElementById('addGroup').value, 10)
+      const resultEl = document.getElementById('addFFResult')
+
+      if (!name || !rank || !group) {
+        resultEl.textContent = 'Name, rank, and group are required.'
+        resultEl.className = 'text-sm font-semibold text-center text-orange-600'
+        return
+      }
+
+      resultEl.textContent = 'Adding...'
+      resultEl.className = 'text-sm font-semibold text-center text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/admin-firefighters`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+          body: JSON.stringify({ name, rank, group_number: group })
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          resultEl.textContent = data.error || 'Error adding.'
+          resultEl.className = 'text-sm font-semibold text-center text-red-600'
+          return
+        }
+        resultEl.textContent = `Added ${data.name} successfully.`
+        resultEl.className = 'text-sm font-semibold text-center text-green-600'
+        document.getElementById('addName').value = ''
+        document.getElementById('addRank').value = ''
+        document.getElementById('addGroup').value = ''
+        loadFirefighters()
+      } catch (e) {
+        resultEl.textContent = 'Network error: ' + e.message
+        resultEl.className = 'text-sm font-semibold text-center text-red-600'
+      }
+    }
+
+    // ---- POSITIONS TAB ----
+    async function loadPositionsGroup(n) {
+      currentPosGroup = n
+      // Update tabs
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById(`postab-${i}`).className = i === n
+          ? 'tab-active font-semibold px-5 py-2 rounded-xl text-sm transition'
+          : 'tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition'
+      }
+
+      document.getElementById('positionsContent').innerHTML = '<div class="text-gray-400 text-sm text-center py-8">Loading...</div>'
+
+      try {
+        const res = await fetch(`${API}/admin-positions?group=${n}`, {
+          headers: { 'x-admin-password': adminPw }
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const data = await res.json()
+        positionsData[n] = data
+        renderPositions(n)
+      } catch (e) {
+        document.getElementById('positionsContent').innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function switchPosGroup(n) {
+      loadPositionsGroup(n)
+    }
+
+    function renderPositions(n) {
+      const data = positionsData[n] || []
+      const ff = data.filter(e => e.rank_type === 'FF')
+      const captains = data.filter(e => e.rank_type === 'Captain')
+
+      const renderSection = (entries, sectionId, label) => {
+        if (entries.length === 0) return `<div class="text-gray-400 text-sm py-4">No ${label} in this group.</div>`
+
+        return `
+          <div class="mb-1">
+            ${entries.map((e, idx) => `
+              <div class="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 mb-2">
+                <span class="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 shrink-0">${e.list_position}</span>
+                <span class="flex-1 font-semibold text-gray-800 text-sm">${e.firefighters ? e.firefighters.name : '—'}</span>
+                <div class="flex gap-1">
+                  <button onclick="movePosition('${sectionId}', ${idx}, -1)" ${idx === 0 ? 'disabled' : ''}
+                    class="w-8 h-8 rounded-lg border font-bold text-lg flex items-center justify-center ${idx === 0 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700'}">↑</button>
+                  <button onclick="movePosition('${sectionId}', ${idx}, 1)" ${idx === entries.length-1 ? 'disabled' : ''}
+                    class="w-8 h-8 rounded-lg border font-bold text-lg flex items-center justify-center ${idx === entries.length-1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : 'bg-white hover:bg-gray-100 text-gray-700'}">↓</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `
+      }
+
+      document.getElementById('positionsContent').innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">FF List</h3>
+              <button onclick="saveOrder('ff')" class="bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-800 transition">Save Order</button>
+            </div>
+            <div id="pos-ff-${n}">${renderSection(ff, `ff-${n}`, 'FFs')}</div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-gray-700 uppercase tracking-wide text-sm">Captain List</h3>
+              <button onclick="saveOrder('captain')" class="bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-800 transition">Save Order</button>
+            </div>
+            <div id="pos-captain-${n}">${renderSection(captains, `captain-${n}`, 'Captains')}</div>
+          </div>
+        </div>
+        <div id="posResult" class="text-sm font-semibold text-center mt-3"></div>
+      `
+    }
+
+    // In-memory reorder before saving
+    function movePosition(sectionId, idx, dir) {
+      const n = currentPosGroup
+      const data = positionsData[n] || []
+      const rankType = sectionId.startsWith('ff') ? 'FF' : 'Captain'
+      const entries = data.filter(e => e.rank_type === rankType)
+      const others = data.filter(e => e.rank_type !== rankType)
+
+      const newIdx = idx + dir
+      if (newIdx < 0 || newIdx >= entries.length) return
+
+      // Swap
+      const temp = entries[idx]
+      entries[idx] = entries[newIdx]
+      entries[newIdx] = temp
+
+      // Reassign list_position
+      entries.forEach((e, i) => { e.list_position = i + 1 })
+
+      positionsData[n] = [...others, ...entries].sort((a, b) => {
+        if (a.rank_type !== b.rank_type) return a.rank_type.localeCompare(b.rank_type)
+        return a.list_position - b.list_position
+      })
+
+      renderPositions(n)
+    }
+
+    async function saveOrder(rankLabel) {
+      const n = currentPosGroup
+      const data = positionsData[n] || []
+      const rankType = rankLabel === 'ff' ? 'FF' : 'Captain'
+      const entries = data.filter(e => e.rank_type === rankType)
+
+      const positions = entries.map(e => ({ id: e.id, list_position: e.list_position }))
+      const resultEl = document.getElementById('posResult')
+      resultEl.textContent = 'Saving...'
+      resultEl.className = 'text-sm font-semibold text-center text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/admin-positions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+          body: JSON.stringify({ positions })
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        resultEl.textContent = 'Order saved.'
+        resultEl.className = 'text-sm font-semibold text-center text-green-600'
+        setTimeout(() => { resultEl.textContent = '' }, 3000)
+        loadPositionsGroup(n)
+      } catch (e) {
+        resultEl.textContent = 'Error saving: ' + e.message
+        resultEl.className = 'text-sm font-semibold text-center text-red-600'
+      }
+    }
+
+    // ---- SICK LOG TAB ----
+    async function loadSickLog() {
+      try {
+        const res = await fetch(`${API}/get-logs?type=sick&limit=200`, {
+          headers: { 'x-admin-password': adminPw }
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const data = await res.json()
+        renderSickLog(data)
+      } catch (e) {
+        document.getElementById('sickLogContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function renderSickLog(entries) {
+      const container = document.getElementById('sickLogContainer')
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No sick log entries.</div>'
+        return
+      }
+
+      const rows = entries.map(e => {
+        const ff = e.firefighters || {}
+        return `
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">${formatEastern(e.created_at)}</td>
+            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${ff.name || '—'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${ff.group_number || '—'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${ff.rank || '—'}</td>
+            <td class="px-4 py-3 text-xs whitespace-nowrap">${formatEastern(e.marked_sick_date)}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${e.marked_sick_by || '—'}</td>
+            <td class="px-4 py-3 text-xs whitespace-nowrap">${formatEastern(e.cleared_date)}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${e.cleared_by || '—'}</td>
+          </tr>
+        `
+      }).join('')
+
+      container.innerHTML = `
+        <table class="w-full text-left min-w-[900px]">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Created</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Marked Sick</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Marked By</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Cleared</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Cleared By</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `
+    }
+
+    // ---- RECALL LOG TAB ----
+    async function loadRecallLog() {
+      try {
+        const res = await fetch(`${API}/get-logs?type=recall&limit=200`, {
+          headers: { 'x-admin-password': adminPw }
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const data = await res.json()
+        renderRecallLog(data)
+      } catch (e) {
+        document.getElementById('recallLogContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function renderRecallLog(entries) {
+      const container = document.getElementById('recallLogContainer')
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No recall log entries.</div>'
+        return
+      }
+
+      const typeLabels = {
+        full_shift: 'Full Shift',
+        short_min: 'Short Min',
+        refused: 'Refused',
+        vacation_skip: 'Vacation Skip'
+      }
+
+      const rows = entries.map(e => {
+        const ff = e.firefighters || {}
+        return `
+          <tr class="border-t border-gray-100 hover:bg-gray-50">
+            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">${formatEastern(e.created_at)}</td>
+            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${ff.name || '—'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${ff.group_number || '—'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${ff.rank || '—'}</td>
+            <td class="px-4 py-3 text-sm">
+              <span class="px-2 py-0.5 rounded text-xs font-bold ${e.recall_type === 'full_shift' ? 'bg-green-100 text-green-800' : e.recall_type === 'refused' ? 'bg-red-100 text-red-800' : e.recall_type === 'vacation_skip' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}">
+                ${typeLabels[e.recall_type] || e.recall_type}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-600">${e.hours_worked !== null ? e.hours_worked + 'h' : '—'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${e.recorded_by || '—'}</td>
+          </tr>
+        `
+      }).join('')
+
+      container.innerHTML = `
+        <table class="w-full text-left min-w-[700px]">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Timestamp</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Type</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Hours</th>
+              <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Recorded By</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error)
+      })
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Recall List — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button { min-height: 44px; }
+    .tab-active { background: #b71c1c; color: white; }
+    .tab-inactive { background: white; color: #374151; border: 1px solid #d1d5db; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex gap-4 text-sm">
+      <a href="/sick" class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall" class="nav-active pb-1">Recall</a>
+      <a href="/admin" class="hover:text-red-200 pb-1">Admin</a>
+    </div>
+  </nav>
+
+  <!-- Error Banner -->
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <div class="max-w-5xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-extrabold text-gray-800 mb-4">Recall List</h1>
+
+    <!-- Group Tabs -->
+    <div class="flex gap-2 mb-6 flex-wrap">
+      <button id="tab-1" onclick="switchGroup(1)" class="tab-active font-semibold px-5 py-2 rounded-xl text-sm transition">Group 1</button>
+      <button id="tab-2" onclick="switchGroup(2)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 2</button>
+      <button id="tab-3" onclick="switchGroup(3)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 3</button>
+      <button id="tab-4" onclick="switchGroup(4)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 4</button>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingMsg" class="text-gray-400 text-sm text-center py-12">Loading...</div>
+
+    <!-- Record Recall Card -->
+    <div id="recallForm" class="hidden bg-white rounded-2xl shadow p-5 mb-6">
+      <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Record Recall</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <select id="recallPerson" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Select person...</option>
+        </select>
+        <select id="recallType" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Recall type...</option>
+          <option value="full_shift">Full Shift (7hrs+)</option>
+          <option value="short_min">Short Minimum (4–7hrs)</option>
+          <option value="refused">Refused</option>
+          <option value="vacation_skip">Vacation Skip</option>
+        </select>
+        <select id="recallOfficer" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Recorded by (officer)...</option>
+        </select>
+        <input id="recallHours" type="number" step="0.5" min="0" max="24"
+          placeholder="Hours worked (optional)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+      </div>
+      <button onclick="recordRecall()" class="mt-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-6 py-3 w-full transition">
+        Record Recall
+      </button>
+      <div id="recallResult" class="text-sm font-semibold text-center mt-2"></div>
+    </div>
+
+    <!-- Lists -->
+    <div id="listsContainer" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">FF List</h2>
+        <div id="ffList"></div>
+      </div>
+      <div>
+        <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">Captain List</h2>
+        <div id="captainList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/.netlify/functions'
+    let currentGroup = 1
+    let groupData = {}
+    let allFirefighters = []
+    let officers = []
+    let countdownInterval = null
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 6000)
+    }
+
+    function countdown(clearedDateISO) {
+      const eligible = new Date(clearedDateISO).getTime() + 96 * 3600 * 1000
+      const ms = eligible - Date.now()
+      if (ms <= 0) return 'Eligible now'
+      const h = Math.floor(ms / 3600000)
+      const m = Math.floor((ms % 3600000) / 60000)
+      return `${h}h ${m}m left`
+    }
+
+    async function loadFirefighters() {
+      const res = await fetch(`${API}/get-firefighters`)
+      if (!res.ok) throw new Error('Failed to load firefighters')
+      allFirefighters = await res.json()
+      officers = allFirefighters.filter(f => f.rank === 'Captain' || f.rank === 'DC')
+    }
+
+    async function loadGroup(n) {
+      document.getElementById('loadingMsg').classList.remove('hidden')
+      document.getElementById('recallForm').classList.add('hidden')
+      document.getElementById('listsContainer').classList.add('hidden')
+
+      try {
+        if (allFirefighters.length === 0) await loadFirefighters()
+
+        const res = await fetch(`${API}/get-recall-list?group=${n}`)
+        if (!res.ok) throw new Error('Failed to load recall list')
+        const data = await res.json()
+        groupData[n] = data
+        renderGroup(n)
+      } catch (e) {
+        showError('Error loading group: ' + e.message)
+        document.getElementById('loadingMsg').textContent = 'Failed to load. Tap a group tab to retry.'
+      }
+    }
+
+    function renderGroup(n) {
+      const data = groupData[n]
+      if (!data) return
+
+      document.getElementById('loadingMsg').classList.add('hidden')
+      document.getElementById('recallForm').classList.remove('hidden')
+      document.getElementById('listsContainer').classList.remove('hidden')
+
+      // Populate person dropdown (FF and Captain only, no DC)
+      const allEntries = [...(data.ff || []), ...(data.captains || [])]
+      let personHtml = '<option value="">Select person...</option>'
+
+      const ffEntries = data.ff || []
+      const capEntries = data.captains || []
+
+      if (ffEntries.length > 0) {
+        personHtml += '<optgroup label="Firefighters">'
+        for (const e of ffEntries) {
+          const ff = e.firefighters || {}
+          const sickLabel = getSickLabel(e)
+          personHtml += `<option value="${e.id}" ${sickLabel ? 'style="color:#9ca3af"' : ''}>Position ${e.list_position} — ${ff.name}${sickLabel ? ` (${sickLabel})` : ''}</option>`
+        }
+        personHtml += '</optgroup>'
+      }
+
+      if (capEntries.length > 0) {
+        personHtml += '<optgroup label="Captains">'
+        for (const e of capEntries) {
+          const ff = e.firefighters || {}
+          const sickLabel = getSickLabel(e)
+          personHtml += `<option value="${e.id}" ${sickLabel ? 'style="color:#9ca3af"' : ''}>Position ${e.list_position} — ${ff.name}${sickLabel ? ` (${sickLabel})` : ''}</option>`
+        }
+        personHtml += '</optgroup>'
+      }
+
+      document.getElementById('recallPerson').innerHTML = personHtml
+
+      // Populate officer dropdown
+      let officerHtml = '<option value="">Recorded by (officer)...</option>'
+      for (const o of officers.sort((a,b) => a.name.localeCompare(b.name))) {
+        officerHtml += `<option value="${o.name}">${o.name} (${o.rank})</option>`
+      }
+      document.getElementById('recallOfficer').innerHTML = officerHtml
+
+      // Render lists
+      renderPersonList(data.ff || [], 'ffList')
+      renderPersonList(data.captains || [], 'captainList')
+
+      startCountdowns()
+    }
+
+    function getSickLabel(entry) {
+      if (!entry.sick_status) return null
+      if (entry.sick_status.currently_sick) return 'SICK'
+      return '96HR'
+    }
+
+    function getBgClass(entry) {
+      if (entry.sick_status) {
+        return 'bg-gray-200'
+      }
+      if (entry.short_min_count >= 1) {
+        return 'bg-yellow-100'
+      }
+      return 'bg-green-100'
+    }
+
+    function renderPersonList(entries, containerId) {
+      const container = document.getElementById(containerId)
+
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 bg-white rounded-xl border border-gray-200">No entries</div>'
+        return
+      }
+
+      container.innerHTML = entries.map(e => {
+        const ff = e.firefighters || {}
+        const bg = getBgClass(e)
+        const sickLabel = getSickLabel(e)
+
+        let badge = ''
+        let extra = ''
+        if (sickLabel === 'SICK') {
+          badge = `<span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">SICK</span>`
+        } else if (sickLabel === '96HR') {
+          badge = `<span class="bg-gray-500 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">96HR</span>`
+          if (e.sick_status && e.sick_status.cleared_date) {
+            extra = `<span class="text-xs font-semibold text-orange-600 countdown" data-cleared="${e.sick_status.cleared_date}">${countdown(e.sick_status.cleared_date)}</span>`
+          }
+        } else if (e.short_min_count >= 1) {
+          badge = `<span class="text-yellow-700 text-xs font-semibold">⚠ Short min pending</span>`
+        }
+
+        return `
+          <div class="flex items-center gap-3 px-4 py-3 rounded-xl mb-2 ${bg}">
+            <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
+              ${e.list_position}
+            </span>
+            <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
+            ${badge}
+            ${extra}
+          </div>
+        `
+      }).join('')
+    }
+
+    async function recordRecall() {
+      const recallListId = document.getElementById('recallPerson').value
+      const recallType = document.getElementById('recallType').value
+      const recordedBy = document.getElementById('recallOfficer').value
+      const hoursWorked = document.getElementById('recallHours').value
+      const resultEl = document.getElementById('recallResult')
+
+      if (!recallListId) { resultEl.textContent = 'Please select a person.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!recallType) { resultEl.textContent = 'Please select a recall type.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!recordedBy) { resultEl.textContent = 'Please select who is recording.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+
+      resultEl.textContent = 'Saving...'
+      resultEl.className = 'text-sm font-semibold text-center text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/record-recall`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recall_list_id: recallListId,
+            recall_type: recallType,
+            hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
+            recorded_by: recordedBy,
+            shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+          })
+        })
+
+        const data = await res.json()
+        if (!res.ok) {
+          resultEl.textContent = data.error || 'Error recording recall.'
+          resultEl.className = 'text-sm font-semibold text-center text-red-600'
+          return
+        }
+
+        resultEl.textContent = 'Recall recorded successfully.'
+        resultEl.className = 'text-sm font-semibold text-center text-green-600'
+
+        // Reset form
+        document.getElementById('recallPerson').value = ''
+        document.getElementById('recallType').value = ''
+        document.getElementById('recallOfficer').value = ''
+        document.getElementById('recallHours').value = ''
+
+        // Update cached data and re-render
+        groupData[currentGroup] = data
+        renderGroup(currentGroup)
+      } catch (e) {
+        resultEl.textContent = 'Network error: ' + e.message
+        resultEl.className = 'text-sm font-semibold text-center text-red-600'
+      }
+    }
+
+    function switchGroup(n) {
+      currentGroup = n
+      // Update tab styles
+      for (let i = 1; i <= 4; i++) {
+        const tab = document.getElementById(`tab-${i}`)
+        tab.className = i === n
+          ? 'tab-active font-semibold px-5 py-2 rounded-xl text-sm transition'
+          : 'tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition'
+      }
+      // Always reload from API on tab switch
+      delete groupData[n]
+      loadGroup(n)
+    }
+
+    function startCountdowns() {
+      if (countdownInterval) clearInterval(countdownInterval)
+      countdownInterval = setInterval(() => {
+        document.querySelectorAll('.countdown[data-cleared]').forEach(el => {
+          el.textContent = countdown(el.dataset.cleared)
+        })
+      }, 60000)
+    }
+
+    // Initial load
+    loadGroup(1)
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error)
+      })
+    }
+  </script>
+</body>
+</html>

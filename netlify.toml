@@ -1,0 +1,22 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  command = "npm install"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/sick"
+  to = "/sick/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/recall"
+  to = "/recall/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin/index.html"
+  status = 200

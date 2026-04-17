@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Sick Tracking — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button { min-height: 44px; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex gap-4 text-sm">
+      <a href="/sick" class="nav-active pb-1">Sick</a>
+      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/admin" class="hover:text-red-200 pb-1">Admin</a>
+    </div>
+  </nav>
+
+  <!-- Error Banner -->
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <div class="max-w-5xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-extrabold text-gray-800 mb-6">Sick Tracking</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- LEFT: Currently Sick -->
+      <div>
+        <!-- Mark Sick Form -->
+        <div class="bg-white rounded-2xl shadow p-5 mb-5">
+          <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Mark Firefighter Sick</h2>
+          <div class="flex flex-col gap-3">
+            <select id="ffSelect" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">Select firefighter...</option>
+            </select>
+            <select id="markedBySelect" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="">Marked by (officer)...</option>
+            </select>
+            <button onclick="markSick()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-3 transition">
+              Mark Sick
+            </button>
+            <div id="markSickResult" class="text-sm font-semibold text-center"></div>
+          </div>
+        </div>
+
+        <!-- Currently Sick List -->
+        <div>
+          <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
+            Currently Sick <span id="sickCount" class="ml-1 bg-red-600 text-white text-xs rounded-full px-2 py-0.5">0</span>
+          </h2>
+          <div id="currentlySickList">
+            <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Recently Cleared -->
+      <div>
+        <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
+          Recently Cleared (96hr Hold)
+          <span id="clearedCount" class="ml-1 bg-gray-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
+        </h2>
+        <div id="recentlyClearedList">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3 text-center">Firefighters cleared within the last 96 hours are still ineligible for recall. Countdown shows time until eligible.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const API = '/.netlify/functions'
+    let allFirefighters = []
+    let officers = []
+    let countdownInterval = null
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 6000)
+    }
+
+    function formatEastern(isoString) {
+      if (!isoString) return '—'
+      return new Date(isoString).toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true
+      })
+    }
+
+    function countdown(clearedDateISO) {
+      const eligible = new Date(clearedDateISO).getTime() + 96 * 3600 * 1000
+      const ms = eligible - Date.now()
+      if (ms <= 0) return 'Eligible now'
+      const h = Math.floor(ms / 3600000)
+      const m = Math.floor((ms % 3600000) / 60000)
+      return `Eligible in ${h}h ${m}m`
+    }
+
+    async function loadData() {
+      try {
+        const [ffRes, sickRes] = await Promise.all([
+          fetch(`${API}/get-firefighters`),
+          fetch(`${API}/get-sick`)
+        ])
+
+        if (!ffRes.ok) throw new Error('Failed to load firefighters')
+        if (!sickRes.ok) throw new Error('Failed to load sick list')
+
+        allFirefighters = await ffRes.json()
+        const sickData = await sickRes.json()
+
+        officers = allFirefighters.filter(f => f.rank === 'Captain' || f.rank === 'DC')
+
+        renderMarkSickForm()
+        renderCurrentlySick(sickData.currently_sick || [])
+        renderRecentlyCleared(sickData.recently_cleared || [])
+        startCountdowns()
+      } catch (e) {
+        showError('Error loading data: ' + e.message)
+        console.error(e)
+      }
+    }
+
+    function renderMarkSickForm() {
+      const ffSel = document.getElementById('ffSelect')
+      const bySel = document.getElementById('markedBySelect')
+
+      // Group firefighters by group number
+      const groups = {}
+      for (const f of allFirefighters) {
+        if (!groups[f.group_number]) groups[f.group_number] = []
+        groups[f.group_number].push(f)
+      }
+
+      let ffHtml = '<option value="">Select firefighter...</option>'
+      for (const g of Object.keys(groups).sort()) {
+        ffHtml += `<optgroup label="Group ${g}">`
+        for (const f of groups[g].sort((a,b) => a.name.localeCompare(b.name))) {
+          ffHtml += `<option value="${f.id}">${f.name} — Group ${f.group_number} — ${f.rank}</option>`
+        }
+        ffHtml += '</optgroup>'
+      }
+      ffSel.innerHTML = ffHtml
+
+      let byHtml = '<option value="">Marked by (officer)...</option>'
+      for (const o of officers.sort((a,b) => a.name.localeCompare(b.name))) {
+        byHtml += `<option value="${o.name}">${o.name} (${o.rank})</option>`
+      }
+      bySel.innerHTML = byHtml
+    }
+
+    function officerOptions(selectedId) {
+      return officers.map(o =>
+        `<option value="${o.name}">${o.name} (${o.rank})</option>`
+      ).join('')
+    }
+
+    function renderCurrentlySick(entries) {
+      const container = document.getElementById('currentlySickList')
+      document.getElementById('sickCount').textContent = entries.length
+
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-xl border border-gray-200">No one currently sick</div>'
+        return
+      }
+
+      container.innerHTML = entries.map(e => {
+        const ff = e.firefighters || {}
+        return `
+          <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-lg text-gray-900">${ff.name || '—'}</div>
+                <div class="text-sm text-gray-500">Group ${ff.group_number} — ${ff.rank}</div>
+                <div class="text-xs text-red-700 mt-1">Sick since: ${formatEastern(e.marked_sick_date)}</div>
+                <div class="text-xs text-gray-500">Marked by: ${e.marked_sick_by || '—'}</div>
+              </div>
+              <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">SICK</span>
+            </div>
+            <div class="flex gap-2 mt-3">
+              <select id="clearBy-${e.id}" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                <option value="">Cleared by...</option>
+                ${officerOptions()}
+              </select>
+              <button onclick="clearSick('${e.id}')" class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap transition">
+                Clear — RTD
+              </button>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    function renderRecentlyCleared(entries) {
+      const container = document.getElementById('recentlyClearedList')
+      document.getElementById('clearedCount').textContent = entries.length
+
+      if (entries.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-xl border border-gray-200">No recently cleared members</div>'
+        return
+      }
+
+      container.innerHTML = entries.map(e => {
+        const ff = e.firefighters || {}
+        return `
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="font-bold text-gray-700">${ff.name || '—'}</div>
+                <div class="text-sm text-gray-500">Group ${ff.group_number} — ${ff.rank}</div>
+                <div class="text-xs text-gray-500 mt-1">Cleared: ${formatEastern(e.cleared_date)}</div>
+                <div class="text-xs text-gray-500">By: ${e.cleared_by || '—'}</div>
+              </div>
+              <div class="text-right shrink-0 ml-2">
+                <span class="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded block mb-1">96HR</span>
+                <div class="text-xs font-semibold text-orange-600 countdown" data-cleared="${e.cleared_date}">${countdown(e.cleared_date)}</div>
+              </div>
+            </div>
+          </div>
+        `
+      }).join('')
+    }
+
+    async function markSick() {
+      const ffId = document.getElementById('ffSelect').value
+      const markedBy = document.getElementById('markedBySelect').value
+      const resultEl = document.getElementById('markSickResult')
+
+      if (!ffId) { resultEl.textContent = 'Please select a firefighter.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!markedBy) { resultEl.textContent = 'Please select who is marking sick.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+
+      resultEl.textContent = 'Saving...'
+      resultEl.className = 'text-sm font-semibold text-center text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/mark-sick`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ firefighter_id: ffId, marked_sick_by: markedBy })
+        })
+
+        const data = await res.json()
+        if (!res.ok) {
+          resultEl.textContent = data.error || 'Error marking sick.'
+          resultEl.className = 'text-sm font-semibold text-center text-red-600'
+          return
+        }
+
+        resultEl.textContent = 'Marked sick successfully.'
+        resultEl.className = 'text-sm font-semibold text-center text-green-600'
+        document.getElementById('ffSelect').value = ''
+        document.getElementById('markedBySelect').value = ''
+        await loadData()
+      } catch (e) {
+        resultEl.textContent = 'Network error: ' + e.message
+        resultEl.className = 'text-sm font-semibold text-center text-red-600'
+      }
+    }
+
+    async function clearSick(sickLogId) {
+      const clearedBy = document.getElementById(`clearBy-${sickLogId}`)?.value
+      if (!clearedBy) {
+        showError('Please select who is clearing this firefighter.')
+        return
+      }
+
+      try {
+        const res = await fetch(`${API}/clear-sick`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sick_log_id: sickLogId, cleared_by: clearedBy })
+        })
+
+        const data = await res.json()
+        if (!res.ok) {
+          showError(data.error || 'Error clearing sick status.')
+          return
+        }
+
+        await loadData()
+      } catch (e) {
+        showError('Network error: ' + e.message)
+      }
+    }
+
+    function startCountdowns() {
+      if (countdownInterval) clearInterval(countdownInterval)
+      countdownInterval = setInterval(() => {
+        document.querySelectorAll('.countdown[data-cleared]').forEach(el => {
+          el.textContent = countdown(el.dataset.cleared)
+        })
+      }, 60000)
+    }
+
+    // Initial load
+    loadData()
+
+    // Auto-refresh every 60s
+    setInterval(loadData, 60000)
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error)
+      })
+    }
+  </script>
+</body>
+</html>

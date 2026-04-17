@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <circle cx="96" cy="96" r="96" fill="#b71c1c"/>
+  <!-- Flame shape -->
+  <path d="M96 28
+    C96 28 116 52 120 72
+    C124 90 112 98 112 98
+    C112 98 118 80 106 68
+    C106 68 110 92 96 108
+    C96 108 82 92 86 68
+    C74 80 80 98 80 98
+    C80 98 68 90 72 72
+    C76 52 96 28 96 28Z"
+    fill="white" opacity="0.95"/>
+  <!-- Inner flame -->
+  <path d="M96 68
+    C96 68 106 80 104 92
+    C102 100 96 108 96 108
+    C96 108 90 100 88 92
+    C86 80 96 68 96 68Z"
+    fill="#ffcc02" opacity="0.85"/>
+  <!-- Base of flame -->
+  <ellipse cx="96" cy="118" rx="18" ry="10" fill="white" opacity="0.5"/>
+</svg>

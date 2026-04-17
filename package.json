@@ -1,0 +1,8 @@
+{
+  "name": "hillside-fd",
+  "version": "1.0.0",
+  "description": "Hillside Fire Department — Sick Tracking and Recall List",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
