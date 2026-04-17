@@ -215,14 +215,17 @@
     }
 
     function getSickLabel(entry) {
-      if (entry.sick_status && entry.sick_status.currently_sick) return 'SICK'
+      if (!entry.sick_status) return null
+      if (entry.sick_status.currently_sick) return 'SICK'
+      if (entry.sick_status.awaiting_confirm) return 'RTD_PENDING'
       return null
     }
 
     function getBgClass(entry) {
-      if (entry.sick_status && entry.sick_status.currently_sick) return 'bg-gray-200'
-      if (entry.short_min_count >= 1) return 'bg-yellow-100'
-      return 'bg-green-100'
+      if (!entry.sick_status) {
+        return entry.short_min_count >= 1 ? 'bg-yellow-100' : 'bg-green-100'
+      }
+      return 'bg-gray-200'
     }
 
     function renderPersonList(entries, containerId) {
@@ -239,8 +242,27 @@
         const sickLabel = getSickLabel(e)
 
         let badge = ''
+        let confirmPanel = ''
+
         if (sickLabel === 'SICK') {
           badge = `<span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">SICK</span>`
+        } else if (sickLabel === 'RTD_PENDING') {
+          badge = `<span class="bg-orange-400 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">RTD PENDING</span>`
+          const sickLogId = e.sick_status.sick_log_id || ''
+          const officerOptions = officers.sort((a,b) => a.name.localeCompare(b.name))
+            .map(o => `<option value="${o.name}">${o.name}</option>`).join('')
+          confirmPanel = `
+            <div class="confirm-24hr-wrap mt-2 pt-2 border-t border-gray-300 w-full">
+              <p class="text-xs text-gray-500 mb-2">Cleared from sick — confirm they worked their 24hr shift to restore eligibility.</p>
+              <div class="flex items-center gap-2">
+                <select class="confirm-officer-select border border-gray-300 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:36px">
+                  <option value="">Officer confirming...</option>
+                  ${officerOptions}
+                </select>
+                <button onclick="submitConfirm24hr(this)" data-sick-log-id="${sickLogId}" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg px-3 py-1.5 shrink-0" style="min-height:36px">Confirm 24hr</button>
+              </div>
+              <div class="confirm-24hr-result text-xs font-semibold mt-1"></div>
+            </div>`
         } else if (e.short_min_count >= 1) {
           badge = `<span class="text-yellow-700 text-xs font-semibold">⚠ Short min pending</span>`
         }
@@ -250,13 +272,16 @@
           : ''
 
         return `
-          <div class="flex items-center gap-3 px-4 py-3 rounded-xl mb-2 ${bg}">
-            <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
-              ${e.list_position}
-            </span>
-            <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
-            ${subNoteBadge}
-            ${badge}
+          <div class="px-4 py-3 rounded-xl mb-2 ${bg}">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
+                ${e.list_position}
+              </span>
+              <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
+              ${subNoteBadge}
+              ${badge}
+            </div>
+            ${confirmPanel}
           </div>
         `
       }).join('')
@@ -321,6 +346,43 @@
           </table>
         </div>
       `
+    }
+
+    async function submitConfirm24hr(btn) {
+      const wrap = btn.closest('.confirm-24hr-wrap')
+      const sickLogId = btn.dataset.sickLogId
+      const officerSelect = wrap.querySelector('.confirm-officer-select')
+      const confirmedBy = officerSelect.value
+      const resultEl = wrap.querySelector('.confirm-24hr-result')
+
+      if (!confirmedBy) { resultEl.textContent = 'Select an officer first.'; resultEl.className = 'text-xs font-semibold text-orange-600'; return }
+
+      btn.disabled = true
+      resultEl.textContent = 'Saving...'
+      resultEl.className = 'text-xs font-semibold text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/confirm-24hr`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sick_log_id: sickLogId, confirmed_by: confirmedBy })
+        })
+        if (!res.ok) {
+          const d = await res.json()
+          resultEl.textContent = d.error || 'Error confirming.'
+          resultEl.className = 'text-xs font-semibold text-red-600'
+          btn.disabled = false
+          return
+        }
+        resultEl.textContent = 'Confirmed — reloading...'
+        resultEl.className = 'text-xs font-semibold text-green-600'
+        delete groupData[currentGroup]
+        loadGroup(currentGroup)
+      } catch (e) {
+        resultEl.textContent = 'Network error: ' + e.message
+        resultEl.className = 'text-xs font-semibold text-red-600'
+        btn.disabled = false
+      }
     }
 
     function onRecallTypeChange() {
