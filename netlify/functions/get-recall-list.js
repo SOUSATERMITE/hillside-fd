@@ -39,28 +39,30 @@ exports.handler = async (event) => {
 
     if (recallError) throw recallError
 
-    // Get firefighter IDs from recall list
+    // Fetch sick status and recall log in parallel
     const firefighterIds = recallEntries.map(e => e.firefighter_id)
+    const safeIds = firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000']
 
-    // Fetch current sick status — only people not yet cleared
-    const { data: sickEntries, error: sickError } = await supabase
-      .from('sick_log')
-      .select('firefighter_id, marked_sick_date')
-      .is('cleared_date', null)
-      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
+    const [sickResult, logResult] = await Promise.all([
+      supabase.from('sick_log')
+        .select('firefighter_id, marked_sick_date')
+        .is('cleared_date', null)
+        .in('firefighter_id', safeIds),
+      supabase.from('recall_log')
+        .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .in('firefighter_id', safeIds)
+        .order('created_at', { ascending: false })
+        .limit(50)
+    ])
 
-    if (sickError) throw sickError
+    if (sickResult.error) throw sickResult.error
+    if (logResult.error) throw logResult.error
 
-    // Build a sick status map — only currently sick (cleared = eligible, no hold)
     const sickMap = {}
-    for (const s of sickEntries) {
-      sickMap[s.firefighter_id] = {
-        currently_sick: true,
-        marked_sick_date: s.marked_sick_date
-      }
+    for (const s of sickResult.data) {
+      sickMap[s.firefighter_id] = { currently_sick: true, marked_sick_date: s.marked_sick_date }
     }
 
-    // Annotate entries with sick_status
     const annotated = recallEntries.map(entry => ({
       ...entry,
       sick_status: sickMap[entry.firefighter_id] || null
@@ -68,16 +70,7 @@ exports.handler = async (event) => {
 
     const ff = annotated.filter(e => e.rank_type === 'FF')
     const captains = annotated.filter(e => e.rank_type === 'Captain')
-
-    // Fetch recent recall log for this group (last 75 entries)
-    const { data: logEntries, error: logError } = await supabase
-      .from('recall_log')
-      .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
-      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
-      .order('created_at', { ascending: false })
-      .limit(75)
-
-    if (logError) throw logError
+    const logEntries = logResult.data
 
     return {
       statusCode: 200,

@@ -62,106 +62,97 @@ exports.handler = async (event) => {
     // 3. Apply rotation logic
     if (recall_type === 'vacation_skip') {
       // No changes to recall_list — just log the event
+
     } else if (recall_type === 'full_shift') {
-      // Move to bottom, reset short_min_count, clear any sub_note
       await moveToBottom(supabase, allEntries, recall_list_id, today, 0)
+
     } else if (recall_type === 'refused') {
       // Move refuser to bottom
       await moveToBottom(supabase, allEntries, recall_list_id, today, 0)
 
-      // If a substitute took the shift, mark them without moving their position
+      // If someone else took the shift, mark them without moving their position
       if (sub_recall_list_id && sub_recall_list_id !== recall_list_id) {
-        const { data: subEntry, error: subFetchError } = await supabase
-          .from('recall_list')
-          .select('*, firefighters(id, name)')
-          .eq('id', sub_recall_list_id)
-          .single()
-        if (subFetchError) throw subFetchError
+        // Fetch sub entry and refuser name in parallel
+        const [subResult, refuserResult] = await Promise.all([
+          supabase.from('recall_list').select('*, firefighters(id, name)').eq('id', sub_recall_list_id).single(),
+          supabase.from('firefighters').select('name').eq('id', firefighter_id).single()
+        ])
+        if (subResult.error) throw subResult.error
+        const subEntry = subResult.data
+        const refuserName = refuserResult.data?.name || 'Unknown'
 
-        // Set sub_note on sub's entry — position unchanged
-        const refuserName = (await supabase.from('firefighters').select('name').eq('id', firefighter_id).single()).data?.name || 'Unknown'
-        const { error: subNoteError } = await supabase
-          .from('recall_list')
-          .update({ sub_note: `Sub for ${refuserName}`, last_recall_date: today })
-          .eq('id', sub_recall_list_id)
-        if (subNoteError) throw subNoteError
-
-        // Log the sub separately
-        await supabase.from('recall_log').insert({
-          firefighter_id: subEntry.firefighter_id,
-          shift_date: today,
-          recall_type: 'substitution',
-          hours_worked: hours_worked || null,
-          recorded_by,
-          refused_ff_id: firefighter_id
-        })
+        // Set sub_note on sub's entry (position unchanged) and log sub entry in parallel
+        await Promise.all([
+          supabase.from('recall_list')
+            .update({ sub_note: `Sub for ${refuserName}`, last_recall_date: today })
+            .eq('id', sub_recall_list_id),
+          supabase.from('recall_log').insert({
+            firefighter_id: subEntry.firefighter_id,
+            shift_date: today,
+            recall_type: 'substitution',
+            hours_worked: hours_worked || null,
+            recorded_by,
+            refused_ff_id: firefighter_id
+          })
+        ])
       }
+
     } else if (recall_type === 'short_min') {
       const newCount = targetEntry.short_min_count + 1
       if (newCount < 2) {
-        // Stay in place, increment count
         const { error: updateError } = await supabase
           .from('recall_list')
           .update({ short_min_count: newCount, last_recall_date: today })
           .eq('id', recall_list_id)
         if (updateError) throw updateError
       } else {
-        // 2nd short min — move to bottom, reset count, clear sub_note
         await moveToBottom(supabase, allEntries, recall_list_id, today, 0)
       }
     }
 
-    // 4. Insert recall_log row for the primary person
-    const { error: logError } = await supabase
-      .from('recall_log')
-      .insert({
+    // 4. Log the primary person + re-fetch list/sick/log all in parallel
+    const groupFFIds = allEntries.map(e => e.firefighter_id)
+    const safeIds = groupFFIds.length > 0 ? groupFFIds : ['00000000-0000-0000-0000-000000000000']
+
+    const [logInsert, listResult, sickResult, logResult] = await Promise.all([
+      supabase.from('recall_log').insert({
         firefighter_id,
         shift_date: today,
         recall_type,
         hours_worked: recall_type === 'refused' ? null : (hours_worked || null),
         recorded_by,
         refused_ff_id: null
-      })
+      }),
+      supabase.from('recall_list')
+        .select('*, firefighters(id, name, rank, group_number)')
+        .eq('group_number', group_number)
+        .order('rank_type', { ascending: true })
+        .order('list_position', { ascending: true }),
+      supabase.from('sick_log')
+        .select('firefighter_id, marked_sick_date')
+        .is('cleared_date', null)
+        .in('firefighter_id', safeIds),
+      supabase.from('recall_log')
+        .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .in('firefighter_id', safeIds)
+        .order('created_at', { ascending: false })
+        .limit(50)
+    ])
 
-    if (logError) throw logError
-
-    // 5. Re-fetch updated recall list and return same format as get-recall-list
-    const { data: updatedList, error: updatedError } = await supabase
-      .from('recall_list')
-      .select('*, firefighters(id, name, rank, group_number)')
-      .eq('group_number', group_number)
-      .order('rank_type', { ascending: true })
-      .order('list_position', { ascending: true })
-
-    if (updatedError) throw updatedError
-
-    // Get sick statuses — only currently sick (no 96hr hold)
-    const firefighterIds = updatedList.map(e => e.firefighter_id)
-
-    const { data: sickEntries, error: sickError } = await supabase
-      .from('sick_log')
-      .select('firefighter_id, marked_sick_date')
-      .is('cleared_date', null)
-      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
-
-    if (sickError) throw sickError
+    if (logInsert.error) throw logInsert.error
+    if (listResult.error) throw listResult.error
+    if (sickResult.error) throw sickResult.error
+    if (logResult.error) throw logResult.error
 
     const sickMap = {}
-    for (const s of sickEntries) {
+    for (const s of sickResult.data) {
       sickMap[s.firefighter_id] = { currently_sick: true, marked_sick_date: s.marked_sick_date }
     }
 
-    const annotated = updatedList.map(entry => ({ ...entry, sick_status: sickMap[entry.firefighter_id] || null }))
-
-    // Fetch updated recall log for this group
-    const { data: logEntries, error: logFetchError } = await supabase
-      .from('recall_log')
-      .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
-      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
-      .order('created_at', { ascending: false })
-      .limit(75)
-
-    if (logFetchError) throw logFetchError
+    const annotated = listResult.data.map(entry => ({
+      ...entry,
+      sick_status: sickMap[entry.firefighter_id] || null
+    }))
 
     return {
       statusCode: 200,
@@ -169,7 +160,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         ff: annotated.filter(e => e.rank_type === 'FF'),
         captains: annotated.filter(e => e.rank_type === 'Captain'),
-        log: logEntries || []
+        log: logResult.data || []
       })
     }
   } catch (e) {
@@ -182,18 +173,24 @@ async function moveToBottom(supabase, entries, targetId, today, newShortMinCount
   const target = entries.find(e => e.id === targetId)
   const newOrder = [...others, target]
 
-  for (let i = 0; i < newOrder.length; i++) {
-    const newPos = i + 1
-    if (newOrder[i].list_position !== newPos) {
-      const { error } = await supabase
-        .from('recall_list')
-        .update({ list_position: newPos })
-        .eq('id', newOrder[i].id)
-      if (error) throw error
+  // Update all positions in parallel
+  const posUpdates = newOrder
+    .map((entry, i) => {
+      const newPos = i + 1
+      if (entry.list_position !== newPos) {
+        return supabase.from('recall_list').update({ list_position: newPos }).eq('id', entry.id)
+      }
+    })
+    .filter(Boolean)
+
+  if (posUpdates.length > 0) {
+    const results = await Promise.all(posUpdates)
+    for (const r of results) {
+      if (r.error) throw r.error
     }
   }
 
-  // Update the moved person's fields explicitly, clearing any sub_note
+  // Update the moved person's extra fields
   const { error } = await supabase
     .from('recall_list')
     .update({ list_position: newOrder.length, short_min_count: newShortMinCount, last_recall_date: today, sub_note: null })
