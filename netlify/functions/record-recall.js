@@ -158,12 +158,23 @@ exports.handler = async (event) => {
 
     const annotated = updatedList.map(entry => ({ ...entry, sick_status: sickMap[entry.firefighter_id] || null }))
 
+    // Fetch updated recall log for this group
+    const { data: logEntries, error: logFetchError } = await supabase
+      .from('recall_log')
+      .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
+      .order('created_at', { ascending: false })
+      .limit(75)
+
+    if (logFetchError) throw logFetchError
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         ff: annotated.filter(e => e.rank_type === 'FF'),
-        captains: annotated.filter(e => e.rank_type === 'Captain')
+        captains: annotated.filter(e => e.rank_type === 'Captain'),
+        log: logEntries || []
       })
     }
   } catch (e) {

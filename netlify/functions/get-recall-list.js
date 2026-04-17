@@ -69,10 +69,20 @@ exports.handler = async (event) => {
     const ff = annotated.filter(e => e.rank_type === 'FF')
     const captains = annotated.filter(e => e.rank_type === 'Captain')
 
+    // Fetch recent recall log for this group (last 75 entries)
+    const { data: logEntries, error: logError } = await supabase
+      .from('recall_log')
+      .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+      .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
+      .order('created_at', { ascending: false })
+      .limit(75)
+
+    if (logError) throw logError
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ff, captains })
+      body: JSON.stringify({ ff, captains, log: logEntries || [] })
     }
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
