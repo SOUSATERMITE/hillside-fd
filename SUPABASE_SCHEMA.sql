@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS firefighters (
   name         text NOT NULL,
   rank         text NOT NULL CHECK (rank IN ('FF', 'Captain', 'DC')),
   group_number int NOT NULL CHECK (group_number BETWEEN 1 AND 4),
+  badge_number integer,
   active       boolean NOT NULL DEFAULT true,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
