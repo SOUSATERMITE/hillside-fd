@@ -19,13 +19,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { recall_list_id, recall_type, hours_worked, recorded_by, shift_date } = JSON.parse(event.body || '{}')
+    const { recall_list_id, recall_type, hours_worked, recorded_by, shift_date, refused_recall_list_id } = JSON.parse(event.body || '{}')
 
     if (!recall_list_id || !recall_type || !recorded_by) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'recall_list_id, recall_type, and recorded_by are required' }) }
     }
 
-    const validTypes = ['full_shift', 'short_min', 'refused', 'vacation_skip']
+    const validTypes = ['full_shift', 'short_min', 'refused', 'vacation_skip', 'substitution']
     if (!validTypes.includes(recall_type)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid recall_type' }) }
     }
@@ -60,10 +60,12 @@ exports.handler = async (event) => {
     const today = shift_date || new Date().toISOString().split('T')[0]
 
     // 3. Apply rotation logic
+    let refused_ff_id = null
+
     if (recall_type === 'vacation_skip') {
       // No changes to recall_list — just log the event
     } else if (recall_type === 'full_shift' || recall_type === 'refused') {
-      // Move to bottom, reset short_min_count
+      // Move to bottom, reset short_min_count, clear any sub_note
       await moveToBottom(supabase, allEntries, recall_list_id, today, 0)
     } else if (recall_type === 'short_min') {
       const newCount = targetEntry.short_min_count + 1
@@ -75,9 +77,43 @@ exports.handler = async (event) => {
           .eq('id', recall_list_id)
         if (updateError) throw updateError
       } else {
-        // 2nd short min — move to bottom, reset count
+        // 2nd short min — move to bottom, reset count, clear sub_note
         await moveToBottom(supabase, allEntries, recall_list_id, today, 0)
       }
+    } else if (recall_type === 'substitution') {
+      if (!refused_recall_list_id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'refused_recall_list_id is required for substitution' }) }
+      }
+
+      // Fetch refuser's recall_list entry
+      const { data: refuserEntry, error: refuserError } = await supabase
+        .from('recall_list')
+        .select('*, firefighters(id, name)')
+        .eq('id', refused_recall_list_id)
+        .single()
+      if (refuserError) throw refuserError
+
+      // Fetch all entries for refuser's group+rank to move them to bottom
+      const { data: refuserGroupEntries, error: rgError } = await supabase
+        .from('recall_list')
+        .select('*')
+        .eq('group_number', refuserEntry.group_number)
+        .eq('rank_type', refuserEntry.rank_type)
+        .order('list_position', { ascending: true })
+      if (rgError) throw rgError
+
+      // Move refuser to bottom
+      await moveToBottom(supabase, refuserGroupEntries, refused_recall_list_id, today, 0)
+
+      // Set sub_note on substitute's entry, keep their position
+      const refuserName = refuserEntry.firefighters?.name || 'Unknown'
+      const { error: subNoteError } = await supabase
+        .from('recall_list')
+        .update({ sub_note: `Sub for ${refuserName}`, last_recall_date: today })
+        .eq('id', recall_list_id)
+      if (subNoteError) throw subNoteError
+
+      refused_ff_id = refuserEntry.firefighter_id
     }
 
     // 4. Insert recall_log row
@@ -88,7 +124,8 @@ exports.handler = async (event) => {
         shift_date: today,
         recall_type,
         hours_worked: hours_worked || null,
-        recorded_by
+        recorded_by,
+        refused_ff_id: refused_ff_id || null
       })
 
     if (logError) throw logError
@@ -156,10 +193,10 @@ async function moveToBottom(supabase, entries, targetId, today, newShortMinCount
     }
   }
 
-  // Update the moved person's fields explicitly
+  // Update the moved person's fields explicitly, clearing any sub_note
   const { error } = await supabase
     .from('recall_list')
-    .update({ list_position: newOrder.length, short_min_count: newShortMinCount, last_recall_date: today })
+    .update({ list_position: newOrder.length, short_min_count: newShortMinCount, last_recall_date: today, sub_note: null })
     .eq('id', targetId)
 
   if (error) throw error

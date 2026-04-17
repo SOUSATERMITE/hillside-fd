@@ -54,12 +54,13 @@
         <select id="recallPerson" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
           <option value="">Select person...</option>
         </select>
-        <select id="recallType" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+        <select id="recallType" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" onchange="onRecallTypeChange()">
           <option value="">Recall type...</option>
           <option value="full_shift">Full Shift (7hrs+)</option>
           <option value="short_min">Short Minimum (4–7hrs)</option>
           <option value="refused">Refused</option>
           <option value="vacation_skip">Vacation Skip</option>
+          <option value="substitution">Substitution (sub for refuser)</option>
         </select>
         <select id="recallOfficer" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
           <option value="">Recorded by (officer)...</option>
@@ -67,6 +68,9 @@
         <input id="recallHours" type="number" step="0.5" min="0" max="24"
           placeholder="Hours worked (optional)"
           class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+        <select id="refusedPerson" class="hidden border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500 col-span-2">
+          <option value="">Who refused? (select person)...</option>
+        </select>
       </div>
       <button onclick="recordRecall()" class="mt-3 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-6 py-3 w-full transition">
         Record Recall
@@ -174,6 +178,26 @@
 
       document.getElementById('recallPerson').innerHTML = personHtml
 
+      // Populate "who refused?" dropdown (same entries as person dropdown)
+      let refusedHtml = '<option value="">Who refused? (select person)...</option>'
+      if (ffEntries.length > 0) {
+        refusedHtml += '<optgroup label="Firefighters">'
+        for (const e of ffEntries) {
+          const ff = e.firefighters || {}
+          refusedHtml += `<option value="${e.id}">Position ${e.list_position} — ${ff.name}</option>`
+        }
+        refusedHtml += '</optgroup>'
+      }
+      if (capEntries.length > 0) {
+        refusedHtml += '<optgroup label="Captains">'
+        for (const e of capEntries) {
+          const ff = e.firefighters || {}
+          refusedHtml += `<option value="${e.id}">Position ${e.list_position} — ${ff.name}</option>`
+        }
+        refusedHtml += '</optgroup>'
+      }
+      document.getElementById('refusedPerson').innerHTML = refusedHtml
+
       // Populate officer dropdown
       let officerHtml = '<option value="">Recorded by (officer)...</option>'
       for (const o of officers.sort((a,b) => a.name.localeCompare(b.name))) {
@@ -219,6 +243,7 @@
 
         let badge = ''
         let extra = ''
+        let confirmPanel = ''
         if (sickLabel === 'SICK') {
           badge = `<span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">SICK</span>`
         } else if (sickLabel === '96HR') {
@@ -226,21 +251,107 @@
           if (e.sick_status && e.sick_status.cleared_date) {
             extra = `<span class="text-xs font-semibold text-orange-600 countdown" data-cleared="${e.sick_status.cleared_date}">${countdown(e.sick_status.cleared_date)}</span>`
           }
+          const sickLogId = e.sick_status && e.sick_status.sick_log_id ? e.sick_status.sick_log_id : ''
+          const officerOptions = officers.sort((a,b) => a.name.localeCompare(b.name))
+            .map(o => `<option value="${o.name}">${o.name}</option>`).join('')
+          confirmPanel = `
+            <div class="confirm-24hr-wrap mt-2 pt-2 border-t border-gray-300 w-full">
+              <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" class="confirm-24hr-check accent-red-700 w-4 h-4" onchange="toggleConfirm24hr(this)" data-sick-log-id="${sickLogId}">
+                Confirm 24hr shift worked — restore eligibility
+              </label>
+              <div class="confirm-24hr-form hidden flex items-center gap-2 mt-2">
+                <select class="confirm-officer-select border border-gray-300 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:36px">
+                  <option value="">Officer confirming...</option>
+                  ${officerOptions}
+                </select>
+                <button onclick="submitConfirm24hr(this)" data-sick-log-id="${sickLogId}" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg px-3 py-1.5 shrink-0" style="min-height:36px">Confirm</button>
+              </div>
+              <div class="confirm-24hr-result text-xs font-semibold mt-1"></div>
+            </div>`
         } else if (e.short_min_count >= 1) {
           badge = `<span class="text-yellow-700 text-xs font-semibold">⚠ Short min pending</span>`
         }
 
+        const subNoteBadge = e.sub_note
+          ? `<span class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded shrink-0">${e.sub_note}</span>`
+          : ''
+
         return `
-          <div class="flex items-center gap-3 px-4 py-3 rounded-xl mb-2 ${bg}">
-            <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
-              ${e.list_position}
-            </span>
-            <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
-            ${badge}
-            ${extra}
+          <div class="px-4 py-3 rounded-xl mb-2 ${bg}">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
+                ${e.list_position}
+              </span>
+              <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
+              ${subNoteBadge}
+              ${badge}
+              ${extra}
+            </div>
+            ${confirmPanel}
           </div>
         `
       }).join('')
+    }
+
+    function onRecallTypeChange() {
+      const type = document.getElementById('recallType').value
+      const refusedSelect = document.getElementById('refusedPerson')
+      if (type === 'substitution') {
+        refusedSelect.classList.remove('hidden')
+      } else {
+        refusedSelect.classList.add('hidden')
+        refusedSelect.value = ''
+      }
+    }
+
+    function toggleConfirm24hr(checkbox) {
+      const wrap = checkbox.closest('.confirm-24hr-wrap')
+      const form = wrap.querySelector('.confirm-24hr-form')
+      if (checkbox.checked) {
+        form.classList.remove('hidden')
+      } else {
+        form.classList.add('hidden')
+        wrap.querySelector('.confirm-24hr-result').textContent = ''
+      }
+    }
+
+    async function submitConfirm24hr(btn) {
+      const wrap = btn.closest('.confirm-24hr-wrap')
+      const sickLogId = btn.dataset.sickLogId
+      const officerSelect = wrap.querySelector('.confirm-officer-select')
+      const confirmedBy = officerSelect.value
+      const resultEl = wrap.querySelector('.confirm-24hr-result')
+
+      if (!confirmedBy) { resultEl.textContent = 'Select an officer first.'; resultEl.className = 'text-xs font-semibold text-orange-600'; return }
+
+      btn.disabled = true
+      resultEl.textContent = 'Saving...'
+      resultEl.className = 'text-xs font-semibold text-gray-500'
+
+      try {
+        const res = await fetch(`${API}/confirm-24hr`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sick_log_id: sickLogId, confirmed_by: confirmedBy })
+        })
+        if (!res.ok) {
+          const d = await res.json()
+          resultEl.textContent = d.error || 'Error confirming.'
+          resultEl.className = 'text-xs font-semibold text-red-600'
+          btn.disabled = false
+          return
+        }
+        resultEl.textContent = 'Confirmed — reloading...'
+        resultEl.className = 'text-xs font-semibold text-green-600'
+        // Reload the current group to reflect eligibility change
+        delete groupData[currentGroup]
+        loadGroup(currentGroup)
+      } catch (e) {
+        resultEl.textContent = 'Network error: ' + e.message
+        resultEl.className = 'text-xs font-semibold text-red-600'
+        btn.disabled = false
+      }
     }
 
     async function recordRecall() {
@@ -248,26 +359,31 @@
       const recallType = document.getElementById('recallType').value
       const recordedBy = document.getElementById('recallOfficer').value
       const hoursWorked = document.getElementById('recallHours').value
+      const refusedPersonId = document.getElementById('refusedPerson').value
       const resultEl = document.getElementById('recallResult')
 
       if (!recallListId) { resultEl.textContent = 'Please select a person.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
       if (!recallType) { resultEl.textContent = 'Please select a recall type.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
       if (!recordedBy) { resultEl.textContent = 'Please select who is recording.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (recallType === 'substitution' && !refusedPersonId) { resultEl.textContent = 'Please select who refused.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
 
       resultEl.textContent = 'Saving...'
       resultEl.className = 'text-sm font-semibold text-center text-gray-500'
 
       try {
+        const payload = {
+          recall_list_id: recallListId,
+          recall_type: recallType,
+          hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
+          recorded_by: recordedBy,
+          shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+        }
+        if (recallType === 'substitution') payload.refused_recall_list_id = refusedPersonId
+
         const res = await fetch(`${API}/record-recall`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recall_list_id: recallListId,
-            recall_type: recallType,
-            hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
-            recorded_by: recordedBy,
-            shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
-          })
+          body: JSON.stringify(payload)
         })
 
         const data = await res.json()
@@ -285,6 +401,8 @@
         document.getElementById('recallType').value = ''
         document.getElementById('recallOfficer').value = ''
         document.getElementById('recallHours').value = ''
+        document.getElementById('refusedPerson').value = ''
+        document.getElementById('refusedPerson').classList.add('hidden')
 
         // Update cached data and re-render
         groupData[currentGroup] = data
