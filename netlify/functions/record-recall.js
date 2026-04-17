@@ -140,26 +140,20 @@ exports.handler = async (event) => {
 
     if (updatedError) throw updatedError
 
-    // Get sick statuses
+    // Get sick statuses — only currently sick (no 96hr hold)
     const firefighterIds = updatedList.map(e => e.firefighter_id)
-    const cutoffISO = new Date(Date.now() - 96 * 3600 * 1000).toISOString()
 
     const { data: sickEntries, error: sickError } = await supabase
       .from('sick_log')
-      .select('firefighter_id, cleared_date, marked_sick_date')
+      .select('firefighter_id, marked_sick_date')
+      .is('cleared_date', null)
       .in('firefighter_id', firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000'])
 
     if (sickError) throw sickError
 
     const sickMap = {}
     for (const s of sickEntries) {
-      if (s.cleared_date === null) {
-        sickMap[s.firefighter_id] = { currently_sick: true, cleared_date: null, marked_sick_date: s.marked_sick_date }
-      } else if (new Date(s.cleared_date) >= new Date(cutoffISO)) {
-        if (!sickMap[s.firefighter_id] || !sickMap[s.firefighter_id].currently_sick) {
-          sickMap[s.firefighter_id] = { currently_sick: false, cleared_date: s.cleared_date, marked_sick_date: s.marked_sick_date }
-        }
-      }
+      sickMap[s.firefighter_id] = { currently_sick: true, marked_sick_date: s.marked_sick_date }
     }
 
     const annotated = updatedList.map(entry => ({ ...entry, sick_status: sickMap[entry.firefighter_id] || null }))

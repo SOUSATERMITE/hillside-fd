@@ -34,7 +34,7 @@
   <div class="max-w-5xl mx-auto px-4 py-6">
     <h1 class="text-2xl font-extrabold text-gray-800 mb-6">Sick Tracking</h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6">
 
       <!-- LEFT: Currently Sick -->
       <div>
@@ -66,17 +66,6 @@
         </div>
       </div>
 
-      <!-- RIGHT: Recently Cleared -->
-      <div>
-        <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
-          Recently Cleared (96hr Hold)
-          <span id="clearedCount" class="ml-1 bg-gray-500 text-white text-xs rounded-full px-2 py-0.5">0</span>
-        </h2>
-        <div id="recentlyClearedList">
-          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
-        </div>
-        <p class="text-xs text-gray-400 mt-3 text-center">Firefighters cleared within the last 96 hours are still ineligible for recall. Countdown shows time until eligible.</p>
-      </div>
 
     </div>
   </div>
@@ -85,7 +74,6 @@
     const API = '/.netlify/functions'
     let allFirefighters = []
     let officers = []
-    let countdownInterval = null
 
     function showError(msg) {
       const b = document.getElementById('errorBanner')
@@ -101,15 +89,6 @@
         month: 'short', day: 'numeric', year: 'numeric',
         hour: 'numeric', minute: '2-digit', hour12: true
       })
-    }
-
-    function countdown(clearedDateISO) {
-      const eligible = new Date(clearedDateISO).getTime() + 96 * 3600 * 1000
-      const ms = eligible - Date.now()
-      if (ms <= 0) return 'Eligible now'
-      const h = Math.floor(ms / 3600000)
-      const m = Math.floor((ms % 3600000) / 60000)
-      return `Eligible in ${h}h ${m}m`
     }
 
     async function loadData() {
@@ -129,8 +108,6 @@
 
         renderMarkSickForm()
         renderCurrentlySick(sickData.currently_sick || [])
-        renderRecentlyCleared(sickData.recently_cleared || [])
-        startCountdowns()
       } catch (e) {
         showError('Error loading data: ' + e.message)
         console.error(e)
@@ -207,36 +184,6 @@
       }).join('')
     }
 
-    function renderRecentlyCleared(entries) {
-      const container = document.getElementById('recentlyClearedList')
-      document.getElementById('clearedCount').textContent = entries.length
-
-      if (entries.length === 0) {
-        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-xl border border-gray-200">No recently cleared members</div>'
-        return
-      }
-
-      container.innerHTML = entries.map(e => {
-        const ff = e.firefighters || {}
-        return `
-          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3">
-            <div class="flex justify-between items-start">
-              <div>
-                <div class="font-bold text-gray-700">${ff.name || '—'}</div>
-                <div class="text-sm text-gray-500">Group ${ff.group_number} — ${ff.rank}</div>
-                <div class="text-xs text-gray-500 mt-1">Cleared: ${formatEastern(e.cleared_date)}</div>
-                <div class="text-xs text-gray-500">By: ${e.cleared_by || '—'}</div>
-              </div>
-              <div class="text-right shrink-0 ml-2">
-                <span class="bg-gray-500 text-white text-xs font-bold px-2 py-1 rounded block mb-1">96HR</span>
-                <div class="text-xs font-semibold text-orange-600 countdown" data-cleared="${e.cleared_date}">${countdown(e.cleared_date)}</div>
-              </div>
-            </div>
-          </div>
-        `
-      }).join('')
-    }
-
     async function markSick() {
       const ffId = document.getElementById('ffSelect').value
       const markedBy = document.getElementById('markedBySelect').value
@@ -297,15 +244,6 @@
       } catch (e) {
         showError('Network error: ' + e.message)
       }
-    }
-
-    function startCountdowns() {
-      if (countdownInterval) clearInterval(countdownInterval)
-      countdownInterval = setInterval(() => {
-        document.querySelectorAll('.countdown[data-cleared]').forEach(el => {
-          el.textContent = countdown(el.dataset.cleared)
-        })
-      }, 60000)
     }
 
     // Initial load
