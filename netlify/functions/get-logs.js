@@ -52,7 +52,7 @@ exports.handler = async (event) => {
     if (type === 'recall') {
       const { data, error } = await supabase
         .from('recall_log')
-        .select('*, firefighters(id, name, rank, group_number)')
+        .select('*, firefighters!recall_log_firefighter_id_fkey(id, name, rank, group_number)')
         .order('created_at', { ascending: false })
         .limit(limit)
 
