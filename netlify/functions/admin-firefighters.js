@@ -1,33 +1,22 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-
-function checkAuth(event) {
-  const provided = (event.headers && event.headers['x-admin-password']) || ''
-  const expected = process.env.ADMIN_PASSWORD || ''
-  return provided === expected && expected !== ''
-}
+const { checkAdmin } = require('./_auth')
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Content-Type, x-admin-password',
+    'Access-Control-Allow-Headers': 'Content-Type, x-admin-password, x-session-token',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Content-Type': 'application/json'
   }
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers, body: '' }
-  }
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
 
-  if (!checkAuth(event)) {
-    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
-  }
+  const admin = await checkAdmin(event)
+  if (!admin) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
   try {
     if (event.httpMethod === 'GET') {
@@ -37,7 +26,6 @@ exports.handler = async (event) => {
         .order('group_number', { ascending: true })
         .order('rank', { ascending: true })
         .order('name', { ascending: true })
-
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
@@ -53,14 +41,10 @@ exports.handler = async (event) => {
         .insert({ name, rank, group_number })
         .select()
         .single()
-
       if (insertError) throw insertError
 
-      // Add to recall_list if FF or Captain
       if (rank === 'FF' || rank === 'Captain') {
         const rankType = rank === 'Captain' ? 'Captain' : 'FF'
-
-        // Get current max position for this group + rank_type
         const { data: existing, error: maxError } = await supabase
           .from('recall_list')
           .select('list_position')
@@ -68,21 +52,11 @@ exports.handler = async (event) => {
           .eq('rank_type', rankType)
           .order('list_position', { ascending: false })
           .limit(1)
-
         if (maxError) throw maxError
-
         const maxPos = existing && existing.length > 0 ? existing[0].list_position : 0
-
         const { error: recallInsertError } = await supabase
           .from('recall_list')
-          .insert({
-            firefighter_id: newFF.id,
-            group_number,
-            rank_type: rankType,
-            list_position: maxPos + 1,
-            short_min_count: 0
-          })
-
+          .insert({ firefighter_id: newFF.id, group_number, rank_type: rankType, list_position: maxPos + 1, short_min_count: 0 })
         if (recallInsertError) throw recallInsertError
       }
 
@@ -92,20 +66,12 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'PUT') {
       const { id, name, rank, group_number, active } = JSON.parse(event.body || '{}')
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id is required' }) }
-
       const updates = {}
       if (name !== undefined) updates.name = name
       if (rank !== undefined) updates.rank = rank
       if (group_number !== undefined) updates.group_number = group_number
       if (active !== undefined) updates.active = active
-
-      const { data: updated, error } = await supabase
-        .from('firefighters')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
+      const { data: updated, error } = await supabase.from('firefighters').update(updates).eq('id', id).select().single()
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(updated) }
     }
@@ -113,14 +79,7 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'DELETE') {
       const { id } = JSON.parse(event.body || '{}')
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id is required' }) }
-
-      const { data: updated, error } = await supabase
-        .from('firefighters')
-        .update({ active: false })
-        .eq('id', id)
-        .select()
-        .single()
-
+      const { data: updated, error } = await supabase.from('firefighters').update({ active: false }).eq('id', id).select().single()
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(updated) }
     }

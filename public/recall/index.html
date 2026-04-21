@@ -20,13 +20,17 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
+  <!-- Auth modal container -->
+  <div id="authModal"></div>
+
   <!-- Nav -->
   <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
-    <div class="flex gap-4 text-sm">
+    <div class="flex items-center gap-3 text-sm">
       <a href="/sick" class="hover:text-red-200 pb-1">Sick</a>
       <a href="/recall" class="nav-active pb-1">Recall</a>
       <a href="/admin" class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
     </div>
   </nav>
 
@@ -44,7 +48,6 @@
       <button id="tab-4" onclick="switchGroup(4)" class="tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition">Group 4</button>
     </div>
 
-    <!-- Loading -->
     <div id="loadingMsg" class="text-gray-400 text-sm text-center py-12">Loading...</div>
 
     <!-- Record Recall Card -->
@@ -59,13 +62,15 @@
           <option value="full_shift">Full Shift (7hrs+)</option>
           <option value="short_min">Short Minimum (4–7hrs)</option>
           <option value="refused">Refused</option>
+          <option value="refused_no_penalty">Refused Without Penalty</option>
           <option value="vacation_skip">Vacation Skip</option>
-        </select>
-        <select id="recallOfficer" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
-          <option value="">Recorded by (officer)...</option>
         </select>
         <input id="recallHours" type="number" step="0.5" min="0" max="24"
           placeholder="Hours worked (optional)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+        <input id="recallStartTime" type="text" maxlength="4" placeholder="Start time (e.g. 0730)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+        <input id="recallEndTime" type="text" maxlength="4" placeholder="End time (e.g. 1730)"
           class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
       </div>
       <!-- Sub section — shown only when Refused is selected -->
@@ -103,12 +108,12 @@
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     const API = '/.netlify/functions'
     let currentGroup = 1
     let groupData = {}
     let allFirefighters = []
-    let officers = []
 
     function showError(msg) {
       const b = document.getElementById('errorBanner')
@@ -121,7 +126,6 @@
       const res = await fetch(`${API}/get-firefighters`)
       if (!res.ok) throw new Error('Failed to load firefighters')
       allFirefighters = await res.json()
-      officers = allFirefighters.filter(f => f.rank === 'Captain' || f.rank === 'DC')
     }
 
     async function loadGroup(n) {
@@ -132,7 +136,6 @@
 
       try {
         if (allFirefighters.length === 0) await loadFirefighters()
-
         const res = await fetch(`${API}/get-recall-list?group=${n}`)
         if (!res.ok) throw new Error('Failed to load recall list')
         const data = await res.json()
@@ -152,85 +155,63 @@
       document.getElementById('recallForm').classList.remove('hidden')
       document.getElementById('listsContainer').classList.remove('hidden')
 
-      // Populate person dropdown (FF and Captain only, no DC)
-      const allEntries = [...(data.ff || []), ...(data.captains || [])]
-      let personHtml = '<option value="">Select person...</option>'
-
-      const ffEntries = data.ff || []
+      const ffEntries  = data.ff || []
       const capEntries = data.captains || []
 
-      if (ffEntries.length > 0) {
+      // Populate person dropdowns
+      let personHtml = '<option value="">Select person...</option>'
+      if (ffEntries.length) {
         personHtml += '<optgroup label="Firefighters">'
         for (const e of ffEntries) {
           const ff = e.firefighters || {}
-          const sickLabel = getSickLabel(e)
-          personHtml += `<option value="${e.id}" ${sickLabel ? 'style="color:#9ca3af"' : ''}>Position ${e.list_position} — ${ff.name}${sickLabel ? ` (${sickLabel})` : ''}</option>`
+          const sl = getSickLabel(e)
+          personHtml += `<option value="${e.id}" ${sl ? 'style="color:#9ca3af"' : ''}>Pos ${e.list_position} — ${ff.name}${sl ? ` (${sl})` : ''}</option>`
         }
         personHtml += '</optgroup>'
       }
-
-      if (capEntries.length > 0) {
+      if (capEntries.length) {
         personHtml += '<optgroup label="Captains">'
         for (const e of capEntries) {
           const ff = e.firefighters || {}
-          const sickLabel = getSickLabel(e)
-          personHtml += `<option value="${e.id}" ${sickLabel ? 'style="color:#9ca3af"' : ''}>Position ${e.list_position} — ${ff.name}${sickLabel ? ` (${sickLabel})` : ''}</option>`
+          const sl = getSickLabel(e)
+          personHtml += `<option value="${e.id}" ${sl ? 'style="color:#9ca3af"' : ''}>Pos ${e.list_position} — ${ff.name}${sl ? ` (${sl})` : ''}</option>`
         }
         personHtml += '</optgroup>'
       }
-
       document.getElementById('recallPerson').innerHTML = personHtml
 
-      // Populate "who substituted?" dropdown (same entries, used when Refused + someone took shift)
       let subHtml = '<option value="">Who substituted?...</option>'
-      if (ffEntries.length > 0) {
+      if (ffEntries.length) {
         subHtml += '<optgroup label="Firefighters">'
-        for (const e of ffEntries) {
-          const ff = e.firefighters || {}
-          subHtml += `<option value="${e.id}">Position ${e.list_position} — ${ff.name}</option>`
-        }
+        for (const e of ffEntries) { const ff = e.firefighters || {}; subHtml += `<option value="${e.id}">Pos ${e.list_position} — ${ff.name}</option>` }
         subHtml += '</optgroup>'
       }
-      if (capEntries.length > 0) {
+      if (capEntries.length) {
         subHtml += '<optgroup label="Captains">'
-        for (const e of capEntries) {
-          const ff = e.firefighters || {}
-          subHtml += `<option value="${e.id}">Position ${e.list_position} — ${ff.name}</option>`
-        }
+        for (const e of capEntries) { const ff = e.firefighters || {}; subHtml += `<option value="${e.id}">Pos ${e.list_position} — ${ff.name}</option>` }
         subHtml += '</optgroup>'
       }
       document.getElementById('subPerson').innerHTML = subHtml
 
-      // Populate officer dropdown
-      let officerHtml = '<option value="">Recorded by (officer)...</option>'
-      for (const o of officers.sort((a,b) => a.name.localeCompare(b.name))) {
-        officerHtml += `<option value="${o.name}">${o.name} (${o.rank})</option>`
-      }
-      document.getElementById('recallOfficer').innerHTML = officerHtml
-
-      // Render lists
-      renderPersonList(data.ff || [], 'ffList')
-      renderPersonList(data.captains || [], 'captainList')
+      renderPersonList(ffEntries, 'ffList')
+      renderPersonList(capEntries, 'captainList')
       renderLog(data.log || [])
     }
 
     function getSickLabel(entry) {
       if (!entry.sick_status) return null
       if (entry.sick_status.currently_sick) return 'SICK'
-      if (entry.sick_status.awaiting_confirm) return 'RTD_PENDING'
+      if (entry.sick_status.awaiting_confirm) return 'RTD PENDING'
       return null
     }
 
     function getBgClass(entry) {
-      if (!entry.sick_status) {
-        return entry.short_min_count >= 1 ? 'bg-yellow-100' : 'bg-green-100'
-      }
-      return 'bg-gray-200'
+      if (entry.sick_status) return 'bg-gray-200'
+      return entry.short_min_count >= 1 ? 'bg-yellow-100' : 'bg-green-100'
     }
 
     function renderPersonList(entries, containerId) {
       const container = document.getElementById(containerId)
-
       if (entries.length === 0) {
         container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 bg-white rounded-xl border border-gray-200">No entries</div>'
         return
@@ -246,21 +227,16 @@
 
         if (sickLabel === 'SICK') {
           badge = `<span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">SICK</span>`
-        } else if (sickLabel === 'RTD_PENDING') {
+        } else if (sickLabel === 'RTD PENDING') {
           badge = `<span class="bg-orange-400 text-white text-xs font-bold px-2 py-0.5 rounded shrink-0">RTD PENDING</span>`
           const sickLogId = e.sick_status.sick_log_id || ''
-          const officerOptions = officers.sort((a,b) => a.name.localeCompare(b.name))
-            .map(o => `<option value="${o.name}">${o.name}</option>`).join('')
           confirmPanel = `
-            <div class="confirm-24hr-wrap mt-2 pt-2 border-t border-gray-300 w-full">
+            <div class="mt-2 pt-2 border-t border-gray-300 w-full">
               <p class="text-xs text-gray-500 mb-2">Cleared from sick — confirm they worked their 24hr shift to restore eligibility.</p>
-              <div class="flex items-center gap-2">
-                <select class="confirm-officer-select border border-gray-300 rounded-lg px-2 py-1.5 text-xs flex-1 focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:36px">
-                  <option value="">Officer confirming...</option>
-                  ${officerOptions}
-                </select>
-                <button onclick="submitConfirm24hr(this)" data-sick-log-id="${sickLogId}" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg px-3 py-1.5 shrink-0" style="min-height:36px">Confirm 24hr</button>
-              </div>
+              <button onclick="submitConfirm24hr(this)" data-sick-log-id="${sickLogId}"
+                class="w-full bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-lg px-3 py-2" style="min-height:36px">
+                Confirm 24hr Shift
+              </button>
               <div class="confirm-24hr-result text-xs font-semibold mt-1"></div>
             </div>`
         } else if (e.short_min_count >= 1) {
@@ -274,9 +250,7 @@
         return `
           <div class="px-4 py-3 rounded-xl mb-2 ${bg}">
             <div class="flex items-center gap-3">
-              <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
-                ${e.list_position}
-              </span>
+              <span class="w-8 h-8 rounded-full bg-white bg-opacity-70 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">${e.list_position}</span>
               <span class="flex-1 font-semibold text-gray-800">${ff.name || '—'}</span>
               ${subNoteBadge}
               ${badge}
@@ -288,24 +262,24 @@
     }
 
     const recallTypeLabels = {
-      full_shift:    'Full Shift',
-      short_min:     'Short Min',
-      refused:       'Refused',
-      vacation_skip: 'Vac Skip',
-      substitution:  'Sub'   // logged automatically when refused + sub taken
+      full_shift:          'Full Shift',
+      short_min:           'Short Min',
+      refused:             'Refused',
+      refused_no_penalty:  'No Penalty',
+      vacation_skip:       'Vac Skip',
+      substitution:        'Sub'
     }
 
     function renderLog(entries) {
-      const section = document.getElementById('recallLogSection')
+      const section   = document.getElementById('recallLogSection')
       const container = document.getElementById('recallLogList')
+      section.classList.remove('hidden')
 
       if (entries.length === 0) {
-        section.classList.remove('hidden')
         container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 bg-white rounded-xl border border-gray-200">No recalls recorded yet</div>'
         return
       }
 
-      section.classList.remove('hidden')
       container.innerHTML = `
         <div class="bg-white rounded-2xl shadow overflow-hidden">
           <table class="w-full text-sm">
@@ -314,6 +288,7 @@
                 <th class="px-4 py-2 text-left">Date</th>
                 <th class="px-4 py-2 text-left">Name</th>
                 <th class="px-4 py-2 text-left">Type</th>
+                <th class="px-4 py-2 text-left hidden sm:table-cell">Time</th>
                 <th class="px-4 py-2 text-left hidden sm:table-cell">Hrs</th>
                 <th class="px-4 py-2 text-left hidden sm:table-cell">By</th>
               </tr>
@@ -326,18 +301,22 @@
                   : '—'
                 const typeLabel = recallTypeLabels[e.recall_type] || e.recall_type
                 const typeBg = {
-                  full_shift:    'bg-green-100 text-green-800',
-                  short_min:     'bg-yellow-100 text-yellow-800',
-                  refused:       'bg-red-100 text-red-700',
-                  vacation_skip: 'bg-gray-100 text-gray-600',
-                  substitution:  'bg-blue-100 text-blue-700'
+                  full_shift:         'bg-green-100 text-green-800',
+                  short_min:          'bg-yellow-100 text-yellow-800',
+                  refused:            'bg-red-100 text-red-700',
+                  refused_no_penalty: 'bg-orange-100 text-orange-700',
+                  vacation_skip:      'bg-gray-100 text-gray-600',
+                  substitution:       'bg-blue-100 text-blue-700'
                 }[e.recall_type] || 'bg-gray-100 text-gray-600'
+                const timeStr = (e.recall_start_time || e.recall_end_time)
+                  ? `${e.recall_start_time || '?'}–${e.recall_end_time || '?'}` : '—'
                 const rowBg = i % 2 === 0 ? '' : 'bg-gray-50'
                 return `
                   <tr class="${rowBg} border-b border-gray-100 last:border-0">
                     <td class="px-4 py-2 text-gray-600 whitespace-nowrap">${date}</td>
                     <td class="px-4 py-2 font-semibold text-gray-800">${ff.name || '—'}</td>
                     <td class="px-4 py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded ${typeBg}">${typeLabel}</span></td>
+                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${timeStr}</td>
                     <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.hours_worked != null ? e.hours_worked : '—'}</td>
                     <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.recorded_by || '—'}</td>
                   </tr>`
@@ -349,38 +328,34 @@
     }
 
     async function submitConfirm24hr(btn) {
-      const wrap = btn.closest('.confirm-24hr-wrap')
+      if (!AUTH.isOfficer()) {
+        AUTH.showLoginModal(() => btn.click())
+        return
+      }
+      const wrap = btn.closest('div')
       const sickLogId = btn.dataset.sickLogId
-      const officerSelect = wrap.querySelector('.confirm-officer-select')
-      const confirmedBy = officerSelect.value
       const resultEl = wrap.querySelector('.confirm-24hr-result')
 
-      if (!confirmedBy) { resultEl.textContent = 'Select an officer first.'; resultEl.className = 'text-xs font-semibold text-orange-600'; return }
-
       btn.disabled = true
-      resultEl.textContent = 'Saving...'
-      resultEl.className = 'text-xs font-semibold text-gray-500'
+      if (resultEl) { resultEl.textContent = 'Saving...'; resultEl.className = 'text-xs font-semibold text-gray-500' }
 
       try {
         const res = await fetch(`${API}/confirm-24hr`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sick_log_id: sickLogId, confirmed_by: confirmedBy })
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ sick_log_id: sickLogId })
         })
         if (!res.ok) {
           const d = await res.json()
-          resultEl.textContent = d.error || 'Error confirming.'
-          resultEl.className = 'text-xs font-semibold text-red-600'
+          if (resultEl) { resultEl.textContent = d.error || 'Error.'; resultEl.className = 'text-xs font-semibold text-red-600' }
           btn.disabled = false
           return
         }
-        resultEl.textContent = 'Confirmed — reloading...'
-        resultEl.className = 'text-xs font-semibold text-green-600'
+        if (resultEl) { resultEl.textContent = 'Confirmed — reloading...'; resultEl.className = 'text-xs font-semibold text-green-600' }
         delete groupData[currentGroup]
         loadGroup(currentGroup)
       } catch (e) {
-        resultEl.textContent = 'Network error: ' + e.message
-        resultEl.className = 'text-xs font-semibold text-red-600'
+        if (resultEl) { resultEl.textContent = 'Network error: ' + e.message; resultEl.className = 'text-xs font-semibold text-red-600' }
         btn.disabled = false
       }
     }
@@ -402,28 +377,29 @@
 
     function toggleSubSection(checkbox) {
       const subPerson = document.getElementById('subPerson')
-      if (checkbox.checked) {
-        subPerson.classList.remove('hidden')
-      } else {
-        subPerson.classList.add('hidden')
-        subPerson.value = ''
-      }
+      if (checkbox.checked) subPerson.classList.remove('hidden')
+      else { subPerson.classList.add('hidden'); subPerson.value = '' }
     }
 
     async function recordRecall() {
-      const recallListId = document.getElementById('recallPerson').value
-      const recallType = document.getElementById('recallType').value
-      const recordedBy = document.getElementById('recallOfficer').value
-      const hoursWorked = document.getElementById('recallHours').value
-      const subTookShift = document.getElementById('subTookShift').checked
-      const subPersonId = document.getElementById('subPerson').value
-      const resultEl = document.getElementById('recallResult')
+      const recallListId  = document.getElementById('recallPerson').value
+      const recallType    = document.getElementById('recallType').value
+      const hoursWorked   = document.getElementById('recallHours').value
+      const startTime     = document.getElementById('recallStartTime').value.trim()
+      const endTime       = document.getElementById('recallEndTime').value.trim()
+      const subTookShift  = document.getElementById('subTookShift').checked
+      const subPersonId   = document.getElementById('subPerson').value
+      const resultEl      = document.getElementById('recallResult')
 
       if (!recallListId) { resultEl.textContent = 'Please select a person.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
-      if (!recallType) { resultEl.textContent = 'Please select a recall type.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
-      if (!recordedBy) { resultEl.textContent = 'Please select who is recording.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!recallType)   { resultEl.textContent = 'Please select a recall type.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
       if (recallType === 'refused' && subTookShift && !subPersonId) { resultEl.textContent = 'Please select who substituted.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
       if (recallType === 'refused' && subTookShift && subPersonId === recallListId) { resultEl.textContent = 'Substitute cannot be the same person who refused.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+
+      if (!AUTH.isOfficer()) {
+        AUTH.showLoginModal(() => recordRecall())
+        return
+      }
 
       resultEl.textContent = 'Saving...'
       resultEl.className = 'text-sm font-semibold text-center text-gray-500'
@@ -433,17 +409,17 @@
           recall_list_id: recallListId,
           recall_type: recallType,
           hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
-          recorded_by: recordedBy,
-          shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+          shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+          recall_start_time: startTime || null,
+          recall_end_time: endTime || null
         }
         if (recallType === 'refused' && subTookShift && subPersonId) payload.sub_recall_list_id = subPersonId
 
         const res = await fetch(`${API}/record-recall`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
           body: JSON.stringify(payload)
         })
-
         const data = await res.json()
         if (!res.ok) {
           resultEl.textContent = data.error || 'Error recording recall.'
@@ -454,17 +430,16 @@
         resultEl.textContent = 'Recall recorded successfully.'
         resultEl.className = 'text-sm font-semibold text-center text-green-600'
 
-        // Reset form
         document.getElementById('recallPerson').value = ''
         document.getElementById('recallType').value = ''
-        document.getElementById('recallOfficer').value = ''
         document.getElementById('recallHours').value = ''
+        document.getElementById('recallStartTime').value = ''
+        document.getElementById('recallEndTime').value = ''
         document.getElementById('subSection').classList.add('hidden')
         document.getElementById('subTookShift').checked = false
         document.getElementById('subPerson').value = ''
         document.getElementById('subPerson').classList.add('hidden')
 
-        // Update cached data and re-render
         groupData[currentGroup] = data
         renderGroup(currentGroup)
       } catch (e) {
@@ -475,26 +450,19 @@
 
     function switchGroup(n) {
       currentGroup = n
-      // Update tab styles
       for (let i = 1; i <= 4; i++) {
-        const tab = document.getElementById(`tab-${i}`)
-        tab.className = i === n
+        document.getElementById(`tab-${i}`).className = i === n
           ? 'tab-active font-semibold px-5 py-2 rounded-xl text-sm transition'
           : 'tab-inactive font-semibold px-5 py-2 rounded-xl text-sm transition'
       }
-      // Always reload from API on tab switch
       delete groupData[n]
       loadGroup(n)
     }
 
-    // Initial load
     loadGroup(1)
 
-    // Register service worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(console.error)
-      })
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
     }
   </script>
 </body>

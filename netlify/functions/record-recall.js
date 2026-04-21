@@ -1,11 +1,12 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
+const { verifySession } = require('./_auth')
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, x-session-token',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   }
@@ -18,14 +19,17 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
   }
 
-  try {
-    const { recall_list_id, recall_type, hours_worked, recorded_by, shift_date, sub_recall_list_id } = JSON.parse(event.body || '{}')
+  const officer = await verifySession(event)
+  if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
 
-    if (!recall_list_id || !recall_type || !recorded_by) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'recall_list_id, recall_type, and recorded_by are required' }) }
+  try {
+    const { recall_list_id, recall_type, shift_date, sub_recall_list_id, recall_start_time, recall_end_time, hours_worked } = JSON.parse(event.body || '{}')
+
+    if (!recall_list_id || !recall_type) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'recall_list_id and recall_type are required' }) }
     }
 
-    const validTypes = ['full_shift', 'short_min', 'refused', 'vacation_skip']
+    const validTypes = ['full_shift', 'short_min', 'refused', 'vacation_skip', 'refused_no_penalty']
     if (!validTypes.includes(recall_type)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid recall_type' }) }
     }
@@ -60,7 +64,7 @@ exports.handler = async (event) => {
     const today = shift_date || new Date().toISOString().split('T')[0]
 
     // 3. Apply rotation logic
-    if (recall_type === 'vacation_skip') {
+    if (recall_type === 'vacation_skip' || recall_type === 'refused_no_penalty') {
       // No changes to recall_list — just log the event
 
     } else if (recall_type === 'full_shift') {
@@ -120,8 +124,11 @@ exports.handler = async (event) => {
         shift_date: today,
         recall_type,
         hours_worked: recall_type === 'refused' ? null : (hours_worked || null),
-        recorded_by,
-        refused_ff_id: null
+        recorded_by: officer.display_name,
+        officer_id: officer.officer_id,
+        refused_ff_id: null,
+        recall_start_time: recall_start_time || null,
+        recall_end_time: recall_end_time || null
       }),
       supabase.from('recall_list')
         .select('*, firefighters(id, name, rank, group_number)')
@@ -133,7 +140,7 @@ exports.handler = async (event) => {
         .is('cleared_date', null)
         .in('firefighter_id', safeIds),
       supabase.from('recall_log')
-        .select('id, shift_date, recall_type, hours_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })
         .limit(50)

@@ -18,13 +18,17 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
+  <!-- Auth modal container -->
+  <div id="authModal"></div>
+
   <!-- Nav -->
   <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
-    <div class="flex gap-4 text-sm">
+    <div class="flex items-center gap-3 text-sm">
       <a href="/sick" class="nav-active pb-1">Sick</a>
       <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
       <a href="/admin" class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
     </div>
   </nav>
 
@@ -36,44 +40,37 @@
 
     <div class="grid grid-cols-1 gap-6">
 
-      <!-- LEFT: Currently Sick -->
-      <div>
-        <!-- Mark Sick Form -->
-        <div class="bg-white rounded-2xl shadow p-5 mb-5">
-          <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Mark Firefighter Sick</h2>
-          <div class="flex flex-col gap-3">
-            <select id="ffSelect" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
-              <option value="">Select firefighter...</option>
-            </select>
-            <select id="markedBySelect" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
-              <option value="">Marked by (officer)...</option>
-            </select>
-            <button onclick="markSick()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-3 transition">
-              Mark Sick
-            </button>
-            <div id="markSickResult" class="text-sm font-semibold text-center"></div>
-          </div>
-        </div>
-
-        <!-- Currently Sick List -->
-        <div>
-          <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
-            Currently Sick <span id="sickCount" class="ml-1 bg-red-600 text-white text-xs rounded-full px-2 py-0.5">0</span>
-          </h2>
-          <div id="currentlySickList">
-            <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
-          </div>
+      <!-- Mark Sick Form -->
+      <div class="bg-white rounded-2xl shadow p-5 mb-2">
+        <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Mark Firefighter Sick</h2>
+        <div class="flex flex-col gap-3">
+          <select id="ffSelect" class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500">
+            <option value="">Select firefighter...</option>
+          </select>
+          <button onclick="markSick()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-3 transition">
+            Mark Sick
+          </button>
+          <div id="markSickResult" class="text-sm font-semibold text-center"></div>
         </div>
       </div>
 
+      <!-- Currently Sick List -->
+      <div>
+        <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
+          Currently Sick <span id="sickCount" class="ml-1 bg-red-600 text-white text-xs rounded-full px-2 py-0.5">0</span>
+        </h2>
+        <div id="currentlySickList">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+      </div>
 
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script>
     const API = '/.netlify/functions'
     let allFirefighters = []
-    let officers = []
 
     function showError(msg) {
       const b = document.getElementById('errorBanner')
@@ -97,55 +94,35 @@
           fetch(`${API}/get-firefighters`),
           fetch(`${API}/get-sick`)
         ])
-
         if (!ffRes.ok) throw new Error('Failed to load firefighters')
         if (!sickRes.ok) throw new Error('Failed to load sick list')
 
         allFirefighters = await ffRes.json()
         const sickData = await sickRes.json()
 
-        officers = allFirefighters.filter(f => f.rank === 'Captain' || f.rank === 'DC')
-
-        renderMarkSickForm()
+        renderFFDropdown()
         renderCurrentlySick(sickData.currently_sick || [])
       } catch (e) {
         showError('Error loading data: ' + e.message)
-        console.error(e)
       }
     }
 
-    function renderMarkSickForm() {
+    function renderFFDropdown() {
       const ffSel = document.getElementById('ffSelect')
-      const bySel = document.getElementById('markedBySelect')
-
-      // Group firefighters by group number
       const groups = {}
       for (const f of allFirefighters) {
         if (!groups[f.group_number]) groups[f.group_number] = []
         groups[f.group_number].push(f)
       }
-
-      let ffHtml = '<option value="">Select firefighter...</option>'
+      let html = '<option value="">Select firefighter...</option>'
       for (const g of Object.keys(groups).sort()) {
-        ffHtml += `<optgroup label="Group ${g}">`
+        html += `<optgroup label="Group ${g}">`
         for (const f of groups[g].sort((a,b) => a.name.localeCompare(b.name))) {
-          ffHtml += `<option value="${f.id}">${f.name} — Group ${f.group_number} — ${f.rank}</option>`
+          html += `<option value="${f.id}">${f.name} — Group ${f.group_number} — ${f.rank}</option>`
         }
-        ffHtml += '</optgroup>'
+        html += '</optgroup>'
       }
-      ffSel.innerHTML = ffHtml
-
-      let byHtml = '<option value="">Marked by (officer)...</option>'
-      for (const o of officers.sort((a,b) => a.name.localeCompare(b.name))) {
-        byHtml += `<option value="${o.name}">${o.name} (${o.rank})</option>`
-      }
-      bySel.innerHTML = byHtml
-    }
-
-    function officerOptions(selectedId) {
-      return officers.map(o =>
-        `<option value="${o.name}">${o.name} (${o.rank})</option>`
-      ).join('')
+      ffSel.innerHTML = html
     }
 
     function renderCurrentlySick(entries) {
@@ -170,15 +147,9 @@
               </div>
               <span class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">SICK</span>
             </div>
-            <div class="flex gap-2 mt-3">
-              <select id="clearBy-${e.id}" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">Cleared by...</option>
-                ${officerOptions()}
-              </select>
-              <button onclick="clearSick('${e.id}')" class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg whitespace-nowrap transition">
-                Clear — RTD
-              </button>
-            </div>
+            <button onclick="clearSick('${e.id}')" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+              Clear — RTD
+            </button>
           </div>
         `
       }).join('')
@@ -186,11 +157,14 @@
 
     async function markSick() {
       const ffId = document.getElementById('ffSelect').value
-      const markedBy = document.getElementById('markedBySelect').value
       const resultEl = document.getElementById('markSickResult')
 
       if (!ffId) { resultEl.textContent = 'Please select a firefighter.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
-      if (!markedBy) { resultEl.textContent = 'Please select who is marking sick.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+
+      if (!AUTH.isOfficer()) {
+        AUTH.showLoginModal(() => markSick())
+        return
+      }
 
       resultEl.textContent = 'Saving...'
       resultEl.className = 'text-sm font-semibold text-center text-gray-500'
@@ -198,21 +172,18 @@
       try {
         const res = await fetch(`${API}/mark-sick`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ firefighter_id: ffId, marked_sick_by: markedBy })
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ firefighter_id: ffId })
         })
-
         const data = await res.json()
         if (!res.ok) {
           resultEl.textContent = data.error || 'Error marking sick.'
           resultEl.className = 'text-sm font-semibold text-center text-red-600'
           return
         }
-
         resultEl.textContent = 'Marked sick successfully.'
         resultEl.className = 'text-sm font-semibold text-center text-green-600'
         document.getElementById('ffSelect').value = ''
-        document.getElementById('markedBySelect').value = ''
         await loadData()
       } catch (e) {
         resultEl.textContent = 'Network error: ' + e.message
@@ -221,42 +192,30 @@
     }
 
     async function clearSick(sickLogId) {
-      const clearedBy = document.getElementById(`clearBy-${sickLogId}`)?.value
-      if (!clearedBy) {
-        showError('Please select who is clearing this firefighter.')
+      if (!AUTH.isOfficer()) {
+        AUTH.showLoginModal(() => clearSick(sickLogId))
         return
       }
 
       try {
         const res = await fetch(`${API}/clear-sick`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sick_log_id: sickLogId, cleared_by: clearedBy })
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ sick_log_id: sickLogId })
         })
-
         const data = await res.json()
-        if (!res.ok) {
-          showError(data.error || 'Error clearing sick status.')
-          return
-        }
-
+        if (!res.ok) { showError(data.error || 'Error clearing sick status.'); return }
         await loadData()
       } catch (e) {
         showError('Network error: ' + e.message)
       }
     }
 
-    // Initial load
     loadData()
-
-    // Auto-refresh every 60s
     setInterval(loadData, 60000)
 
-    // Register service worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(console.error)
-      })
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
     }
   </script>
 </body>
