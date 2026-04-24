@@ -28,6 +28,7 @@ exports.handler = async (event) => {
       const { data, error } = await supabase
         .from('sick_log')
         .select('*, firefighters(id, name, rank, group_number)')
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
         .limit(limit)
       if (error) throw error
@@ -37,7 +38,8 @@ exports.handler = async (event) => {
     if (type === 'recall') {
       const { data, error } = await supabase
         .from('recall_log')
-        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank, group_number)')
+        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, tour_worked, notes, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank, group_number)')
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
         .limit(limit)
       if (error) throw error

@@ -23,7 +23,7 @@ exports.handler = async (event) => {
   if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
 
   try {
-    const { recall_list_id, recall_type, shift_date, sub_recall_list_id, recall_start_time, recall_end_time, hours_worked } = JSON.parse(event.body || '{}')
+    const { recall_list_id, recall_type, shift_date, sub_recall_list_id, recall_start_time, recall_end_time, hours_worked, tour_worked } = JSON.parse(event.body || '{}')
 
     if (!recall_list_id || !recall_type) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'recall_list_id and recall_type are required' }) }
@@ -63,6 +63,18 @@ exports.handler = async (event) => {
 
     const today = shift_date || new Date().toISOString().split('T')[0]
 
+    // Auto-calculate hours from start/end times if not provided
+    function calcHours(start, end) {
+      if (!start || !end || start.length < 4 || end.length < 4) return null
+      const sh = parseInt(start.slice(0, 2), 10), sm = parseInt(start.slice(2, 4), 10)
+      const eh = parseInt(end.slice(0, 2), 10), em = parseInt(end.slice(2, 4), 10)
+      if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return null
+      let mins = (eh * 60 + em) - (sh * 60 + sm)
+      if (mins < 0) mins += 24 * 60
+      return Math.round(mins / 60 * 10) / 10
+    }
+    const computed_hours = hours_worked != null ? hours_worked : calcHours(recall_start_time, recall_end_time)
+
     // 3. Apply rotation logic
     if (recall_type === 'vacation_skip' || recall_type === 'refused_no_penalty') {
       // No changes to recall_list — just log the event
@@ -85,17 +97,29 @@ exports.handler = async (event) => {
         const subEntry = subResult.data
         const refuserName = refuserResult.data?.name || 'Unknown'
 
+        // Build sub_note with time/tour info
+        const dateLabel = new Date(today + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const noteParts = [`${refuserName} recall on ${dateLabel}`]
+        if (recall_start_time && recall_end_time) noteParts.push(`${recall_start_time}-${recall_end_time}`)
+        if (tour_worked) noteParts.push(`Tour ${tour_worked}`)
+        noteParts.push('— does not move')
+        const subNoteText = 'Took ' + noteParts.join(' ')
+
         // Set sub_note on sub's entry (position unchanged) and log sub entry in parallel
         await Promise.all([
           supabase.from('recall_list')
-            .update({ sub_note: `Sub for ${refuserName}`, last_recall_date: today })
+            .update({ sub_note: subNoteText, last_recall_date: today })
             .eq('id', sub_recall_list_id),
           supabase.from('recall_log').insert({
             firefighter_id: subEntry.firefighter_id,
             shift_date: today,
             recall_type: 'substitution',
-            hours_worked: hours_worked || null,
-            recorded_by,
+            hours_worked: computed_hours,
+            recorded_by: officer.display_name,
+            officer_id: officer.officer_id,
+            recall_start_time: recall_start_time || null,
+            recall_end_time: recall_end_time || null,
+            tour_worked: tour_worked || null,
             refused_ff_id: firefighter_id
           })
         ])
@@ -123,12 +147,13 @@ exports.handler = async (event) => {
         firefighter_id,
         shift_date: today,
         recall_type,
-        hours_worked: recall_type === 'refused' ? null : (hours_worked || null),
+        hours_worked: recall_type === 'refused' ? null : computed_hours,
         recorded_by: officer.display_name,
         officer_id: officer.officer_id,
         refused_ff_id: null,
         recall_start_time: recall_start_time || null,
-        recall_end_time: recall_end_time || null
+        recall_end_time: recall_end_time || null,
+        tour_worked: tour_worked || null
       }),
       supabase.from('recall_list')
         .select('*, firefighters(id, name, rank, group_number)')
@@ -140,7 +165,8 @@ exports.handler = async (event) => {
         .is('cleared_date', null)
         .in('firefighter_id', safeIds),
       supabase.from('recall_log')
-        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, tour_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .eq('deleted', false)
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })
         .limit(50)

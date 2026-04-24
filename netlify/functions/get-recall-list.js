@@ -47,16 +47,19 @@ exports.handler = async (event) => {
       // Currently sick (not yet cleared)
       supabase.from('sick_log')
         .select('firefighter_id, marked_sick_date')
+        .eq('deleted', false)
         .is('cleared_date', null)
         .in('firefighter_id', safeIds),
       // Cleared but not yet confirmed 24hr shift — ineligible until officer confirms
       supabase.from('sick_log')
         .select('id, firefighter_id, cleared_date')
+        .eq('deleted', false)
         .not('cleared_date', 'is', null)
         .eq('confirmed_24hr', false)
         .in('firefighter_id', safeIds),
       supabase.from('recall_log')
-        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, tour_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .eq('deleted', false)
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })
         .limit(50)

@@ -28,6 +28,7 @@ exports.handler = async (event) => {
     const { data: currentlySick, error: sickError } = await supabase
       .from('sick_log')
       .select('id, marked_sick_date, cleared_date, cleared_by, notes, confirmed_24hr, confirmed_by, confirmed_at, firefighters(id, name, rank, group_number)')
+      .eq('deleted', false)
       .is('cleared_date', null)
       .order('marked_sick_date', { ascending: false })
 
@@ -39,6 +40,7 @@ exports.handler = async (event) => {
     const { data: recentlyCleared, error: clearedError } = await supabase
       .from('sick_log')
       .select('id, marked_sick_date, cleared_date, cleared_by, notes, confirmed_24hr, confirmed_by, confirmed_at, firefighters(id, name, rank, group_number)')
+      .eq('deleted', false)
       .not('cleared_date', 'is', null)
       .gte('cleared_date', cutoffISO)
       .order('cleared_date', { ascending: false })

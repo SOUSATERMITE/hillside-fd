@@ -65,12 +65,16 @@
           <option value="refused_no_penalty">Refused Without Penalty</option>
           <option value="vacation_skip">Vacation Skip</option>
         </select>
-        <input id="recallHours" type="number" step="0.5" min="0" max="24"
-          placeholder="Hours worked (optional)"
-          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
         <input id="recallStartTime" type="text" maxlength="4" placeholder="Start time (e.g. 0730)"
+          oninput="onTimesChange()"
           class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
         <input id="recallEndTime" type="text" maxlength="4" placeholder="End time (e.g. 1730)"
+          oninput="onTimesChange()"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+        <input id="recallHours" type="number" step="0.5" min="0" max="24"
+          placeholder="Hours (auto-calculated)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+        <input id="recallTour" type="text" maxlength="1" placeholder="Tour (1–4)"
           class="border border-gray-300 rounded-xl px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
       </div>
       <!-- Sub section — shown only when Refused is selected -->
@@ -290,6 +294,7 @@
                 <th class="px-4 py-2 text-left">Type</th>
                 <th class="px-4 py-2 text-left hidden sm:table-cell">Time</th>
                 <th class="px-4 py-2 text-left hidden sm:table-cell">Hrs</th>
+                <th class="px-4 py-2 text-left hidden sm:table-cell">Tour</th>
                 <th class="px-4 py-2 text-left hidden sm:table-cell">By</th>
               </tr>
             </thead>
@@ -318,6 +323,7 @@
                     <td class="px-4 py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded ${typeBg}">${typeLabel}</span></td>
                     <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${timeStr}</td>
                     <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.hours_worked != null ? e.hours_worked : '—'}</td>
+                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.tour_worked ? 'Tour ' + e.tour_worked : '—'}</td>
                     <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.recorded_by || '—'}</td>
                   </tr>`
               }).join('')}
@@ -360,8 +366,36 @@
       }
     }
 
+    function calcHoursFromTimes(start, end) {
+      if (!start || !end || start.length < 4 || end.length < 4) return null
+      const sh = parseInt(start.slice(0, 2), 10), sm = parseInt(start.slice(2, 4), 10)
+      const eh = parseInt(end.slice(0, 2), 10), em = parseInt(end.slice(2, 4), 10)
+      if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return null
+      let mins = (eh * 60 + em) - (sh * 60 + sm)
+      if (mins < 0) mins += 24 * 60
+      return Math.round(mins / 60 * 10) / 10
+    }
+
+    function onTimesChange() {
+      const start = document.getElementById('recallStartTime').value.trim()
+      const end   = document.getElementById('recallEndTime').value.trim()
+      const hours = calcHoursFromTimes(start, end)
+      if (hours !== null) {
+        document.getElementById('recallHours').value = hours
+        // Auto-set recall type only if it was previously auto-set or is empty
+        const typeEl = document.getElementById('recallType')
+        if (!typeEl.value || typeEl.dataset.autoSet === 'true') {
+          if (hours >= 7) { typeEl.value = 'full_shift'; typeEl.dataset.autoSet = 'true'; onRecallTypeChange() }
+          else if (hours >= 4) { typeEl.value = 'short_min'; typeEl.dataset.autoSet = 'true'; onRecallTypeChange() }
+        }
+      }
+    }
+
     function onRecallTypeChange() {
-      const type = document.getElementById('recallType').value
+      const typeEl = document.getElementById('recallType')
+      // Clear auto-set flag when user manually changes type
+      typeEl.dataset.autoSet = ''
+      const type = typeEl.value
       const subSection = document.getElementById('subSection')
       const subTookShift = document.getElementById('subTookShift')
       const subPerson = document.getElementById('subPerson')
@@ -387,6 +421,7 @@
       const hoursWorked   = document.getElementById('recallHours').value
       const startTime     = document.getElementById('recallStartTime').value.trim()
       const endTime       = document.getElementById('recallEndTime').value.trim()
+      const tourWorked    = document.getElementById('recallTour').value.trim()
       const subTookShift  = document.getElementById('subTookShift').checked
       const subPersonId   = document.getElementById('subPerson').value
       const resultEl      = document.getElementById('recallResult')
@@ -411,7 +446,8 @@
           hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
           shift_date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
           recall_start_time: startTime || null,
-          recall_end_time: endTime || null
+          recall_end_time: endTime || null,
+          tour_worked: tourWorked || null
         }
         if (recallType === 'refused' && subTookShift && subPersonId) payload.sub_recall_list_id = subPersonId
 
@@ -435,6 +471,7 @@
         document.getElementById('recallHours').value = ''
         document.getElementById('recallStartTime').value = ''
         document.getElementById('recallEndTime').value = ''
+        document.getElementById('recallTour').value = ''
         document.getElementById('subSection').classList.add('hidden')
         document.getElementById('subTookShift').checked = false
         document.getElementById('subPerson').value = ''
