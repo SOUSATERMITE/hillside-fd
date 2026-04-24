@@ -150,6 +150,13 @@
         </div>
         <div id="actingResult" class="mt-4 hidden"></div>
       </div>
+
+      <div class="bg-white rounded-2xl shadow p-5">
+        <h2 class="font-bold text-gray-800 text-base mb-4 uppercase tracking-wide">Currently Active</h2>
+        <div id="actingListContainer">
+          <div class="text-gray-400 text-sm text-center py-4">Loading...</div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB: Sick Log -->
@@ -237,6 +244,7 @@
       if (tab === 'sicklog')   loadSickLog()
       if (tab === 'recalllog') loadRecallLog()
       if (tab === 'positions') loadPositionsGroup(currentPosGroup)
+      if (tab === 'acting')    loadActingList()
     }
 
     // ── Firefighters Tab ──────────────────────────────────────────────────────────
@@ -563,6 +571,7 @@
 
         // Reload officers list in AUTH so the acting FF appears in login dropdown
         await AUTH.loadOfficers()
+        loadActingList()
       } catch (e) { showError('Network error: ' + e.message) }
     }
 
@@ -919,6 +928,54 @@
         resultEl.textContent = 'Saved.'; resultEl.className = 'text-sm font-semibold text-center text-green-600'
         setTimeout(() => { closeEditModal(); loadRecallLog() }, 700)
       } catch (e) { resultEl.textContent = 'Error: ' + e.message; resultEl.className = 'text-sm font-semibold text-center text-red-600' }
+    }
+
+    // ── Acting Captain List ───────────────────────────────────────────────────────
+
+    async function loadActingList() {
+      const container = document.getElementById('actingListContainer')
+      if (!container) return
+      container.innerHTML = '<div class="text-gray-400 text-sm text-center py-4">Loading...</div>'
+      try {
+        const res = await fetch(`${API}/get-acting`, { headers: AUTH.getHeaders() })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const data = await res.json()
+        if (!data.length) {
+          container.innerHTML = '<div class="text-gray-400 text-sm text-center py-4">No acting captains currently active.</div>'
+          return
+        }
+        container.innerHTML = data.map(o => {
+          const safeName = (o.name || '').replace(/'/g, "\\'")
+          return `
+            <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-2">
+              <div>
+                <div class="font-semibold text-gray-800 text-sm">${o.display_name || o.name}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Granted ${formatEastern(o.created_at)}</div>
+              </div>
+              <button onclick="revokeActing('${o.id}', '${safeName}')"
+                class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg ml-3 shrink-0">
+                Remove Access
+              </button>
+            </div>`
+        }).join('')
+      } catch (e) {
+        container.innerHTML = `<div class="text-red-500 text-sm text-center py-4">${e.message}</div>`
+      }
+    }
+
+    async function revokeActing(officerId, name) {
+      if (!confirm(`Remove acting access for ${name}?`)) return
+      try {
+        const res = await fetch(`${API}/revoke-acting`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ officer_id: officerId })
+        })
+        const data = await res.json()
+        if (!res.ok) { showError(data.error || 'Error revoking access.'); return }
+        await AUTH.loadOfficers()
+        loadActingList()
+      } catch (e) { showError('Network error: ' + e.message) }
     }
 
     if ('serviceWorker' in navigator) {

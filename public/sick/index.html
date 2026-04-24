@@ -35,6 +35,9 @@
   <!-- Error Banner -->
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
 
+  <!-- Acting Captain Banner -->
+  <div id="actingBanner"></div>
+
   <div class="max-w-5xl mx-auto px-4 py-6">
     <h1 class="text-2xl font-extrabold text-gray-800 mb-6">Sick Tracking</h1>
 
@@ -211,7 +214,26 @@
       }
     }
 
+    async function loadActingBanner() {
+      try {
+        await AUTH.loadOfficers()
+        const acting = AUTH.getActingOfficers()
+        const el = document.getElementById('actingBanner')
+        if (!el) return
+        if (!acting.length) { el.innerHTML = ''; return }
+        const names = acting.map(o => {
+          const m = o.display_name.match(/^Acting: (.+?) \(/)
+          return m ? m[1] : o.display_name
+        }).join(', ')
+        el.innerHTML = `
+          <div class="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs font-semibold px-4 py-2 text-center">
+            ⚡ Acting officer${acting.length > 1 ? 's' : ''} on duty this shift: ${names}
+          </div>`
+      } catch {}
+    }
+
     loadData()
+    loadActingBanner()
     setInterval(loadData, 60000)
 
     if ('serviceWorker' in navigator) {

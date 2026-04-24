@@ -37,6 +37,9 @@
   <!-- Error Banner -->
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
 
+  <!-- Acting Captain Banner -->
+  <div id="actingBanner"></div>
+
   <div class="max-w-5xl mx-auto px-4 py-6">
     <h1 class="text-2xl font-extrabold text-gray-800 mb-4">Recall List</h1>
 
@@ -284,53 +287,44 @@
         return
       }
 
-      container.innerHTML = `
-        <div class="bg-white rounded-2xl shadow overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
-                <th class="px-4 py-2 text-left">Date</th>
-                <th class="px-4 py-2 text-left">Name</th>
-                <th class="px-4 py-2 text-left">Type</th>
-                <th class="px-4 py-2 text-left hidden sm:table-cell">Time</th>
-                <th class="px-4 py-2 text-left hidden sm:table-cell">Hrs</th>
-                <th class="px-4 py-2 text-left hidden sm:table-cell">Tour</th>
-                <th class="px-4 py-2 text-left hidden sm:table-cell">By</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map((e, i) => {
-                const ff = e.firefighters || {}
-                const date = e.shift_date
-                  ? new Date(e.shift_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : '—'
-                const typeLabel = recallTypeLabels[e.recall_type] || e.recall_type
-                const typeBg = {
-                  full_shift:         'bg-green-100 text-green-800',
-                  short_min:          'bg-yellow-100 text-yellow-800',
-                  refused:            'bg-red-100 text-red-700',
-                  refused_no_penalty: 'bg-orange-100 text-orange-700',
-                  vacation_skip:      'bg-gray-100 text-gray-600',
-                  substitution:       'bg-blue-100 text-blue-700'
-                }[e.recall_type] || 'bg-gray-100 text-gray-600'
-                const timeStr = (e.recall_start_time || e.recall_end_time)
-                  ? `${e.recall_start_time || '?'}–${e.recall_end_time || '?'}` : '—'
-                const rowBg = i % 2 === 0 ? '' : 'bg-gray-50'
-                return `
-                  <tr class="${rowBg} border-b border-gray-100 last:border-0">
-                    <td class="px-4 py-2 text-gray-600 whitespace-nowrap">${date}</td>
-                    <td class="px-4 py-2 font-semibold text-gray-800">${ff.name || '—'}</td>
-                    <td class="px-4 py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded ${typeBg}">${typeLabel}</span></td>
-                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${timeStr}</td>
-                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.hours_worked != null ? e.hours_worked : '—'}</td>
-                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.tour_worked ? 'Tour ' + e.tour_worked : '—'}</td>
-                    <td class="px-4 py-2 text-gray-500 hidden sm:table-cell">${e.recorded_by || '—'}</td>
-                  </tr>`
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `
+      container.innerHTML = entries.map(e => {
+        const ff = e.firefighters || {}
+        const date = e.shift_date
+          ? new Date(e.shift_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '—'
+        const typeLabel = recallTypeLabels[e.recall_type] || e.recall_type
+        const typeBg = {
+          full_shift:         'bg-green-100 text-green-800',
+          short_min:          'bg-yellow-100 text-yellow-800',
+          refused:            'bg-red-100 text-red-700',
+          refused_no_penalty: 'bg-orange-100 text-orange-700',
+          vacation_skip:      'bg-gray-100 text-gray-600',
+          substitution:       'bg-blue-100 text-blue-700'
+        }[e.recall_type] || 'bg-gray-100 text-gray-600'
+        const timeStr = (e.recall_start_time || e.recall_end_time)
+          ? `${e.recall_start_time || '?'}–${e.recall_end_time || '?'}` : '—'
+        const hoursStr = e.hours_worked != null ? e.hours_worked + 'h' : '—'
+        const tourStr  = e.tour_worked ? 'Tour ' + e.tour_worked : '—'
+
+        return `
+          <div class="bg-white border border-gray-200 rounded-xl p-4 mb-2 shadow-sm">
+            <div class="flex items-start justify-between mb-1">
+              <span class="font-bold text-gray-800 text-base">${ff.name || '—'}</span>
+              <span class="ml-2 shrink-0 text-xs font-bold px-2 py-0.5 rounded ${typeBg}">${typeLabel}</span>
+            </div>
+            <div class="text-xs text-gray-500 mb-3">${date}</div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <span class="text-xs text-gray-400 uppercase tracking-wide">Time</span>
+              <span class="font-medium text-gray-700">${timeStr}</span>
+              <span class="text-xs text-gray-400 uppercase tracking-wide">Hours</span>
+              <span class="font-medium text-gray-700">${hoursStr}</span>
+              <span class="text-xs text-gray-400 uppercase tracking-wide">Tour</span>
+              <span class="font-medium text-gray-700">${tourStr}</span>
+              <span class="text-xs text-gray-400 uppercase tracking-wide">Recorded by</span>
+              <span class="font-medium text-gray-700">${e.recorded_by || '—'}</span>
+            </div>
+          </div>`
+      }).join('')
     }
 
     async function submitConfirm24hr(btn) {
@@ -496,7 +490,26 @@
       loadGroup(n)
     }
 
+    async function loadActingBanner() {
+      try {
+        await AUTH.loadOfficers()
+        const acting = AUTH.getActingOfficers()
+        const el = document.getElementById('actingBanner')
+        if (!el) return
+        if (!acting.length) { el.innerHTML = ''; return }
+        const names = acting.map(o => {
+          const m = o.display_name.match(/^Acting: (.+?) \(/)
+          return m ? m[1] : o.display_name
+        }).join(', ')
+        el.innerHTML = `
+          <div class="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs font-semibold px-4 py-2 text-center">
+            ⚡ Acting officer${acting.length > 1 ? 's' : ''} on duty this shift: ${names}
+          </div>`
+      } catch {}
+    }
+
     loadGroup(1)
+    loadActingBanner()
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))

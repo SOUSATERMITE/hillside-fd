@@ -56,6 +56,10 @@ const AUTH = (() => {
     } catch {}
   }
 
+  function getActingOfficers() {
+    return officersList.filter(o => o.is_temporary)
+  }
+
   function buildOfficerOptions() {
     const regular = officersList.filter(o => !o.is_temporary)
     const acting  = officersList.filter(o => o.is_temporary)
@@ -231,7 +235,7 @@ const AUTH = (() => {
   return {
     getSession, isLoggedIn, isOfficer, isAdmin, getDisplayName, getHeaders,
     showLoginModal, hideModal, showChangePinModal,
-    logout, updateNav, loadOfficers,
+    logout, updateNav, loadOfficers, getActingOfficers,
     _doLogin, _doChangePin
   }
 })()
