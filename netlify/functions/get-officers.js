@@ -16,6 +16,22 @@ exports.handler = async (event) => {
   try {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
+    // Lazy cleanup: deactivate any temp officers whose acting grant has expired
+    const now = new Date().toISOString()
+    const { data: expired } = await supabase
+      .from('acting_captains')
+      .select('officer_id')
+      .lt('expires_at', now)
+
+    if (expired && expired.length > 0) {
+      const expiredIds = expired.map(e => e.officer_id)
+      await Promise.all([
+        supabase.from('officers').update({ active: false }).in('id', expiredIds),
+        supabase.from('sessions').delete().in('officer_id', expiredIds),
+        supabase.from('acting_captains').delete().lt('expires_at', now)
+      ])
+    }
+
     const { data, error } = await supabase
       .from('officers')
       .select('name, display_name, role, is_temporary')
