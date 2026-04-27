@@ -59,15 +59,16 @@ exports.handler = async (event) => {
 
     if (ffError || !ff) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Firefighter not found' }) }
 
-    // Check if FF name already exists in officers (avoid collision)
-    const { data: existing } = await supabase
+    // Block only if a permanent (non-temp) officer already has this name
+    const { data: existingPerm } = await supabase
       .from('officers')
       .select('id')
       .eq('name', ff.name)
       .eq('active', true)
+      .eq('is_temporary', false)
       .maybeSingle()
 
-    if (existing) {
+    if (existingPerm) {
       return { statusCode: 409, headers, body: JSON.stringify({ error: `${ff.name} already has an officer account. They can log in directly.` }) }
     }
 
@@ -77,13 +78,6 @@ exports.handler = async (event) => {
       .delete()
       .eq('firefighter_id', firefighter_id)
 
-    // Deactivate any previous temp officer for this FF name
-    await supabase
-      .from('officers')
-      .update({ active: false })
-      .eq('name', ff.name)
-      .eq('is_temporary', true)
-
     // Generate 4-digit PIN
     const pin = String(Math.floor(1000 + Math.random() * 9000))
     const pinHash = hashPin(pin)
@@ -91,20 +85,51 @@ exports.handler = async (event) => {
 
     const grantedByName = admin.display_name || 'Admin'
 
-    // Create temporary officer record
-    const { data: tempOfficer, error: officerError } = await supabase
+    // Check for any existing temp officer with this name (active or inactive)
+    // If found, update in place to avoid hitting the unique constraint on name
+    const { data: existingTemp } = await supabase
       .from('officers')
-      .insert({
-        name: ff.name,
-        display_name: `Acting: ${ff.name} (${grantedByName})`,
-        role: 'officer',
-        pin_hash: pinHash,
-        must_change_pin: false,
-        is_temporary: true,
-        active: true
-      })
-      .select()
-      .single()
+      .select('id')
+      .eq('name', ff.name)
+      .eq('is_temporary', true)
+      .maybeSingle()
+
+    let tempOfficer, officerError
+    if (existingTemp) {
+      // Expire any live sessions for the old temp record
+      await supabase.from('sessions').delete().eq('officer_id', existingTemp.id)
+      // Refresh the existing record with new credentials
+      const result = await supabase
+        .from('officers')
+        .update({
+          display_name: `Acting: ${ff.name} (${grantedByName})`,
+          pin_hash: pinHash,
+          must_change_pin: false,
+          active: true
+        })
+        .eq('id', existingTemp.id)
+        .select()
+        .single()
+      tempOfficer = result.data
+      officerError = result.error
+    } else {
+      // No prior record — insert fresh
+      const result = await supabase
+        .from('officers')
+        .insert({
+          name: ff.name,
+          display_name: `Acting: ${ff.name} (${grantedByName})`,
+          role: 'officer',
+          pin_hash: pinHash,
+          must_change_pin: false,
+          is_temporary: true,
+          active: true
+        })
+        .select()
+        .single()
+      tempOfficer = result.data
+      officerError = result.error
+    }
 
     if (officerError) throw officerError
 
