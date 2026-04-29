@@ -91,6 +91,7 @@
       <button id="adminTab-ff"        onclick="switchAdminTab('ff')"        class="admin-tab-active px-5 py-3 text-sm whitespace-nowrap">Firefighters</button>
       <button id="adminTab-positions" onclick="switchAdminTab('positions')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Recall Positions</button>
       <button id="adminTab-acting"    onclick="switchAdminTab('acting')"    class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Acting Captain</button>
+      <button id="adminTab-logins"    onclick="switchAdminTab('logins')"    class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Officer Logins</button>
       <button id="adminTab-sicklog"   onclick="switchAdminTab('sicklog')"   class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Sick Log</button>
       <button id="adminTab-recalllog" onclick="switchAdminTab('recalllog')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Recall Log</button>
     </div>
@@ -165,6 +166,33 @@
       </div>
     </div>
 
+    <!-- TAB: Officer Logins -->
+    <div id="tab-logins" class="hidden">
+      <div class="bg-white rounded-2xl shadow p-5 mb-5">
+        <h2 class="font-bold text-gray-800 text-base mb-1 uppercase tracking-wide">Create Officer Login</h2>
+        <p class="text-sm text-gray-500 mb-4">Creates a permanent login (name + PIN) for a Captain, DC, or Chief so they can approve vacation requests. A temporary PIN will be shown — give it to them so they can log in and set their own PIN.</p>
+        <div class="flex flex-col sm:flex-row gap-3 mb-3">
+          <select id="loginFFSelect" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+            <option value="">Select firefighter...</option>
+          </select>
+          <button onclick="createOfficerLogin()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-6 py-2 transition sm:w-auto w-full">Create Login</button>
+        </div>
+        <div id="loginResult" class="hidden mt-3 bg-green-50 border border-green-200 rounded-xl p-4">
+          <div class="font-bold text-green-800 mb-1" id="loginResultName"></div>
+          <div class="text-sm text-gray-600 mb-2">Give this temporary PIN to the officer. They will be required to set a new PIN on first login.</div>
+          <div class="text-4xl font-extrabold text-center tracking-widest text-red-700 bg-white border-2 border-red-200 rounded-xl py-4" id="loginResultPin"></div>
+        </div>
+        <div id="loginError" class="text-red-600 text-sm mt-2 hidden"></div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100"><h2 class="font-bold text-gray-800">Permanent Officer Logins</h2></div>
+        <div id="officerLoginsContainer" class="p-4">
+          <div class="text-gray-400 text-sm text-center py-4">Loading...</div>
+        </div>
+      </div>
+    </div>
+
     <!-- TAB: Sick Log -->
     <div id="tab-sicklog" class="hidden">
       <div class="bg-white rounded-2xl shadow overflow-hidden">
@@ -191,6 +219,10 @@
   <script>
     const API = '/.netlify/functions'
     let currentAdminTab = 'ff'
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
     let currentPosGroup = 1
     let positionsData = {}
     let editingFFId = null
@@ -239,7 +271,7 @@
     // ── Admin Tabs ────────────────────────────────────────────────────────────────
 
     function switchAdminTab(tab) {
-      const tabs = ['ff', 'positions', 'acting', 'sicklog', 'recalllog']
+      const tabs = ['ff', 'positions', 'acting', 'logins', 'sicklog', 'recalllog']
       for (const t of tabs) {
         document.getElementById(`adminTab-${t}`).className = t === tab
           ? 'admin-tab-active px-5 py-3 text-sm whitespace-nowrap'
@@ -251,6 +283,7 @@
       if (tab === 'recalllog') loadRecallLog()
       if (tab === 'positions') loadPositionsGroup(currentPosGroup)
       if (tab === 'acting')    loadActingList()
+      if (tab === 'logins')    loadOfficerLogins()
     }
 
     // ── Firefighters Tab ──────────────────────────────────────────────────────────
@@ -992,6 +1025,109 @@
         await AUTH.loadOfficers()
         loadActingList()
       } catch (e) { showError('Network error: ' + e.message) }
+    }
+
+    // ── Officer Logins Tab ─────────────────────────────────────────────────────
+
+    async function loadOfficerLogins() {
+      const container = document.getElementById('officerLoginsContainer')
+      container.innerHTML = '<div class="text-gray-400 text-sm text-center py-4">Loading...</div>'
+      try {
+        const res = await fetch(`${API}/admin-officers`, { headers: AUTH.getHeaders() })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        const officers = await res.json()
+
+        // Also populate the FF select with current firefighters (non-FF ranks only, to keep list focused)
+        const ffs = await (await fetch(`${API}/admin-firefighters`, { headers: AUTH.getHeaders() })).json()
+        const loginsSelect = document.getElementById('loginFFSelect')
+        const existingNames = new Set(officers.map(o => o.name))
+        loginsSelect.innerHTML = '<option value="">Select firefighter...</option>' +
+          ffs.filter(f => f.active && !existingNames.has(f.name))
+             .sort((a, b) => a.name.localeCompare(b.name))
+             .map(f => `<option value="${f.id}">${f.rank} ${f.name}${f.group_number ? ' (Group ' + f.group_number + ')' : ''}</option>`)
+             .join('')
+
+        if (!officers.length) {
+          container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6">No permanent officer logins yet.</div>'
+          return
+        }
+        container.innerHTML = officers.map(o => `
+          <div class="flex items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-0">
+            <div>
+              <div class="font-semibold text-gray-800 text-sm">${esc(o.name)}</div>
+              <div class="text-xs text-gray-500">${o.role === 'admin' ? 'Admin' : 'Officer'} · ${o.active ? '<span class="text-green-600">Active</span>' : '<span class="text-red-500">Inactive</span>'}${o.must_change_pin ? ' · <span class="text-orange-500">PIN not yet set</span>' : ''}</div>
+            </div>
+            <div class="flex gap-2 flex-shrink-0">
+              <button data-reset-id="${o.id}" data-reset-name="${esc(o.name)}"
+                onclick="resetOfficerPin(this.dataset.resetId, this.dataset.resetName, this)"
+                class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition">Reset PIN</button>
+              ${o.active ? `<button data-del-id="${o.id}" data-del-name="${esc(o.name)}"
+                onclick="deactivateOfficerLogin(this.dataset.delId, this.dataset.delName, this)"
+                class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-3 py-1.5 rounded-lg transition">Deactivate</button>` : ''}
+            </div>
+          </div>`).join('')
+      } catch (e) {
+        container.innerHTML = `<div class="text-red-500 text-sm text-center py-4">${e.message}</div>`
+      }
+    }
+
+    async function createOfficerLogin() {
+      const sel = document.getElementById('loginFFSelect')
+      const firefighter_id = sel.value
+      const errEl = document.getElementById('loginError')
+      const resultEl = document.getElementById('loginResult')
+      errEl.classList.add('hidden')
+      resultEl.classList.add('hidden')
+      if (!firefighter_id) { errEl.textContent = 'Select a firefighter.'; errEl.classList.remove('hidden'); return }
+
+      try {
+        const res = await fetch(`${API}/admin-officers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ firefighter_id })
+        })
+        const data = await res.json()
+        if (!res.ok) { errEl.textContent = data.error || 'Error creating login.'; errEl.classList.remove('hidden'); return }
+
+        document.getElementById('loginResultName').textContent = `Login created for ${data.name}`
+        document.getElementById('loginResultPin').textContent = data.temp_pin
+        resultEl.classList.remove('hidden')
+        loadOfficerLogins()
+      } catch (e) {
+        errEl.textContent = 'Network error: ' + e.message
+        errEl.classList.remove('hidden')
+      }
+    }
+
+    async function resetOfficerPin(id, name, btn) {
+      if (!confirm(`Reset PIN for ${name}? Their current PIN will stop working and they'll need to set a new one.`)) return
+      btn.disabled = true
+      try {
+        const res = await fetch(`${API}/admin-officers`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ id })
+        })
+        const data = await res.json()
+        if (!res.ok) { alert(data.error || 'Error'); btn.disabled = false; return }
+        alert(`New temporary PIN for ${data.name}: ${data.temp_pin}\n\nThey'll be required to set a new PIN on first login.`)
+        loadOfficerLogins()
+      } catch (e) { alert('Network error: ' + e.message); btn.disabled = false }
+    }
+
+    async function deactivateOfficerLogin(id, name, btn) {
+      if (!confirm(`Deactivate the login for ${name}? They will not be able to log in until a new login is created.`)) return
+      btn.disabled = true
+      try {
+        const res = await fetch(`${API}/admin-officers`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ id })
+        })
+        const data = await res.json()
+        if (!res.ok) { alert(data.error || 'Error'); btn.disabled = false; return }
+        loadOfficerLogins()
+      } catch (e) { alert('Network error: ' + e.message); btn.disabled = false }
     }
 
     if ('serviceWorker' in navigator) {
