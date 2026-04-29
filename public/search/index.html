@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#b71c1c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,6 +15,8 @@
     .nav-active { border-bottom: 3px solid white; font-weight: 700; }
     select, button, input { min-height: 44px; }
     mark { background: #fef08a; color: inherit; border-radius: 2px; padding: 0 1px; }
+    nav { padding-top: max(12px, env(safe-area-inset-top)); }
+    #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); }
     .cat-btn { transition: all .15s; }
     .cat-btn.active { background: #b91c1c; color: white; border-color: #b91c1c; }
     .result-card:hover { border-color: #fca5a5; }
