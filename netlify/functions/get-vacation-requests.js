@@ -32,16 +32,33 @@ exports.handler = async (event) => {
     const officer = await verifySession(event)
     if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
 
-    // Look up officer in firefighters table to get rank + group
-    const { data: officerFF } = await supabase
+    // Look up officer in firefighters table to get rank + group.
+    // Try exact match first, fall back to case-insensitive match so that
+    // minor name formatting differences (e.g. "gwidzz" vs "Gwidzz") don't break the lookup.
+    let officerFF = null
+    const { data: exactMatch } = await supabase
       .from('firefighters')
-      .select('rank, group_number')
+      .select('rank, group_number, name')
       .eq('name', officer.name)
       .eq('active', true)
       .maybeSingle()
 
+    if (exactMatch) {
+      officerFF = exactMatch
+    } else {
+      const { data: ilikeMatch } = await supabase
+        .from('firefighters')
+        .select('rank, group_number, name')
+        .ilike('name', officer.name)
+        .eq('active', true)
+        .maybeSingle()
+      if (ilikeMatch) officerFF = ilikeMatch
+    }
+
     const rank    = officerFF?.rank || ''
     const isChief = rank === 'Chief' || officer.role === 'admin'
+
+    console.log(`[get-vacation-requests] officer="${officer.name}" display="${officer.display_name}" role="${officer.role}" | ff_match="${officerFF?.name || 'NOT FOUND'}" rank="${rank}" group=${officerFF?.group_number ?? 'null'} isChief=${isChief}`)
 
     let query = supabase
       .from('vacation_requests')
@@ -61,9 +78,20 @@ exports.handler = async (event) => {
     const { data, error } = await query
     if (error) throw error
 
+    console.log(`[get-vacation-requests] returning ${(data || []).length} requests, officerRank="${rank}"`)
+
     // Return requests + officer's rank so client can compute canAct per-request
-    return { statusCode: 200, headers, body: JSON.stringify({ requests: data || [], officerRank: rank }) }
+    return {
+      statusCode: 200, headers,
+      body: JSON.stringify({
+        requests: data || [],
+        officerRank: rank,
+        // Debug fields — client logs these, never shown in UI
+        _debug: { officerName: officer.name, ffMatch: officerFF?.name || null, rank, group: officerFF?.group_number ?? null }
+      })
+    }
   } catch (e) {
+    console.error('[get-vacation-requests] error:', e.message)
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
   }
 }
