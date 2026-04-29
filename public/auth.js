@@ -239,3 +239,10 @@ const AUTH = (() => {
     _doLogin, _doChangePin
   }
 })()
+
+// Mobile nav hamburger toggle — called from onclick in each page's nav
+function toggleMobileMenu() {
+  const m = document.getElementById('mobileMenu')
+  if (!m) return
+  m.classList.toggle('hidden')
+}

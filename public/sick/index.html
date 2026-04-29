@@ -24,16 +24,31 @@
   <!-- Nav -->
   <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
-    <div class="flex items-center gap-3 text-sm">
-      <a href="/sick"   class="nav-active pb-1">Sick</a>
-      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
-      <a href="/docs"   class="hover:text-red-200 pb-1">Docs</a>
-      <a href="/search" class="hover:text-red-200 pb-1">Search</a>
-      <a href="/vacation" class="hover:text-red-200 pb-1">Vacation</a>
-      <a href="/admin"  class="hover:text-red-200 pb-1">Admin</a>
-      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
+    <div class="flex items-center gap-2">
+      <div class="hidden sm:flex items-center gap-3 text-sm">
+        <a href="/sick"     class="nav-active pb-1">Sick</a>
+        <a href="/recall"   class="hover:text-red-200 pb-1">Recall</a>
+        <a href="/docs"     class="hover:text-red-200 pb-1">Docs</a>
+        <a href="/search"   class="hover:text-red-200 pb-1">Search</a>
+        <a href="/vacation" class="hover:text-red-200 pb-1">Vacation</a>
+        <a href="/admin"    class="hover:text-red-200 pb-1">Admin</a>
+      </div>
+      <span id="authSlot" class="flex items-center gap-2 text-sm"></span>
+      <button onclick="toggleMobileMenu()" class="sm:hidden p-2 rounded hover:bg-red-700 transition" style="min-height:0;line-height:1;" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
     </div>
   </nav>
+  <div id="mobileMenu" class="hidden bg-red-900 border-t border-red-800 sticky top-14 z-40">
+    <div class="px-4 py-1">
+      <a href="/sick"     class="block py-3 text-sm font-bold text-red-200 border-b border-red-800">Sick</a>
+      <a href="/recall"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Recall</a>
+      <a href="/docs"     class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Docs</a>
+      <a href="/search"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Search</a>
+      <a href="/vacation" class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Vacation</a>
+      <a href="/admin"    class="block py-3 text-sm text-white hover:text-red-200">Admin</a>
+    </div>
+  </div>
 
   <!-- Error Banner -->
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>

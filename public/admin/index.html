@@ -56,16 +56,31 @@
   <!-- Nav -->
   <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
-    <div class="flex items-center gap-3 text-sm">
-      <a href="/sick"   class="hover:text-red-200 pb-1">Sick</a>
-      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
-      <a href="/docs"   class="hover:text-red-200 pb-1">Docs</a>
-      <a href="/search" class="hover:text-red-200 pb-1">Search</a>
-      <a href="/vacation" class="hover:text-red-200 pb-1">Vacation</a>
-      <a href="/admin"  class="nav-active pb-1">Admin</a>
-      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
+    <div class="flex items-center gap-2">
+      <div class="hidden sm:flex items-center gap-3 text-sm">
+        <a href="/sick"     class="hover:text-red-200 pb-1">Sick</a>
+        <a href="/recall"   class="hover:text-red-200 pb-1">Recall</a>
+        <a href="/docs"     class="hover:text-red-200 pb-1">Docs</a>
+        <a href="/search"   class="hover:text-red-200 pb-1">Search</a>
+        <a href="/vacation" class="hover:text-red-200 pb-1">Vacation</a>
+        <a href="/admin"    class="nav-active pb-1">Admin</a>
+      </div>
+      <span id="authSlot" class="flex items-center gap-2 text-sm"></span>
+      <button onclick="toggleMobileMenu()" class="sm:hidden p-2 rounded hover:bg-red-700 transition" style="min-height:0;line-height:1;" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
     </div>
   </nav>
+  <div id="mobileMenu" class="hidden bg-red-900 border-t border-red-800 sticky top-14 z-40">
+    <div class="px-4 py-1">
+      <a href="/sick"     class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Sick</a>
+      <a href="/recall"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Recall</a>
+      <a href="/docs"     class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Docs</a>
+      <a href="/search"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Search</a>
+      <a href="/vacation" class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Vacation</a>
+      <a href="/admin"    class="block py-3 text-sm font-bold text-red-200">Admin</a>
+    </div>
+  </div>
 
   <!-- Error Banner -->
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
@@ -305,60 +320,60 @@
         container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No firefighters found.</div>'
         return
       }
-      const rows = firefighters.map(f => {
+      container.innerHTML = firefighters.map(f => {
         if (editingFFId === f.id) {
           return `
-            <tr class="bg-yellow-50">
-              <td class="px-4 py-2"><input id="edit-name-${f.id}" value="${f.name}" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px;min-width:120px"></td>
-              <td class="px-4 py-2"><input id="edit-email-${f.id}" type="email" value="${f.email||''}" placeholder="email@hillsidefire.org" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px;min-width:180px"></td>
-              <td class="px-4 py-2">
-                <select id="edit-rank-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
-                  <option ${f.rank==='FF'?'selected':''} value="FF">FF</option>
-                  <option ${f.rank==='Captain'?'selected':''} value="Captain">Captain</option>
-                  <option ${f.rank==='DC'?'selected':''} value="DC">DC</option>
-                  <option ${f.rank==='Chief'?'selected':''} value="Chief">Chief</option>
-                </select>
-              </td>
-              <td class="px-4 py-2">
-                <select id="edit-group-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
-                  <option value="">—</option>
-                  ${[1,2,3,4].map(g=>`<option ${f.group_number===g?'selected':''} value="${g}">${g}</option>`).join('')}
-                </select>
-              </td>
-              <td class="px-4 py-2">${f.active?'<span class="text-green-600 text-sm font-semibold">Active</span>':'<span class="text-gray-400 text-sm">Inactive</span>'}</td>
-              <td class="px-4 py-2 flex gap-2">
-                <button onclick="saveEditFF('${f.id}')" class="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Save</button>
-                <button onclick="cancelEditFF()" class="bg-gray-300 text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg">Cancel</button>
-              </td>
-            </tr>`
+            <div class="border-t border-gray-100 p-4 bg-yellow-50">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Name</label>
+                  <input id="edit-name-${f.id}" value="${f.name}" class="border rounded-xl px-3 py-2 text-sm w-full" style="min-height:44px">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Email</label>
+                  <input id="edit-email-${f.id}" type="email" value="${f.email||''}" placeholder="email@hillsidefire.org" class="border rounded-xl px-3 py-2 text-sm w-full" style="min-height:44px">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Rank</label>
+                  <select id="edit-rank-${f.id}" class="border rounded-xl px-3 py-2 text-sm w-full" style="min-height:44px">
+                    <option ${f.rank==='FF'?'selected':''} value="FF">FF</option>
+                    <option ${f.rank==='Captain'?'selected':''} value="Captain">Captain</option>
+                    <option ${f.rank==='DC'?'selected':''} value="DC">DC</option>
+                    <option ${f.rank==='Chief'?'selected':''} value="Chief">Chief</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Group</label>
+                  <select id="edit-group-${f.id}" class="border rounded-xl px-3 py-2 text-sm w-full" style="min-height:44px">
+                    <option value="">— No group</option>
+                    ${[1,2,3,4].map(g=>`<option ${f.group_number===g?'selected':''} value="${g}">Group ${g}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="saveEditFF('${f.id}')" class="flex-1 bg-green-600 text-white text-sm font-bold px-3 py-3 rounded-xl">Save</button>
+                <button onclick="cancelEditFF()" class="flex-1 bg-gray-300 text-gray-700 text-sm font-bold px-3 py-3 rounded-xl">Cancel</button>
+              </div>
+            </div>`
         }
         return `
-          <tr class="border-t border-gray-100 hover:bg-gray-50">
-            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${f.name}</td>
-            <td class="px-4 py-3 text-sm text-gray-500">${f.email ? `<a href="mailto:${f.email}" class="text-blue-600 hover:underline">${f.email}</a>` : '<span class="text-red-400 text-xs">no email</span>'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${f.group_number || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${f.rank}</td>
-            <td class="px-4 py-3">${f.active?'<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">Active</span>':'<span class="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-0.5 rounded">Inactive</span>'}</td>
-            <td class="px-4 py-3 flex gap-2 flex-wrap">
-              <button onclick="startEditFF('${f.id}')" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Edit</button>
-              <button onclick="${f.active?`deactivateFF('${f.id}')`:`activateFF('${f.id}')`}" class="text-white text-xs font-bold px-3 py-1.5 rounded-lg ${f.active?'bg-gray-500':'bg-green-600'}">
+          <div class="border-t border-gray-100 p-4 hover:bg-gray-50">
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-gray-800">${f.name}</div>
+                <div class="text-xs text-gray-500 mt-0.5">${f.rank} · ${f.group_number ? 'Group ' + f.group_number : 'No group'}</div>
+                <div class="text-xs mt-0.5">${f.email ? `<a href="mailto:${f.email}" class="text-blue-600">${f.email}</a>` : '<span class="text-red-400">no email</span>'}</div>
+              </div>
+              ${f.active ? '<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded self-start">Active</span>' : '<span class="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-0.5 rounded self-start">Inactive</span>'}
+            </div>
+            <div class="flex gap-2">
+              <button onclick="startEditFF('${f.id}')" class="flex-1 bg-blue-600 text-white text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
+              <button onclick="${f.active?`deactivateFF('${f.id}')`:`activateFF('${f.id}')`}" class="flex-1 text-white text-sm font-bold px-3 py-2.5 rounded-xl ${f.active?'bg-gray-500':'bg-green-600'}">
                 ${f.active?'Deactivate':'Activate'}
               </button>
-            </td>
-          </tr>`
+            </div>
+          </div>`
       }).join('')
-      container.innerHTML = `
-        <table class="w-full text-left min-w-[800px]">
-          <thead class="bg-gray-50"><tr>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Email</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Actions</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`
     }
 
     function startEditFF(id)  { editingFFId = id; loadFirefighters() }
@@ -645,42 +660,34 @@
     function renderSickLog(entries) {
       const container = document.getElementById('sickLogContainer')
       if (entries.length === 0) { container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No sick log entries.</div>'; return }
-      const rows = entries.map(e => {
+      container.innerHTML = entries.map(e => {
         const ff = e.firefighters || {}
-        const notesCell = e.notes ? `<span title="${e.notes.replace(/"/g,'&quot;')}" class="text-xs text-gray-500 truncate max-w-[120px] inline-block">${e.notes}</span>` : '—'
         return `
-          <tr class="border-t border-gray-100 hover:bg-gray-50" id="sick-row-${e.id}">
-            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">${formatEastern(e.created_at)}</td>
-            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${ff.name || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${ff.group_number || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${ff.rank || '—'}</td>
-            <td class="px-4 py-3 text-xs whitespace-nowrap">${formatEastern(e.marked_sick_date)}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${e.marked_sick_by || '—'}</td>
-            <td class="px-4 py-3 text-xs whitespace-nowrap">${formatEastern(e.cleared_date)}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${e.cleared_by || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-500">${notesCell}</td>
-            <td class="px-4 py-3 whitespace-nowrap">
-              <button onclick="editSickRecord('${e.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg mr-1">Edit</button>
-              <button onclick="showDeleteModal('sick', '${e.id}', document.getElementById('sick-row-${e.id}'))" class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg">Delete...</button>
-            </td>
-          </tr>`
+          <div class="border-t border-gray-100 p-4 hover:bg-gray-50" id="sick-row-${e.id}">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <div class="font-semibold text-gray-800">${ff.name || '—'}</div>
+                <div class="text-xs text-gray-500">${ff.rank || '—'} · ${ff.group_number ? 'Group ' + ff.group_number : '—'}</div>
+              </div>
+              <div class="text-xs text-gray-400 whitespace-nowrap">${formatEastern(e.created_at)}</div>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
+              <span class="text-gray-400 uppercase tracking-wide">Sick since</span>
+              <span class="text-gray-700">${formatEastern(e.marked_sick_date)}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Marked by</span>
+              <span class="text-gray-700">${e.marked_sick_by || '—'}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Cleared</span>
+              <span class="text-gray-700">${formatEastern(e.cleared_date)}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Cleared by</span>
+              <span class="text-gray-700">${e.cleared_by || '—'}</span>
+              ${e.notes ? `<span class="text-gray-400 uppercase tracking-wide">Notes</span><span class="text-gray-700">${e.notes}</span>` : ''}
+            </div>
+            <div class="flex gap-2">
+              <button onclick="editSickRecord('${e.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
+              <button onclick="showDeleteModal('sick', '${e.id}', document.getElementById('sick-row-${e.id}'))" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-3 py-2.5 rounded-xl">Delete...</button>
+            </div>
+          </div>`
       }).join('')
-      container.innerHTML = `
-        <table class="w-full text-left min-w-[1000px]">
-          <thead class="bg-gray-50"><tr>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Created</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Marked Sick</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Marked By</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Cleared</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Cleared By</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Notes</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase"></th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`
     }
 
     // ── Recall Log Tab ────────────────────────────────────────────────────────────
@@ -705,7 +712,7 @@
         full_shift: 'Full Shift', short_min: 'Short Min', refused: 'Refused',
         refused_no_penalty: 'No Penalty', vacation_skip: 'Vacation Skip', substitution: 'Sub'
       }
-      const rows = entries.map(e => {
+      container.innerHTML = entries.map(e => {
         const ff = e.firefighters || {}
         const typeBg = {
           full_shift: 'bg-green-100 text-green-800', short_min: 'bg-yellow-100 text-yellow-800',
@@ -714,42 +721,34 @@
         }[e.recall_type] || 'bg-gray-100 text-gray-600'
         const timeStr = (e.recall_start_time || e.recall_end_time)
           ? `${e.recall_start_time || '?'}–${e.recall_end_time || '?'}` : '—'
-        const notesCell = e.notes ? `<span title="${e.notes.replace(/"/g,'&quot;')}" class="text-xs text-gray-500 truncate max-w-[100px] inline-block">${e.notes}</span>` : '—'
         return `
-          <tr class="border-t border-gray-100 hover:bg-gray-50" id="recall-row-${e.id}">
-            <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">${formatEastern(e.created_at)}</td>
-            <td class="px-4 py-3 text-sm font-semibold text-gray-800">${ff.name || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${ff.group_number || '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${ff.rank || '—'}</td>
-            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-bold ${typeBg}">${typeLabels[e.recall_type] || e.recall_type}</span></td>
-            <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">${timeStr}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${e.hours_worked != null ? e.hours_worked + 'h' : '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${e.tour_worked ? 'Tour ' + e.tour_worked : '—'}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${notesCell}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${e.recorded_by || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap">
-              <button onclick="editRecallRecord('${e.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg mr-1">Edit</button>
-              <button onclick="showDeleteModal('recall', '${e.id}', document.getElementById('recall-row-${e.id}'))" class="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg">Delete...</button>
-            </td>
-          </tr>`
+          <div class="border-t border-gray-100 p-4 hover:bg-gray-50" id="recall-row-${e.id}">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <div class="font-semibold text-gray-800">${ff.name || '—'}</div>
+                <div class="text-xs text-gray-500">${ff.rank || '—'} · ${ff.group_number ? 'Group ' + ff.group_number : '—'}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded text-xs font-bold ${typeBg} shrink-0">${typeLabels[e.recall_type] || e.recall_type}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
+              <span class="text-gray-400 uppercase tracking-wide">Date</span>
+              <span class="text-gray-700">${e.shift_date ? new Date(e.shift_date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—'}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Time</span>
+              <span class="text-gray-700">${timeStr}${e.hours_worked != null ? ' · ' + e.hours_worked + 'h' : ''}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Recalled to</span>
+              <span class="text-gray-700">${e.tour_worked ? 'Tour ' + e.tour_worked : '—'}</span>
+              <span class="text-gray-400 uppercase tracking-wide">Recorded by</span>
+              <span class="text-gray-700">${e.recorded_by || '—'}</span>
+              ${e.notes ? `<span class="text-gray-400 uppercase tracking-wide">Notes</span><span class="text-gray-700">${e.notes}</span>` : ''}
+              <span class="text-gray-400 uppercase tracking-wide">Created</span>
+              <span class="text-gray-700">${formatEastern(e.created_at)}</span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="editRecallRecord('${e.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
+              <button onclick="showDeleteModal('recall', '${e.id}', document.getElementById('recall-row-${e.id}'))" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-3 py-2.5 rounded-xl">Delete...</button>
+            </div>
+          </div>`
       }).join('')
-      container.innerHTML = `
-        <table class="w-full text-left min-w-[1100px]">
-          <thead class="bg-gray-50"><tr>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Timestamp</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Type</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Time</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Hours</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Recalled To</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Notes</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Recorded By</th>
-            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase"></th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`
     }
 
     // ── Delete Record Modal ───────────────────────────────────────────────────────

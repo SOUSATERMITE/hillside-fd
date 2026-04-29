@@ -31,16 +31,31 @@
 
   <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
-    <div class="flex items-center gap-2 text-sm flex-wrap justify-end">
-      <a href="/sick"     class="hover:text-red-200 pb-1">Sick</a>
-      <a href="/recall"   class="hover:text-red-200 pb-1">Recall</a>
-      <a href="/docs"     class="hover:text-red-200 pb-1">Docs</a>
-      <a href="/search"   class="hover:text-red-200 pb-1">Search</a>
-      <a href="/vacation" class="nav-active pb-1">Vacation</a>
-      <a href="/admin"    class="hover:text-red-200 pb-1">Admin</a>
-      <span id="authSlot" class="flex items-center gap-2 ml-1"></span>
+    <div class="flex items-center gap-2">
+      <div class="hidden sm:flex items-center gap-3 text-sm">
+        <a href="/sick"     class="hover:text-red-200 pb-1">Sick</a>
+        <a href="/recall"   class="hover:text-red-200 pb-1">Recall</a>
+        <a href="/docs"     class="hover:text-red-200 pb-1">Docs</a>
+        <a href="/search"   class="hover:text-red-200 pb-1">Search</a>
+        <a href="/vacation" class="nav-active pb-1">Vacation</a>
+        <a href="/admin"    class="hover:text-red-200 pb-1">Admin</a>
+      </div>
+      <span id="authSlot" class="flex items-center gap-2 text-sm"></span>
+      <button onclick="toggleMobileMenu()" class="sm:hidden p-2 rounded hover:bg-red-700 transition" style="min-height:0;line-height:1;" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
     </div>
   </nav>
+  <div id="mobileMenu" class="hidden bg-red-900 border-t border-red-800 sticky top-14 z-40">
+    <div class="px-4 py-1">
+      <a href="/sick"     class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Sick</a>
+      <a href="/recall"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Recall</a>
+      <a href="/docs"     class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Docs</a>
+      <a href="/search"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Search</a>
+      <a href="/vacation" class="block py-3 text-sm font-bold text-red-200 border-b border-red-800">Vacation</a>
+      <a href="/admin"    class="block py-3 text-sm text-white hover:text-red-200">Admin</a>
+    </div>
+  </div>
 
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
   <div id="infoBanner"  class="hidden bg-blue-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
@@ -175,7 +190,7 @@
       <!-- Filter -->
       <div class="flex gap-2 mb-4 flex-wrap">
         <select id="officerStatusFilter" onchange="loadOfficerRequests()"
-          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          class="w-full sm:w-auto border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
           <option value="all">All Statuses</option>
           <option value="pending">Pending (Needs Captain)</option>
           <option value="captain_approved">Captain Approved (Needs DC)</option>
@@ -489,11 +504,11 @@
           ${canAct ? `
           <div class="flex gap-2 mt-3">
             <button onclick="openApprove('${r.id}', '${r.status}')"
-              class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg transition">
+              class="flex-1 bg-green-700 hover:bg-green-800 text-white text-sm font-bold px-3 py-3 rounded-xl transition">
               Approve
             </button>
             <button onclick="openDeny('${r.id}')"
-              class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg transition">
+              class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-bold px-3 py-3 rounded-xl transition">
               Deny
             </button>
           </div>` : ''}
