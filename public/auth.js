@@ -33,35 +33,17 @@ const AUTH = (() => {
 
   function updateNav() {
     const slot = document.getElementById('authSlot')
-    const mobileSlot = document.getElementById('mobileMenuAuth')
+    if (!slot) return
     const s = getSession()
-    if (slot) {
-      if (s) {
-        slot.innerHTML = `
-          <span class="text-white text-xs font-semibold opacity-90 max-w-[140px] truncate">${s.display_name}</span>
-          <button onclick="AUTH.logout()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log Out</button>
-        `
-      } else {
-        slot.innerHTML = `
-          <button onclick="AUTH.showLoginModal()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log In</button>
-        `
-      }
-    }
-    if (mobileSlot) {
-      if (s) {
-        mobileSlot.innerHTML = `
-          <div class="border-t border-red-800 mt-1 pt-2 pb-2 flex items-center justify-between">
-            <span class="text-xs text-red-300 font-semibold truncate max-w-[180px]">${s.display_name}</span>
-            <button onclick="AUTH.logout()" style="min-height:36px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-4 py-1 rounded-lg transition">Log Out</button>
-          </div>
-        `
-      } else {
-        mobileSlot.innerHTML = `
-          <div class="border-t border-red-800 mt-1 pt-2 pb-2">
-            <button onclick="AUTH.showLoginModal()" style="min-height:40px" class="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm font-bold rounded-xl py-2 transition">Log In</button>
-          </div>
-        `
-      }
+    if (s) {
+      slot.innerHTML = `
+        <span class="hidden sm:inline text-white text-xs font-semibold max-w-[110px] truncate">${s.display_name}</span>
+        <button onclick="AUTH.logout()" style="min-height:0;padding:6px 12px;font-size:12px;background:rgba(255,255,255,0.2);border:none;border-radius:8px;cursor:pointer;" class="text-white font-bold transition hover:bg-white hover:bg-opacity-30 whitespace-nowrap">Log Out</button>
+      `
+    } else {
+      slot.innerHTML = `
+        <button onclick="AUTH.showLoginModal()" style="min-height:0;padding:6px 12px;font-size:12px;background:rgba(255,255,255,0.2);border:none;border-radius:8px;cursor:pointer;" class="text-white font-bold transition hover:bg-white hover:bg-opacity-30 whitespace-nowrap">Log In</button>
+      `
     }
   }
 
@@ -258,9 +240,17 @@ const AUTH = (() => {
   }
 })()
 
-// Mobile nav hamburger toggle — called from onclick in each page's nav
+// Mobile nav — called from onclick in each page's nav
 function toggleMobileMenu() {
   const m = document.getElementById('mobileMenu')
+  const b = document.getElementById('menuBackdrop')
   if (!m) return
+  const opening = m.classList.contains('hidden')
   m.classList.toggle('hidden')
+  if (b) { opening ? b.classList.remove('hidden') : b.classList.add('hidden') }
+}
+
+function closeMobileMenu() {
+  document.getElementById('mobileMenu')?.classList.add('hidden')
+  document.getElementById('menuBackdrop')?.classList.add('hidden')
 }
