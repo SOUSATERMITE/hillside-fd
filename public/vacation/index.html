@@ -22,6 +22,7 @@
     .status-denied            { background:#fee2e2; color:#991b1b; }
     .status-dc_approved       { background:#ede9fe; color:#5b21b6; }
     .request-highlight        { border-color:#fbbf24 !important; box-shadow:0 0 0 3px rgba(251,191,36,0.25) !important; }
+    .status-chief_review      { background:#fdf4ff; color:#7c3aed; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -179,6 +180,7 @@
           <option value="pending">Pending (Needs Captain)</option>
           <option value="captain_approved">Captain Approved (Needs DC)</option>
           <option value="dc_approved">DC Approved (Needs Chief)</option>
+          <option value="chief_review">Chief Review (Admin Staff)</option>
           <option value="approved">Fully Approved</option>
           <option value="denied">Denied</option>
         </select>
@@ -386,10 +388,17 @@
           <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
           ${r.staffing_impact ? `<div class="text-sm text-red-600 mb-1"><span class="font-semibold">Staffing Impact:</span> Yes — ${esc(r.impact_explanation)}</div>` : ''}
           <div class="mt-3 flex flex-col gap-1 text-xs text-gray-400">
-            ${r.captain_name ? `<span>1. Captain: ${esc(r.captain_name)} ${r.captain_overtime_acknowledged ? '✓' : ''} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</span>` : '<span class="text-gray-300">1. Captain: pending</span>'}
-            ${r.dc_name ? `<span>2. DC: ${esc(r.dc_name)} · ${r.dc_action || ''} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</span>` : '<span class="text-gray-300">2. DC: pending</span>'}
-            ${r.chief_name ? `<span>3. Chief: ${esc(r.chief_name)} · ${r.chief_action || ''} ${r.chief_action_date ? '· ' + fmtDate(r.chief_action_date) : ''}</span>` : '<span class="text-gray-300">3. Chief: pending</span>'}
-            ${r.denial_reason ? `<span class="text-red-500 mt-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</span>` : ''}
+            ${!r.ff_group ? `
+              <span class="text-gray-500 font-semibold">Administrative staff — direct Chief review</span>
+              <span>1. Submitted ✓ ${fmtDate(r.created_at)}</span>
+              <span>2. Chief Review ${r.chief_name ? '— ' + esc(r.chief_name) + ' · ' + (r.chief_action || '') + (r.chief_action_date ? ' · ' + fmtDate(r.chief_action_date) : '') : '— pending'}</span>
+              ${r.denial_reason ? `<span class="text-red-500">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</span>` : ''}
+            ` : `
+              ${r.captain_name ? `<span>1. Capt. ${esc(r.captain_name)} approved ${r.captain_overtime_acknowledged ? '✓' : ''} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</span>` : '<span class="text-gray-300">1. Captain: pending</span>'}
+              ${r.dc_name ? `<span>2. DC ${esc(r.dc_name)} · ${r.dc_action || ''} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</span>` : '<span class="text-gray-300">2. DC: pending</span>'}
+              ${r.chief_name ? `<span>3. Chief ${esc(r.chief_name)} · ${r.chief_action || ''} ${r.chief_action_date ? '· ' + fmtDate(r.chief_action_date) : ''}</span>` : '<span class="text-gray-300">3. Chief: pending</span>'}
+              ${r.denial_reason ? `<span class="text-red-500 mt-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</span>` : ''}
+            `}
           </div>
         </div>`
     }
@@ -406,12 +415,16 @@
           headers: AUTH.getHeaders()
         })
         if (res.status === 401) { container.innerHTML = '<div class="text-red-500 text-sm text-center py-10">Login required. Use the login button in the nav.</div>'; return }
-        const data = await res.json()
-        if (!data.length) {
+        const payload = await res.json()
+        // Server returns {requests, officerRank}; fall back to bare array for safety
+        const requests    = Array.isArray(payload) ? payload : (payload.requests || [])
+        const officerRank = Array.isArray(payload) ? null    : (payload.officerRank || null)
+
+        if (!requests.length) {
           container.innerHTML = '<div class="text-gray-400 text-sm text-center py-10 bg-white rounded-2xl border border-gray-200">No requests found.</div>'
           return
         }
-        container.innerHTML = data.map(renderOfficerCard).join('')
+        container.innerHTML = requests.map(r => renderOfficerCard(r, officerRank)).join('')
 
         // Deep link: scroll to and highlight the target request
         if (pendingDeepRequestId) {
@@ -426,28 +439,44 @@
       }
     }
 
-    function renderOfficerCard(r) {
+    function renderOfficerCard(r, officerRank) {
       const badge     = statusBadge(r.status)
       const cancelled = formatDates(r.cancelled_dates)
       const newD      = formatDates(r.new_dates)
-      const canAct    = r.status === 'pending' || r.status === 'captain_approved' || r.status === 'dc_approved'
+      const isAdm     = AUTH.isAdmin()
+
+      // Rank-based canAct — only the right rank sees action buttons for each status
+      let canAct = false
+      if (r.status === 'pending')          canAct = officerRank === 'Captain' || isAdm
+      if (r.status === 'captain_approved') canAct = officerRank === 'DC'      || isAdm
+      if (r.status === 'dc_approved')      canAct = officerRank === 'Chief'   || isAdm
+      if (r.status === 'chief_review')     canAct = officerRank === 'Chief'   || isAdm
+
+      // Notified captains — who was emailed vs who acted first
+      const notified     = r.notified_captains || []
+      const otherCaps    = r.captain_name ? notified.filter(n => n !== r.captain_name) : []
+      const awaitingCaps = !r.captain_name && notified.length > 0
 
       return `
         <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-request-id="${r.id}">
           <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
             <div>
               <div class="font-bold text-gray-800">${esc(r.ff_name)}</div>
-              <div class="text-xs text-gray-400">Group ${r.ff_group || '—'} · Submitted ${fmtDate(r.created_at)}</div>
+              <div class="text-xs text-gray-400">${r.ff_group ? `Group ${r.ff_group}` : 'Administrative'} · Submitted ${fmtDate(r.created_at)}</div>
             </div>
             ${badge}
           </div>
           <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">Cancelled:</span> ${cancelled}</div>
           <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
           ${r.staffing_impact ? `<div class="text-sm text-red-600 font-semibold mb-1">⚠ Staffing Impact: ${esc(r.impact_explanation)}</div>` : ''}
-          ${r.captain_name ? `<div class="text-xs text-gray-400 mb-1">Captain approved by ${esc(r.captain_name)} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</div>` : ''}
-          ${r.dc_name && r.dc_action === 'approved' ? `<div class="text-xs text-gray-400 mb-1">DC approved by ${esc(r.dc_name)} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</div>` : ''}
-          ${r.chief_name && r.chief_action === 'approved' ? `<div class="text-xs text-gray-400 mb-1">Chief approved by ${esc(r.chief_name)} ${r.chief_action_date ? '· ' + fmtDate(r.chief_action_date) : ''}</div>` : ''}
-          ${r.denial_reason ? `<div class="text-xs text-red-500 mb-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</div>` : ''}
+          <div class="mt-2 flex flex-col gap-0.5">
+            ${r.captain_name ? `<div class="text-xs text-gray-400">Capt. ${esc(r.captain_name)} approved · ${r.captain_action_date ? fmtDate(r.captain_action_date) : ''}</div>` : ''}
+            ${otherCaps.length ? `<div class="text-xs text-gray-400">Also notified: Capt. ${otherCaps.map(esc).join(', Capt. ')}</div>` : ''}
+            ${awaitingCaps ? `<div class="text-xs text-gray-400">Awaiting Capt. ${notified.map(esc).join(' or Capt. ')}</div>` : ''}
+            ${r.dc_name && r.dc_action === 'approved' ? `<div class="text-xs text-gray-400">DC ${esc(r.dc_name)} approved · ${r.dc_action_date ? fmtDate(r.dc_action_date) : ''}</div>` : ''}
+            ${r.chief_name && r.chief_action === 'approved' ? `<div class="text-xs text-gray-400">Chief ${esc(r.chief_name)} approved · ${r.chief_action_date ? fmtDate(r.chief_action_date) : ''}</div>` : ''}
+            ${r.denial_reason ? `<div class="text-xs text-red-500">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</div>` : ''}
+          </div>
           ${canAct ? `
           <div class="flex gap-2 mt-3">
             <button onclick="openApprove('${r.id}', '${r.status}')"
@@ -467,9 +496,10 @@
       currentRequestId  = reqId
       currentActionType = 'approve'
 
-      const isPending   = currentStatus === 'pending'
-      const isCaptainAp = currentStatus === 'captain_approved'
-      const isDCAp      = currentStatus === 'dc_approved'
+      const isPending    = currentStatus === 'pending'
+      const isCaptainAp  = currentStatus === 'captain_approved'
+      const isDCAp       = currentStatus === 'dc_approved'
+      const isChiefReview = currentStatus === 'chief_review'
 
       document.getElementById('actionModalTitle').textContent =
         isPending ? 'Captain Approval' : isCaptainAp ? 'DC Approval' : 'Chief Approval'
@@ -489,6 +519,11 @@
         ackHtml = `
           <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-800">
             This request has been approved by the Captain. As DC, your approval sends it to the Chief for final review.
+          </div>`
+      } else if (isChiefReview) {
+        ackHtml = `
+          <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4 text-sm text-purple-800">
+            This is an administrative staff request — Captain and DC approval are not required. As Chief, your approval is final and will notify the firefighter.
           </div>`
       } else {
         ackHtml = `
@@ -581,6 +616,7 @@
         pending:          ['Pending — Awaiting Captain', 'status-pending'],
         captain_approved: ['Captain Approved — Awaiting DC', 'status-captain_approved'],
         dc_approved:      ['DC Approved — Awaiting Chief', 'status-dc_approved'],
+        chief_review:     ['Awaiting Chief Review', 'status-chief_review'],
         approved:         ['Fully Approved', 'status-approved'],
         denied:           ['Denied', 'status-denied']
       }

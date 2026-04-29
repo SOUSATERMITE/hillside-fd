@@ -40,6 +40,9 @@ exports.handler = async (event) => {
       .eq('active', true)
       .maybeSingle()
 
+    const rank    = officerFF?.rank || ''
+    const isChief = rank === 'Chief' || officer.role === 'admin'
+
     let query = supabase
       .from('vacation_requests')
       .select('*')
@@ -51,7 +54,6 @@ exports.handler = async (event) => {
     }
 
     // Non-admin, non-Chief officers: filter to own tour
-    const isChief = officerFF?.rank === 'Chief'
     if (officer.role !== 'admin' && !isChief && officerFF?.group_number) {
       query = query.eq('ff_group', officerFF.group_number)
     }
@@ -59,7 +61,8 @@ exports.handler = async (event) => {
     const { data, error } = await query
     if (error) throw error
 
-    return { statusCode: 200, headers, body: JSON.stringify(data || []) }
+    // Return requests + officer's rank so client can compute canAct per-request
+    return { statusCode: 200, headers, body: JSON.stringify({ requests: data || [], officerRank: rank }) }
   } catch (e) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
   }

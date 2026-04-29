@@ -35,6 +35,10 @@ function formatDates(arr) {
   return arr.map(d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })).join(', ')
 }
 
+function reviewBtn(url, color) {
+  return `<p style="margin:16px 0 0;"><a href="${url}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">Review Request →</a></p>`
+}
+
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
@@ -53,7 +57,7 @@ exports.handler = async (event) => {
       staffing_impact, impact_explanation
     } = JSON.parse(event.body || '{}')
 
-    if (!firefighter_id || !ff_signature || !ff_signature.trim()) {
+    if (!firefighter_id || !ff_signature?.trim()) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'firefighter_id and signature are required' }) }
     }
     if (!cancelled_dates?.length || !new_dates?.length) {
@@ -73,6 +77,91 @@ exports.handler = async (event) => {
       .single()
     if (ffErr || !ff) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Firefighter not found' }) }
 
+    const cancelledStr = formatDates(cancelled_dates)
+    const newStr       = formatDates(new_dates)
+    const isAdminFF    = !ff.group_number  // NULL = not assigned to a tour
+
+    // ── ADMIN FF PATH: goes directly to Chief ───────────────────────────────────
+    if (isAdminFF) {
+      const { data: req, error: insertErr } = await supabase
+        .from('vacation_requests')
+        .insert({
+          firefighter_id: ff.id,
+          ff_name: ff.name,
+          ff_email: ff.email || '',
+          ff_group: null,
+          request_date: new Date().toISOString().slice(0, 10),
+          cancelled_dates,
+          new_dates,
+          staffing_impact: !!staffing_impact,
+          impact_explanation: impact_explanation?.trim() || null,
+          ff_signature: sanitize(ff_signature),
+          status: 'chief_review',
+          notified_captains: []
+        })
+        .select()
+        .single()
+      if (insertErr) throw insertErr
+
+      const reviewUrl = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
+
+      const { data: chiefs } = await supabase
+        .from('firefighters')
+        .select('name, email')
+        .eq('rank', 'Chief')
+        .eq('active', true)
+
+      const impactLine = staffing_impact
+        ? `<tr><td style="padding:8px 12px;font-weight:600;color:#b91c1c;">Staffing Impact</td><td style="padding:8px 12px;color:#b91c1c;font-weight:600;">YES — ${sanitize(impact_explanation)}</td></tr>`
+        : `<tr><td style="padding:8px 12px;font-weight:600;">Staffing Impact</td><td style="padding:8px 12px;">No</td></tr>`
+
+      const chiefHtml = `
+<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
+  <div style="background:#7c3aed;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">Action Required — Administrative Staff Vacation Change</h2>
+  </div>
+  <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+    <p style="margin:0 0 16px;">An administrative staff member has submitted a vacation change request. As Chief, your approval is required.</p>
+    <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr><td style="padding:8px 12px;font-weight:600;">Firefighter</td><td style="padding:8px 12px;">${ff.name}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Assignment</td><td style="padding:8px 12px;">Administrative (no tour)</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Cancelled Dates</td><td style="padding:8px 12px;">${cancelledStr}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">New Dates</td><td style="padding:8px 12px;">${newStr}</td></tr>
+      ${impactLine}
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Signature</td><td style="padding:8px 12px;">${sanitize(ff_signature)}</td></tr>
+    </table>
+    ${reviewBtn(reviewUrl, '#7c3aed')}
+    <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Request ID: ${req.id}</p>
+  </div>
+</div>`
+
+      let chiefsNotified = 0
+      for (const chief of (chiefs || [])) {
+        if (chief.email) {
+          await sendEmail({
+            to: chief.email,
+            subject: `Action Required — Administrative Staff Vacation Change Request from ${ff.name}`,
+            html: chiefHtml,
+            text: `Administrative staff vacation change from ${ff.name}. Cancelled: ${cancelledStr}. New Dates: ${newStr}. Your approval is required. Review at: ${reviewUrl}`
+          })
+          chiefsNotified++
+        }
+      }
+
+      console.log(`[submit-vacation] Admin request ${req.id} created for ${ff.name}. Chiefs notified: ${chiefsNotified}`)
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
+    }
+
+    // ── TOUR FF PATH: normal Captain → DC → Chief chain ────────────────────────
+    const { data: captains } = await supabase
+      .from('firefighters')
+      .select('id, name, email')
+      .eq('group_number', ff.group_number)
+      .eq('rank', 'Captain')
+      .eq('active', true)
+
+    const captainNames = (captains || []).map(c => c.name)
+
     const { data: req, error: insertErr } = await supabase
       .from('vacation_requests')
       .insert({
@@ -86,22 +175,14 @@ exports.handler = async (event) => {
         staffing_impact: !!staffing_impact,
         impact_explanation: impact_explanation?.trim() || null,
         ff_signature: sanitize(ff_signature),
-        status: 'pending'
+        status: 'pending',
+        notified_captains: captainNames
       })
       .select()
       .single()
     if (insertErr) throw insertErr
 
-    const { data: captains } = await supabase
-      .from('firefighters')
-      .select('id, name, email')
-      .eq('group_number', ff.group_number)
-      .eq('rank', 'Captain')
-      .eq('active', true)
-
-    const cancelledStr = formatDates(cancelled_dates)
-    const newStr       = formatDates(new_dates)
-    const reviewUrl    = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
+    const reviewUrl = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
 
     const impactLine = staffing_impact
       ? `<tr><td style="padding:8px 12px;font-weight:600;color:#b91c1c;">Staffing Impact</td><td style="padding:8px 12px;color:#b91c1c;font-weight:600;">YES — ${sanitize(impact_explanation)}</td></tr>`
@@ -113,7 +194,7 @@ exports.handler = async (event) => {
     <h2 style="color:#fff;margin:0;font-size:18px;">Action Required — Vacation Change Request</h2>
   </div>
   <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
-    <p style="margin:0 0 16px;">A vacation change request has been submitted and requires your approval.</p>
+    <p style="margin:0 0 16px;">A vacation change request requires your approval. Either captain may approve — first response is final.</p>
     <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
       <tr><td style="padding:8px 12px;font-weight:600;">Firefighter</td><td style="padding:8px 12px;">${ff.name}</td></tr>
       <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Tour / Group</td><td style="padding:8px 12px;">Group ${ff.group_number}</td></tr>
@@ -122,10 +203,7 @@ exports.handler = async (event) => {
       ${impactLine}
       <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Signature</td><td style="padding:8px 12px;">${sanitize(ff_signature)}</td></tr>
     </table>
-    <p style="margin:0 0 16px;">Click below to log in and review this request directly:</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">
-      Review Request →
-    </a>
+    ${reviewBtn(reviewUrl, '#b91c1c')}
     <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Request ID: ${req.id}</p>
   </div>
 </div>`
@@ -137,7 +215,7 @@ exports.handler = async (event) => {
           to: cap.email,
           subject: `Action Required — Vacation Change Request from ${ff.name}`,
           html: captainEmailHtml,
-          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}).\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nReview at: ${reviewUrl}`
+          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}). Either captain may approve — first response is final.\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nReview at: ${reviewUrl}`
         })
         captainsNotified++
       } else {
@@ -148,18 +226,18 @@ exports.handler = async (event) => {
           html: `<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;">
             <div style="background:#dc2626;padding:16px 24px;border-radius:10px 10px 0 0;"><h2 style="color:#fff;margin:0;">⚠ Missing Email Alert</h2></div>
             <div style="background:#fff;padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
-              <p><strong>Captain ${cap.name}</strong> (Group ${ff.group_number}) has no email address on file and was not notified of a vacation change request.</p>
+              <p><strong>Captain ${cap.name}</strong> (Group ${ff.group_number}) has no email and was not notified.</p>
               <p><strong>Submitted by:</strong> ${ff.name}<br><strong>Cancelled:</strong> ${cancelledStr}<br><strong>New Dates:</strong> ${newStr}</p>
-              <p>Please update ${cap.name}'s email in the Admin panel and manually notify them.</p>
+              <p>Update ${cap.name}'s email in the Admin panel and manually notify them.</p>
               <a href="${reviewUrl}" style="display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;">View Request →</a>
             </div>
           </div>`,
-          text: `ALERT: Captain ${cap.name} has no email. FF ${ff.name} submitted a vacation request that was not delivered. Review: ${reviewUrl}`
+          text: `ALERT: Captain ${cap.name} has no email. FF ${ff.name} submitted a vacation request not delivered to them. Review: ${reviewUrl}`
         })
       }
     }
 
-    console.log(`[submit-vacation] Request ${req.id} created. Captains in group: ${(captains || []).length}. Notified: ${captainsNotified}`)
+    console.log(`[submit-vacation] Tour request ${req.id} created for ${ff.name} (Group ${ff.group_number}). Captains notified: ${captainsNotified}/${(captains || []).length}`)
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
   } catch (e) {
     console.error('[submit-vacation] Error:', e)

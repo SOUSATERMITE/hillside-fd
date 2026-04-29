@@ -381,6 +381,56 @@ exports.handler = async (event) => {
           }
         }
       }
+    }
+
+    // ── ADMIN/DIRECT CHIEF LEVEL (chief_review) ──────────────────────────────────
+    else if (vacReq.status === 'chief_review') {
+      if (!isChief) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Chief login required to act on administrative staff requests' }) }
+
+      if (action === 'approve') {
+        await supabase.from('vacation_requests').update({
+          status: 'approved',
+          chief_name: officer.display_name,
+          chief_action: 'approved',
+          chief_action_date: now
+        }).eq('id', request_id)
+
+        const ffRows = [
+          row('Request', `Vacation change for ${vacReq.ff_name}`),
+          row('Assignment', 'Administrative (no tour)', true),
+          row('Cancelled Dates', cancelledStr),
+          row('New Dates', newStr, true),
+          row('Chief Approved By', officer.display_name)
+        ].join('')
+
+        const ffHtml = buildEmail(
+          'Approved — Your Vacation Change Request',
+          '#15803d', ffRows,
+          '<p style="color:#15803d;font-weight:600;">Your vacation change request has been approved by the Chief.</p>',
+          request_id, null
+        )
+
+        if (vacReq.ff_email) {
+          await sendEmail({
+            to: vacReq.ff_email,
+            subject: 'Approved — Your Vacation Change Request',
+            html: ffHtml,
+            text: `Your vacation change request has been approved by Chief ${officer.display_name}. Cancelled: ${cancelledStr}. New Dates: ${newStr}.`
+          })
+        }
+
+      } else {
+        await supabase.from('vacation_requests').update({
+          status: 'denied',
+          denial_reason: sanitize(denial_reason),
+          denied_by_name: officer.display_name,
+          chief_name: officer.display_name,
+          chief_action: 'denied',
+          chief_action_date: now
+        }).eq('id', request_id)
+
+        await sendDenialEmail(vacReq, officer.display_name, denial_reason, cancelledStr, newStr, request_id)
+      }
     } else {
       return { statusCode: 400, headers, body: JSON.stringify({ error: `Cannot act on a request with status: ${vacReq.status}` }) }
     }
