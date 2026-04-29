@@ -20,6 +20,8 @@
     .status-captain_approved  { background:#dbeafe; color:#1e40af; }
     .status-approved          { background:#dcfce7; color:#166534; }
     .status-denied            { background:#fee2e2; color:#991b1b; }
+    .status-dc_approved       { background:#ede9fe; color:#5b21b6; }
+    .request-highlight        { border-color:#fbbf24 !important; box-shadow:0 0 0 3px rgba(251,191,36,0.25) !important; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -40,6 +42,7 @@
   </nav>
 
   <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+  <div id="infoBanner"  class="hidden bg-blue-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
 
   <div class="max-w-3xl mx-auto px-4 py-6">
     <h1 class="text-2xl font-extrabold text-gray-800 mb-1">Vacation Change Request</h1>
@@ -175,6 +178,7 @@
           <option value="all">All Statuses</option>
           <option value="pending">Pending (Needs Captain)</option>
           <option value="captain_approved">Captain Approved (Needs DC)</option>
+          <option value="dc_approved">DC Approved (Needs Chief)</option>
           <option value="approved">Fully Approved</option>
           <option value="denied">Denied</option>
         </select>
@@ -205,11 +209,15 @@
     let currentRequestId = null
     let currentActionType = null
     let currentOfficerRank = null
+    let pendingDeepRequestId = null
 
     // ── BOOT ──────────────────────────────────────────────────────────────────
     async function boot() {
       // Set today's date
       document.getElementById('requestDate').value = new Date().toISOString().slice(0, 10)
+
+      // Check for deep-linked request in URL
+      const deepRequestId = new URLSearchParams(window.location.search).get('request')
 
       // Load firefighters for dropdowns
       try {
@@ -220,11 +228,24 @@
         }
       } catch (e) { console.error(e) }
 
-      // Show officer tab if logged in
+      // Show officer tab if logged in; handle deep link
       setTimeout(() => {
         if (AUTH.isOfficer()) {
           document.getElementById('tabOfficer').classList.remove('hidden')
           detectOfficerRank()
+          if (deepRequestId) {
+            pendingDeepRequestId = deepRequestId
+            showTab('officer')
+          }
+        } else if (deepRequestId) {
+          pendingDeepRequestId = deepRequestId
+          showInfo('Please log in to review this vacation request.')
+          AUTH.showLoginModal((session) => {
+            if (AUTH.isOfficer()) {
+              document.getElementById('tabOfficer').classList.remove('hidden')
+              showTab('officer')
+            }
+          })
         }
       }, 150)
     }
@@ -365,9 +386,10 @@
           <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
           ${r.staffing_impact ? `<div class="text-sm text-red-600 mb-1"><span class="font-semibold">Staffing Impact:</span> Yes — ${esc(r.impact_explanation)}</div>` : ''}
           <div class="mt-3 flex flex-col gap-1 text-xs text-gray-400">
-            ${r.captain_name ? `<span>Captain: ${esc(r.captain_name)} ${r.captain_overtime_acknowledged ? '✓ Overtime acknowledged' : ''} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</span>` : ''}
-            ${r.dc_name ? `<span>DC: ${esc(r.dc_name)} ${r.dc_action ? '· ' + r.dc_action : ''} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</span>` : ''}
-            ${r.denial_reason ? `<span class="text-red-500">Denial reason: ${esc(r.denial_reason)}</span>` : ''}
+            ${r.captain_name ? `<span>1. Captain: ${esc(r.captain_name)} ${r.captain_overtime_acknowledged ? '✓' : ''} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</span>` : '<span class="text-gray-300">1. Captain: pending</span>'}
+            ${r.dc_name ? `<span>2. DC: ${esc(r.dc_name)} · ${r.dc_action || ''} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</span>` : '<span class="text-gray-300">2. DC: pending</span>'}
+            ${r.chief_name ? `<span>3. Chief: ${esc(r.chief_name)} · ${r.chief_action || ''} ${r.chief_action_date ? '· ' + fmtDate(r.chief_action_date) : ''}</span>` : '<span class="text-gray-300">3. Chief: pending</span>'}
+            ${r.denial_reason ? `<span class="text-red-500 mt-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</span>` : ''}
           </div>
         </div>`
     }
@@ -390,6 +412,15 @@
           return
         }
         container.innerHTML = data.map(renderOfficerCard).join('')
+
+        // Deep link: scroll to and highlight the target request
+        if (pendingDeepRequestId) {
+          const card = container.querySelector(`[data-request-id="${pendingDeepRequestId}"]`)
+          if (card) {
+            card.classList.add('request-highlight')
+            setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+          }
+        }
       } catch (e) {
         container.innerHTML = `<div class="text-red-500 text-sm text-center py-10">${e.message}</div>`
       }
@@ -399,10 +430,10 @@
       const badge     = statusBadge(r.status)
       const cancelled = formatDates(r.cancelled_dates)
       const newD      = formatDates(r.new_dates)
-      const canAct    = r.status === 'pending' || r.status === 'captain_approved'
+      const canAct    = r.status === 'pending' || r.status === 'captain_approved' || r.status === 'dc_approved'
 
       return `
-        <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm" data-request-id="${r.id}">
           <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
             <div>
               <div class="font-bold text-gray-800">${esc(r.ff_name)}</div>
@@ -414,6 +445,8 @@
           <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
           ${r.staffing_impact ? `<div class="text-sm text-red-600 font-semibold mb-1">⚠ Staffing Impact: ${esc(r.impact_explanation)}</div>` : ''}
           ${r.captain_name ? `<div class="text-xs text-gray-400 mb-1">Captain approved by ${esc(r.captain_name)} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</div>` : ''}
+          ${r.dc_name && r.dc_action === 'approved' ? `<div class="text-xs text-gray-400 mb-1">DC approved by ${esc(r.dc_name)} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</div>` : ''}
+          ${r.chief_name && r.chief_action === 'approved' ? `<div class="text-xs text-gray-400 mb-1">Chief approved by ${esc(r.chief_name)} ${r.chief_action_date ? '· ' + fmtDate(r.chief_action_date) : ''}</div>` : ''}
           ${r.denial_reason ? `<div class="text-xs text-red-500 mb-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</div>` : ''}
           ${canAct ? `
           <div class="flex gap-2 mt-3">
@@ -434,21 +467,35 @@
       currentRequestId  = reqId
       currentActionType = 'approve'
 
-      const isPending = currentStatus === 'pending'
-      document.getElementById('actionModalTitle').textContent = isPending ? 'Captain Approval' : 'DC Approval'
+      const isPending   = currentStatus === 'pending'
+      const isCaptainAp = currentStatus === 'captain_approved'
+      const isDCAp      = currentStatus === 'dc_approved'
 
-      const ackHtml = isPending ? `
-        <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-4">
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" id="overtimeAck" class="mt-0.5 accent-red-700" style="min-height:0;width:18px;height:18px;">
-            <span class="text-sm text-amber-900 font-semibold leading-snug">
-              I have verified this vacation change will not cause overtime, or have confirmed overtime is authorized.
-            </span>
-          </label>
-        </div>` : `
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-800">
-          This request has been approved by the Captain. As DC, your approval completes the process and notifies the firefighter.
-        </div>`
+      document.getElementById('actionModalTitle').textContent =
+        isPending ? 'Captain Approval' : isCaptainAp ? 'DC Approval' : 'Chief Approval'
+
+      let ackHtml
+      if (isPending) {
+        ackHtml = `
+          <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-4">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" id="overtimeAck" class="mt-0.5 accent-red-700" style="min-height:0;width:18px;height:18px;">
+              <span class="text-sm text-amber-900 font-semibold leading-snug">
+                I have verified this vacation change will not cause overtime, or have confirmed overtime is authorized.
+              </span>
+            </label>
+          </div>`
+      } else if (isCaptainAp) {
+        ackHtml = `
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-800">
+            This request has been approved by the Captain. As DC, your approval sends it to the Chief for final review.
+          </div>`
+      } else {
+        ackHtml = `
+          <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-4 text-sm text-purple-800">
+            This request has been approved by the Captain and DC. As Chief, your approval is final and will notify the firefighter.
+          </div>`
+      }
 
       document.getElementById('actionModalBody').innerHTML = ackHtml
       const confirmBtn = document.getElementById('actionModalConfirm')
@@ -517,6 +564,13 @@
     }
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
+    function showInfo(msg) {
+      const b = document.getElementById('infoBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 8000)
+    }
+
     function showResult(el, msg, color) {
       el.textContent = msg
       el.className = 'text-sm font-semibold text-center mt-3 ' + (color === 'green' ? 'text-green-600' : color === 'red' ? 'text-red-600' : color === 'orange' ? 'text-orange-600' : 'text-gray-500')
@@ -526,6 +580,7 @@
       const map = {
         pending:          ['Pending — Awaiting Captain', 'status-pending'],
         captain_approved: ['Captain Approved — Awaiting DC', 'status-captain_approved'],
+        dc_approved:      ['DC Approved — Awaiting Chief', 'status-dc_approved'],
         approved:         ['Fully Approved', 'status-approved'],
         denied:           ['Denied', 'status-denied']
       }

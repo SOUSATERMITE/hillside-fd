@@ -12,13 +12,22 @@ function makeTransport() {
 }
 
 async function sendEmail({ to, subject, html, text }) {
-  if (!process.env.ZOHO_SMTP_USER || !process.env.ZOHO_SMTP_PASS) return
+  if (!process.env.ZOHO_SMTP_USER || !process.env.ZOHO_SMTP_PASS) {
+    console.log(`[SMTP] SKIP — not configured | to: ${to}`)
+    return { ok: false, error: 'SMTP not configured' }
+  }
+  console.log(`[SMTP] Attempting → to: ${to} | subject: ${subject}`)
   try {
-    await makeTransport().sendMail({
+    const result = await makeTransport().sendMail({
       from: '"Hillside Fire Department" <sousa@sousapest.com>',
       to, subject, html, text
     })
-  } catch (e) { console.error('Email error:', e.message) }
+    console.log(`[SMTP] OK → to: ${to} | messageId: ${result.messageId}`)
+    return { ok: true, messageId: result.messageId }
+  } catch (e) {
+    console.error(`[SMTP] FAILED → to: ${to} | error: ${e.message}`)
+    return { ok: false, error: e.message }
+  }
 }
 
 function formatDates(arr) {
@@ -56,7 +65,6 @@ exports.handler = async (event) => {
 
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
-    // Load the FF
     const { data: ff, error: ffErr } = await supabase
       .from('firefighters')
       .select('id, name, rank, group_number, email')
@@ -65,7 +73,6 @@ exports.handler = async (event) => {
       .single()
     if (ffErr || !ff) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Firefighter not found' }) }
 
-    // Insert request
     const { data: req, error: insertErr } = await supabase
       .from('vacation_requests')
       .insert({
@@ -74,8 +81,8 @@ exports.handler = async (event) => {
         ff_email: ff.email || '',
         ff_group: ff.group_number,
         request_date: new Date().toISOString().slice(0, 10),
-        cancelled_dates: cancelled_dates,
-        new_dates: new_dates,
+        cancelled_dates,
+        new_dates,
         staffing_impact: !!staffing_impact,
         impact_explanation: impact_explanation?.trim() || null,
         ff_signature: sanitize(ff_signature),
@@ -85,7 +92,6 @@ exports.handler = async (event) => {
       .single()
     if (insertErr) throw insertErr
 
-    // Find captains on this tour to notify
     const { data: captains } = await supabase
       .from('firefighters')
       .select('id, name, email')
@@ -95,7 +101,9 @@ exports.handler = async (event) => {
 
     const cancelledStr = formatDates(cancelled_dates)
     const newStr       = formatDates(new_dates)
-    const impactLine   = staffing_impact
+    const reviewUrl    = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
+
+    const impactLine = staffing_impact
       ? `<tr><td style="padding:8px 12px;font-weight:600;color:#b91c1c;">Staffing Impact</td><td style="padding:8px 12px;color:#b91c1c;font-weight:600;">YES — ${sanitize(impact_explanation)}</td></tr>`
       : `<tr><td style="padding:8px 12px;font-weight:600;">Staffing Impact</td><td style="padding:8px 12px;">No</td></tr>`
 
@@ -114,29 +122,47 @@ exports.handler = async (event) => {
       ${impactLine}
       <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Signature</td><td style="padding:8px 12px;">${sanitize(ff_signature)}</td></tr>
     </table>
-    <p style="margin:0 0 16px;">Log in to the Hillside FD app to approve or deny this request:</p>
-    <a href="https://hillside-fd.netlify.app/vacation"
-       style="display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">
+    <p style="margin:0 0 16px;">Click below to log in and review this request directly:</p>
+    <a href="${reviewUrl}" style="display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">
       Review Request →
     </a>
     <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Request ID: ${req.id}</p>
   </div>
 </div>`
 
+    let captainsNotified = 0
     for (const cap of (captains || [])) {
       if (cap.email) {
         await sendEmail({
           to: cap.email,
           subject: `Action Required — Vacation Change Request from ${ff.name}`,
           html: captainEmailHtml,
-          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}).\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nReview at: https://hillside-fd.netlify.app/vacation`
+          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}).\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nReview at: ${reviewUrl}`
+        })
+        captainsNotified++
+      } else {
+        console.warn(`[submit-vacation] Captain ${cap.name} has no email — sending fallback alert`)
+        await sendEmail({
+          to: 'fsousa@hillsidefire.org, sousa@sousapest.com',
+          subject: `ALERT — Captain ${cap.name} has no email: vacation request from ${ff.name} not delivered`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;">
+            <div style="background:#dc2626;padding:16px 24px;border-radius:10px 10px 0 0;"><h2 style="color:#fff;margin:0;">⚠ Missing Email Alert</h2></div>
+            <div style="background:#fff;padding:20px 24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+              <p><strong>Captain ${cap.name}</strong> (Group ${ff.group_number}) has no email address on file and was not notified of a vacation change request.</p>
+              <p><strong>Submitted by:</strong> ${ff.name}<br><strong>Cancelled:</strong> ${cancelledStr}<br><strong>New Dates:</strong> ${newStr}</p>
+              <p>Please update ${cap.name}'s email in the Admin panel and manually notify them.</p>
+              <a href="${reviewUrl}" style="display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;">View Request →</a>
+            </div>
+          </div>`,
+          text: `ALERT: Captain ${cap.name} has no email. FF ${ff.name} submitted a vacation request that was not delivered. Review: ${reviewUrl}`
         })
       }
     }
 
+    console.log(`[submit-vacation] Request ${req.id} created. Captains in group: ${(captains || []).length}. Notified: ${captainsNotified}`)
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
   } catch (e) {
-    console.error(e)
+    console.error('[submit-vacation] Error:', e)
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
   }
 }

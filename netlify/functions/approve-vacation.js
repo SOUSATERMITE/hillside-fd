@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 const { allowOrigin } = require('./_cors')
-const { verifySession, checkAdmin } = require('./_auth')
+const { verifySession } = require('./_auth')
 
 function sanitize(v) { return (v || '').replace(/[\r\n\t]/g, ' ').trim() }
 
@@ -13,13 +13,22 @@ function makeTransport() {
 }
 
 async function sendEmail({ to, subject, html, text }) {
-  if (!process.env.ZOHO_SMTP_USER || !process.env.ZOHO_SMTP_PASS) return
+  if (!process.env.ZOHO_SMTP_USER || !process.env.ZOHO_SMTP_PASS) {
+    console.log(`[SMTP] SKIP — not configured | to: ${to}`)
+    return { ok: false, error: 'SMTP not configured' }
+  }
+  console.log(`[SMTP] Attempting → to: ${to} | subject: ${subject}`)
   try {
-    await makeTransport().sendMail({
+    const result = await makeTransport().sendMail({
       from: '"Hillside Fire Department" <sousa@sousapest.com>',
       to, subject, html, text
     })
-  } catch (e) { console.error('Email error:', e.message) }
+    console.log(`[SMTP] OK → to: ${to} | messageId: ${result.messageId}`)
+    return { ok: true, messageId: result.messageId }
+  } catch (e) {
+    console.error(`[SMTP] FAILED → to: ${to} | error: ${e.message}`)
+    return { ok: false, error: e.message }
+  }
 }
 
 function formatDates(arr) {
@@ -27,7 +36,15 @@ function formatDates(arr) {
   return arr.map(d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })).join(', ')
 }
 
-function baseEmail(title, accentColor, rows, bodyHtml, reqId) {
+function row(label, value, shade) {
+  const bg = shade ? 'background:#f3f4f6;' : ''
+  return `<tr style="${bg}"><td style="padding:8px 12px;font-weight:600;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`
+}
+
+function buildEmail(title, accentColor, rows, bodyHtml, reqId, reviewUrl) {
+  const btnHtml = reviewUrl
+    ? `<p style="margin:16px 0 0;"><a href="${reviewUrl}" style="display:inline-block;background:${accentColor};color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">Review Request →</a></p>`
+    : ''
   return `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
   <div style="background:${accentColor};padding:20px 28px;border-radius:10px 10px 0 0;">
@@ -38,14 +55,35 @@ function baseEmail(title, accentColor, rows, bodyHtml, reqId) {
       ${rows}
     </table>
     ${bodyHtml}
+    ${btnHtml}
     <p style="margin:20px 0 0;font-size:12px;color:#9ca3af;">Request ID: ${reqId}</p>
   </div>
 </div>`
 }
 
-function row(label, value, shade) {
-  const bg = shade ? 'background:#f3f4f6;' : ''
-  return `<tr style="${bg}"><td style="padding:8px 12px;font-weight:600;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`
+async function sendDenialEmail(vacReq, deniedByName, reason, cancelledStr, newStr, reqId) {
+  const rows = [
+    row('Cancelled Dates', cancelledStr),
+    row('New Dates', newStr, true),
+    row('Denied By', deniedByName),
+    row('Reason', sanitize(reason), true)
+  ].join('')
+
+  const html = buildEmail(
+    'Denied — Your Vacation Change Request',
+    '#6b7280', rows,
+    '<p>Your vacation change request has been denied. Contact your officer with any questions.</p>',
+    reqId, null
+  )
+
+  if (vacReq.ff_email) {
+    await sendEmail({
+      to: vacReq.ff_email,
+      subject: 'Denied — Your Vacation Change Request',
+      html,
+      text: `Your vacation change request has been denied by ${deniedByName}. Reason: ${sanitize(reason)}`
+    })
+  }
 }
 
 exports.handler = async (event) => {
@@ -71,7 +109,6 @@ exports.handler = async (event) => {
 
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
-    // Load the request
     const { data: vacReq, error: reqErr } = await supabase
       .from('vacation_requests')
       .select('*')
@@ -79,7 +116,6 @@ exports.handler = async (event) => {
       .single()
     if (reqErr || !vacReq) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Request not found' }) }
 
-    // Look up officer's FF record to determine rank
     const { data: officerFF } = await supabase
       .from('firefighters')
       .select('rank, group_number')
@@ -90,13 +126,17 @@ exports.handler = async (event) => {
     const isAdmin   = officer.role === 'admin'
     const rank      = officerFF?.rank || ''
     const isCaptain = rank === 'Captain' || isAdmin
-    const isDC      = rank === 'DC' || isAdmin
+    const isDC      = rank === 'DC'      || isAdmin
+    const isChief   = rank === 'Chief'   || isAdmin
 
-    const now = new Date().toISOString()
+    const now          = new Date().toISOString()
     const cancelledStr = formatDates(vacReq.cancelled_dates)
     const newStr       = formatDates(vacReq.new_dates)
+    const reviewUrl    = `https://hillside-fd.netlify.app/vacation?request=${request_id}`
 
-    // ── CAPTAIN LEVEL ────────────────────────────────────────────────────────
+    console.log(`[approve-vacation] officer: ${officer.display_name} (${rank}) | action: ${action} | status: ${vacReq.status} | request: ${request_id}`)
+
+    // ── CAPTAIN LEVEL ────────────────────────────────────────────────────────────
     if (vacReq.status === 'pending') {
       if (!isCaptain) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Captain login required to act on pending requests' }) }
       if (action === 'approve' && !captain_overtime_acknowledged) {
@@ -111,7 +151,6 @@ exports.handler = async (event) => {
           captain_action_date: now
         }).eq('id', request_id)
 
-        // Email DC(s) of this tour
         const { data: dcs } = await supabase
           .from('firefighters')
           .select('name, email')
@@ -129,12 +168,11 @@ exports.handler = async (event) => {
           row('Overtime Acknowledged', 'Yes — Captain confirmed no overtime or overtime is authorized')
         ].join('')
 
-        const html = baseEmail(
+        const html = buildEmail(
           `Action Required — ${vacReq.ff_name} Vacation Change — Captain Approved`,
           '#1d4ed8', rows,
-          `<p>This request has been approved by Captain ${officer.display_name} and now requires your review.</p>
-           <a href="https://hillside-fd.netlify.app/vacation" style="display:inline-block;background:#1d4ed8;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">Review Request →</a>`,
-          request_id
+          `<p>This request has been approved by Captain ${officer.display_name} and now requires your review as DC.</p>`,
+          request_id, reviewUrl
         )
 
         for (const dc of (dcs || [])) {
@@ -143,69 +181,43 @@ exports.handler = async (event) => {
               to: dc.email,
               subject: `Action Required — ${vacReq.ff_name} Vacation Change — Captain Approved, Awaiting DC Review`,
               html,
-              text: `Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) approved by Captain ${officer.display_name}. Cancelled: ${cancelledStr}. New: ${newStr}. Review at: https://hillside-fd.netlify.app/vacation`
+              text: `Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) approved by Captain ${officer.display_name}. Cancelled: ${cancelledStr}. New: ${newStr}. Review at: ${reviewUrl}`
             })
+          } else {
+            console.warn(`[approve-vacation] DC ${dc.name} has no email`)
           }
         }
 
       } else {
-        // Captain denies
         await supabase.from('vacation_requests').update({
           status: 'denied',
           denial_reason: sanitize(denial_reason),
           denied_by_name: officer.display_name,
           captain_action_date: now
         }).eq('id', request_id)
-
         await sendDenialEmail(vacReq, officer.display_name, denial_reason, cancelledStr, newStr, request_id)
       }
     }
 
-    // ── DC LEVEL ─────────────────────────────────────────────────────────────
+    // ── DC LEVEL ─────────────────────────────────────────────────────────────────
     else if (vacReq.status === 'captain_approved') {
       if (!isDC) return { statusCode: 403, headers, body: JSON.stringify({ error: 'DC login required to act on captain-approved requests' }) }
 
       if (action === 'approve') {
         await supabase.from('vacation_requests').update({
-          status: 'approved',
+          status: 'dc_approved',
           dc_name: officer.display_name,
           dc_action: 'approved',
           dc_action_date: now
         }).eq('id', request_id)
 
-        // Email FF
-        const rows = [
-          row('Request', `Vacation change for ${vacReq.ff_name}`),
-          row('Cancelled Dates', cancelledStr, true),
-          row('New Dates', newStr),
-          row('Captain Approved By', vacReq.captain_name, true),
-          row('DC Approved By', officer.display_name)
-        ].join('')
-
-        const html = baseEmail(
-          'Approved — Your Vacation Change Request',
-          '#15803d', rows,
-          `<p style="color:#15803d;font-weight:600;">Your vacation change request has been fully approved.</p>`,
-          request_id
-        )
-
-        if (vacReq.ff_email) {
-          await sendEmail({
-            to: vacReq.ff_email,
-            subject: 'Approved — Your Vacation Change Request',
-            html,
-            text: `Your vacation change request has been approved. Cancelled: ${cancelledStr}. New Dates: ${newStr}. Approved by DC ${officer.display_name}.`
-          })
-        }
-
-        // FYI email to Chief(s)
         const { data: chiefs } = await supabase
           .from('firefighters')
           .select('name, email')
           .eq('rank', 'Chief')
           .eq('active', true)
 
-        const chiefRows = [
+        const rows = [
           row('Firefighter', vacReq.ff_name),
           row('Group', `Group ${vacReq.ff_group}`, true),
           row('Cancelled Dates', cancelledStr),
@@ -214,26 +226,27 @@ exports.handler = async (event) => {
           row('DC Approved By', officer.display_name, true)
         ].join('')
 
-        const chiefHtml = baseEmail(
-          `FYI — Vacation Change Approved: ${vacReq.ff_name}`,
-          '#6b7280', chiefRows,
-          `<p style="color:#6b7280;">This vacation change request has been fully approved. No action required from you.</p>`,
-          request_id
+        const html = buildEmail(
+          `Action Required — ${vacReq.ff_name} Vacation Change — Awaiting Chief Approval`,
+          '#7c3aed', rows,
+          `<p>This request has been approved by the Captain and DC. Your approval as Chief is the final step.</p>`,
+          request_id, reviewUrl
         )
 
         for (const chief of (chiefs || [])) {
           if (chief.email) {
             await sendEmail({
               to: chief.email,
-              subject: `FYI — Vacation Change Approved: ${vacReq.ff_name}`,
-              html: chiefHtml,
-              text: `FYI: Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) has been fully approved. Cancelled: ${cancelledStr}. New: ${newStr}. Captain: ${vacReq.captain_name}. DC: ${officer.display_name}. No action required.`
+              subject: `Action Required — ${vacReq.ff_name} Vacation Change — Awaiting Chief Approval`,
+              html,
+              text: `Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) approved by Captain ${vacReq.captain_name} and DC ${officer.display_name}. Your final approval is needed. Review at: ${reviewUrl}`
             })
+          } else {
+            console.warn(`[approve-vacation] Chief ${chief.name} has no email`)
           }
         }
 
       } else {
-        // DC denies
         await supabase.from('vacation_requests').update({
           status: 'denied',
           denial_reason: sanitize(denial_reason),
@@ -242,41 +255,140 @@ exports.handler = async (event) => {
           dc_action: 'denied',
           dc_action_date: now
         }).eq('id', request_id)
-
         await sendDenialEmail(vacReq, officer.display_name, denial_reason, cancelledStr, newStr, request_id)
+      }
+    }
+
+    // ── CHIEF LEVEL ──────────────────────────────────────────────────────────────
+    else if (vacReq.status === 'dc_approved') {
+      if (!isChief) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Chief login required to act on DC-approved requests' }) }
+
+      if (action === 'approve') {
+        await supabase.from('vacation_requests').update({
+          status: 'approved',
+          chief_name: officer.display_name,
+          chief_action: 'approved',
+          chief_action_date: now
+        }).eq('id', request_id)
+
+        // Email FF — final approval
+        const ffRows = [
+          row('Request', `Vacation change for ${vacReq.ff_name}`),
+          row('Cancelled Dates', cancelledStr, true),
+          row('New Dates', newStr),
+          row('Captain Approved By', vacReq.captain_name, true),
+          row('DC Approved By', vacReq.dc_name),
+          row('Chief Approved By', officer.display_name, true)
+        ].join('')
+
+        const ffHtml = buildEmail(
+          'Fully Approved — Your Vacation Change Request',
+          '#15803d', ffRows,
+          '<p style="color:#15803d;font-weight:600;">Your vacation change request has been fully approved by your Captain, DC, and Chief.</p>',
+          request_id, null
+        )
+
+        if (vacReq.ff_email) {
+          await sendEmail({
+            to: vacReq.ff_email,
+            subject: 'Approved — Your Vacation Change Request',
+            html: ffHtml,
+            text: `Your vacation change request has been fully approved. Cancelled: ${cancelledStr}. New Dates: ${newStr}. Approved by Captain ${vacReq.captain_name}, DC ${vacReq.dc_name}, and Chief ${officer.display_name}.`
+          })
+        }
+
+        // FYI to all tour officers (Captains + DC)
+        const { data: tourOfficers } = await supabase
+          .from('firefighters')
+          .select('name, email')
+          .eq('group_number', vacReq.ff_group)
+          .in('rank', ['Captain', 'DC'])
+          .eq('active', true)
+
+        const fiyRows = [
+          row('Firefighter', vacReq.ff_name),
+          row('Group', `Group ${vacReq.ff_group}`, true),
+          row('Cancelled Dates', cancelledStr),
+          row('New Dates', newStr, true),
+          row('Captain Approved By', vacReq.captain_name),
+          row('DC Approved By', vacReq.dc_name, true),
+          row('Chief Approved By', officer.display_name)
+        ].join('')
+
+        const fiyHtml = buildEmail(
+          `FYI — Vacation Change Fully Approved: ${vacReq.ff_name}`,
+          '#6b7280', fiyRows,
+          '<p style="color:#6b7280;">This vacation change has been fully approved. No action required.</p>',
+          request_id, null
+        )
+
+        for (const o of (tourOfficers || [])) {
+          if (o.email) {
+            await sendEmail({
+              to: o.email,
+              subject: `FYI — ${vacReq.ff_name} Vacation Change Approved`,
+              html: fiyHtml,
+              text: `FYI: Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) fully approved. Cancelled: ${cancelledStr}. New: ${newStr}. No action required.`
+            })
+          }
+        }
+
+      } else {
+        // Chief denies
+        await supabase.from('vacation_requests').update({
+          status: 'denied',
+          denial_reason: sanitize(denial_reason),
+          denied_by_name: officer.display_name,
+          chief_name: officer.display_name,
+          chief_action: 'denied',
+          chief_action_date: now
+        }).eq('id', request_id)
+
+        // Email FF
+        await sendDenialEmail(vacReq, officer.display_name, denial_reason, cancelledStr, newStr, request_id)
+
+        // Email DC — inform their approval was overridden
+        const { data: dcs } = await supabase
+          .from('firefighters')
+          .select('name, email')
+          .eq('group_number', vacReq.ff_group)
+          .eq('rank', 'DC')
+          .eq('active', true)
+
+        const dcRows = [
+          row('Firefighter', vacReq.ff_name),
+          row('Cancelled Dates', cancelledStr, true),
+          row('New Dates', newStr),
+          row('Denied By', officer.display_name, true),
+          row('Reason', sanitize(denial_reason))
+        ].join('')
+
+        const dcHtml = buildEmail(
+          `Denied by Chief — ${vacReq.ff_name} Vacation Change`,
+          '#6b7280', dcRows,
+          `<p>This vacation change was denied by Chief ${officer.display_name} after your DC approval.</p>`,
+          request_id, null
+        )
+
+        for (const dc of (dcs || [])) {
+          if (dc.email) {
+            await sendEmail({
+              to: dc.email,
+              subject: `FYI — ${vacReq.ff_name} Vacation Change Denied by Chief`,
+              html: dcHtml,
+              text: `FYI: Vacation change for ${vacReq.ff_name} denied by Chief ${officer.display_name}. Reason: ${sanitize(denial_reason)}`
+            })
+          }
+        }
       }
     } else {
       return { statusCode: 400, headers, body: JSON.stringify({ error: `Cannot act on a request with status: ${vacReq.status}` }) }
     }
 
+    console.log(`[approve-vacation] Complete. officer: ${officer.display_name} | action: ${action} | request: ${request_id}`)
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
   } catch (e) {
-    console.error(e)
+    console.error('[approve-vacation] Error:', e)
     return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
-  }
-}
-
-async function sendDenialEmail(vacReq, deniedByName, reason, cancelledStr, newStr, reqId) {
-  const rows = [
-    row('Cancelled Dates', cancelledStr),
-    row('New Dates', newStr, true),
-    row('Denied By', deniedByName),
-    row('Reason', sanitize(reason), true)
-  ].join('')
-
-  const html = baseEmail(
-    'Denied — Your Vacation Change Request',
-    '#6b7280', rows,
-    `<p>Your vacation change request has been denied. Contact your officer with any questions.</p>`,
-    reqId
-  )
-
-  if (vacReq.ff_email) {
-    await sendEmail({
-      to: vacReq.ff_email,
-      subject: 'Denied — Your Vacation Change Request',
-      html,
-      text: `Your vacation change request has been denied by ${deniedByName}. Reason: ${sanitize(reason)}`
-    })
   }
 }
