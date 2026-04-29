@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Policy Search — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button, input { min-height: 44px; }
+    mark { background: #fef08a; color: inherit; border-radius: 2px; padding: 0 1px; }
+    .cat-btn { transition: all .15s; }
+    .cat-btn.active { background: #b91c1c; color: white; border-color: #b91c1c; }
+    .result-card:hover { border-color: #fca5a5; }
+    #recentDropdown { max-height: 220px; overflow-y: auto; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="authModal"></div>
+
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="/sick"   class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/docs"   class="hover:text-red-200 pb-1">Docs</a>
+      <a href="/search" class="nav-active pb-1">Search</a>
+      <a href="/admin"  class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
+    </div>
+  </nav>
+
+  <div class="max-w-3xl mx-auto px-4 py-6">
+
+    <h1 class="text-2xl font-extrabold text-gray-800 mb-1">Policy Search</h1>
+    <p class="text-sm text-gray-500 mb-5">Search titles, descriptions, and full document text.</p>
+
+    <!-- Search bar -->
+    <div class="relative mb-3">
+      <div class="flex gap-2">
+        <div class="relative flex-1">
+          <input id="searchInput" type="search" placeholder="Search policies... (e.g. sick leave, recall, overtime)"
+            autocomplete="off"
+            oninput="onSearchInput()"
+            onfocus="showRecent()"
+            onkeydown="handleKey(event)"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white shadow-sm"
+            style="min-height:48px;">
+          <button id="clearBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none" style="min-height:0;">✕</button>
+        </div>
+        <button onclick="runSearch()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-5 transition" style="min-height:48px;">
+          Search
+        </button>
+      </div>
+
+      <!-- Recent searches dropdown -->
+      <div id="recentDropdown" class="hidden absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden" style="max-width: calc(100% - 90px);">
+        <div class="px-3 py-2 text-xs text-gray-400 font-semibold uppercase tracking-wide border-b border-gray-100 flex items-center justify-between">
+          <span>Recent searches</span>
+          <button onclick="clearRecent()" class="text-red-500 hover:text-red-700 font-bold normal-case" style="min-height:0;">Clear</button>
+        </div>
+        <div id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- Category filter -->
+    <div class="flex flex-wrap gap-2 mb-6">
+      <button onclick="setCategory('')" data-cat="" class="cat-btn active text-xs font-bold px-3 py-1.5 rounded-full border border-red-700 bg-red-700 text-white">All</button>
+      <button onclick="setCategory('Labor Contract')" data-cat="Labor Contract" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">Labor Contract</button>
+      <button onclick="setCategory('SOPs')" data-cat="SOPs" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">SOPs</button>
+      <button onclick="setCategory('Recall Policy')" data-cat="Recall Policy" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">Recall Policy</button>
+      <button onclick="setCategory('Memos')" data-cat="Memos" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">Memos</button>
+      <button onclick="setCategory('Rules & Regs')" data-cat="Rules &amp; Regs" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">Rules &amp; Regs</button>
+      <button onclick="setCategory('Other')" data-cat="Other" class="cat-btn text-xs font-bold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600">Other</button>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="text-gray-400 text-sm text-center py-12">Loading documents...</div>
+    </div>
+
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const API = '/.netlify/functions'
+    const RECENT_KEY = 'hfd_recent_searches'
+    const CATEGORY_COLORS = {
+      'Memos':          'bg-amber-100 text-amber-800',
+      'Labor Contract': 'bg-blue-100 text-blue-800',
+      'SOPs':           'bg-green-100 text-green-800',
+      'Recall Policy':  'bg-purple-100 text-purple-800',
+      'Rules & Regs':   'bg-red-100 text-red-800',
+      'Other':          'bg-gray-100 text-gray-600'
+    }
+
+    let allDocs = []       // full dataset fetched once
+    let currentCategory = ''
+    let currentSearch = ''
+    let searchTimeout = null
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    async function loadDocs() {
+      try {
+        const res = await fetch(`${API}/get-documents`)
+        if (!res.ok) throw new Error('Failed to load documents')
+        allDocs = await res.json()
+        applyFilters()
+      } catch (e) {
+        document.getElementById('results').innerHTML =
+          `<div class="text-red-500 text-sm text-center py-12">${escHtml(e.message)}</div>`
+      }
+    }
+
+    // ── Filtering / search ────────────────────────────────────────────────────
+    function applyFilters() {
+      let docs = allDocs
+
+      if (currentCategory) docs = docs.filter(d => d.category === currentCategory)
+
+      const q = currentSearch.trim().toLowerCase()
+      if (q) {
+        docs = docs.filter(d =>
+          d.title.toLowerCase().includes(q) ||
+          (d.description || '').toLowerCase().includes(q) ||
+          (d.content_text || '').toLowerCase().includes(q)
+        )
+      }
+
+      render(docs, q)
+    }
+
+    function onSearchInput() {
+      const val = document.getElementById('searchInput').value
+      document.getElementById('clearBtn').classList.toggle('hidden', !val)
+      clearTimeout(searchTimeout)
+      searchTimeout = setTimeout(() => {
+        currentSearch = val
+        applyFilters()
+      }, 250)
+    }
+
+    function runSearch() {
+      const val = document.getElementById('searchInput').value.trim()
+      if (val) saveRecent(val)
+      currentSearch = val
+      hideRecent()
+      applyFilters()
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter') { runSearch(); document.getElementById('searchInput').blur() }
+      if (e.key === 'Escape') { hideRecent(); document.getElementById('searchInput').blur() }
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = ''
+      document.getElementById('clearBtn').classList.add('hidden')
+      currentSearch = ''
+      applyFilters()
+    }
+
+    function setCategory(cat) {
+      currentCategory = cat
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        const active = btn.dataset.cat === cat
+        btn.classList.toggle('active', active)
+        btn.classList.toggle('bg-red-700', active)
+        btn.classList.toggle('text-white', active)
+        btn.classList.toggle('border-red-700', active)
+        btn.classList.toggle('bg-white', !active)
+        btn.classList.toggle('text-gray-600', !active)
+        btn.classList.toggle('border-gray-300', !active)
+      })
+      applyFilters()
+    }
+
+    // ── Rendering ─────────────────────────────────────────────────────────────
+    function render(docs, q) {
+      const container = document.getElementById('results')
+
+      if (docs.length === 0) {
+        const msg = q
+          ? `No documents found for "<strong>${escHtml(q)}</strong>" — contact your officer.`
+          : 'No documents in this category yet.'
+        container.innerHTML = `<div class="text-gray-500 text-sm text-center py-12 bg-white rounded-2xl border border-gray-200">${msg}</div>`
+        return
+      }
+
+      const label = q
+        ? `<p class="text-xs text-gray-400 mb-3">${docs.length} result${docs.length !== 1 ? 's' : ''} for "<strong>${escHtml(q)}</strong>"</p>`
+        : `<p class="text-xs text-gray-400 mb-3">Showing ${docs.length} document${docs.length !== 1 ? 's' : ''}</p>`
+
+      const cards = docs.map(d => renderCard(d, q)).join('')
+      container.innerHTML = label + cards
+    }
+
+    function renderCard(d, q) {
+      const catColor = CATEGORY_COLORS[d.category] || 'bg-gray-100 text-gray-600'
+      const ext = (d.file_name || '').split('.').pop().toUpperCase()
+      const excerpt = q ? getExcerpt(d, q) : ''
+
+      return `
+        <a href="${escHtml(d.download_url)}" target="_blank" rel="noopener"
+          class="result-card block bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm hover:shadow-md transition cursor-pointer">
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <div class="font-bold text-gray-800 text-base leading-tight flex-1">${highlight(d.title, q)}</div>
+            <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${catColor}">${escHtml(d.category)}</span>
+          </div>
+          ${d.description ? `<div class="text-sm text-gray-500 mb-1">${highlight(d.description, q)}</div>` : ''}
+          ${excerpt ? `<div class="text-xs text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mt-2 leading-relaxed">${excerpt}</div>` : ''}
+          <div class="flex items-center gap-2 mt-2 text-xs text-gray-400">
+            <span class="font-semibold text-red-700">↓ ${ext}</span>
+            <span>·</span>
+            <span>${escHtml(d.file_name)}</span>
+            ${d.file_size ? `<span>·</span><span>${formatSize(d.file_size)}</span>` : ''}
+          </div>
+        </a>`
+    }
+
+    function getExcerpt(doc, q) {
+      if (!q) return ''
+      const text = doc.content_text || doc.description || ''
+      if (!text) return ''
+      const lower = text.toLowerCase()
+      const idx = lower.indexOf(q.toLowerCase())
+      if (idx === -1) return ''
+      const start = Math.max(0, idx - 120)
+      const end   = Math.min(text.length, idx + q.length + 120)
+      const slice = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '')
+      return highlight(escHtml(slice.trim()), q)
+    }
+
+    function highlight(text, q) {
+      if (!q || !text) return text
+      // text may already be html-escaped, so escape q for regex but match the escaped form
+      const escaped = escHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      try {
+        return text.replace(new RegExp(escaped, 'gi'), m => `<mark>${m}</mark>`)
+      } catch { return text }
+    }
+
+    // ── Recent searches ───────────────────────────────────────────────────────
+    function getRecent() {
+      try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
+    }
+
+    function saveRecent(term) {
+      if (!term) return
+      let list = getRecent().filter(t => t.toLowerCase() !== term.toLowerCase())
+      list.unshift(term)
+      list = list.slice(0, 8)
+      localStorage.setItem(RECENT_KEY, JSON.stringify(list))
+    }
+
+    function clearRecent() {
+      localStorage.removeItem(RECENT_KEY)
+      hideRecent()
+    }
+
+    function showRecent() {
+      const list = getRecent()
+      if (!list.length) return
+      const el = document.getElementById('recentList')
+      el.innerHTML = list.map(t => `
+        <button onclick="pickRecent(${JSON.stringify(escHtml(t))})"
+          class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+          <span class="text-gray-400 text-xs">🕐</span>${escHtml(t)}
+        </button>`).join('')
+      document.getElementById('recentDropdown').classList.remove('hidden')
+    }
+
+    function hideRecent() {
+      document.getElementById('recentDropdown').classList.add('hidden')
+    }
+
+    function pickRecent(term) {
+      document.getElementById('searchInput').value = term
+      document.getElementById('clearBtn').classList.remove('hidden')
+      currentSearch = term
+      hideRecent()
+      applyFilters()
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#recentDropdown') && !e.target.closest('#searchInput')) hideRecent()
+    })
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return ''
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB'
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+    }
+
+    loadDocs()
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
+    }
+  </script>
+</body>
+</html>

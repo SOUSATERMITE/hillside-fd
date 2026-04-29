@@ -1,7 +1,7 @@
 {
   "name": "Hillside Fire Department",
   "short_name": "Hillside FD",
-  "description": "Sick Tracking, Recall List, Document Library, and AI Assistant",
+  "description": "Sick Tracking, Recall List, Document Library, and Policy Search",
   "start_url": "/sick",
   "scope": "/",
   "display": "standalone",
@@ -30,10 +30,10 @@
       "description": "View and upload department documents"
     },
     {
-      "name": "Ask AI",
-      "short_name": "Ask AI",
-      "url": "/chat",
-      "description": "Ask questions about FD documents"
+      "name": "Policy Search",
+      "short_name": "Search",
+      "url": "/search",
+      "description": "Search policies and documents"
     }
   ]
 }

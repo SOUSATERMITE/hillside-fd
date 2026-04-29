@@ -17,13 +17,12 @@ exports.handler = async (event) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     const params = event.queryStringParameters || {}
     const category = params.category || null
-    const search   = (params.search || '').trim().toLowerCase()
 
+    // Include content_text so /search can do client-side full-text matching
     let query = supabase
       .from('fd_documents')
-      .select('id, title, category, description, file_name, file_path, file_size, uploaded_by, created_at')
+      .select('id, title, category, description, content_text, file_name, file_path, file_size, uploaded_by, created_at')
       .eq('active', true)
-      .order('category', { ascending: true })
       .order('created_at', { ascending: false })
 
     if (category) query = query.eq('category', category)
@@ -31,19 +30,9 @@ exports.handler = async (event) => {
     const { data, error } = await query
     if (error) throw error
 
-    let docs = data || []
-
-    // Client-side search filter (simple — avoids full-text index dependency)
-    if (search) {
-      docs = docs.filter(d =>
-        d.title.toLowerCase().includes(search) ||
-        (d.description || '').toLowerCase().includes(search)
-      )
-    }
-
     // Attach public download URL
     const base = `${process.env.SUPABASE_URL}/storage/v1/object/public/fd-documents`
-    docs = docs.map(d => ({ ...d, download_url: `${base}/${d.file_path}` }))
+    const docs = (data || []).map(d => ({ ...d, download_url: `${base}/${d.file_path}` }))
 
     return { statusCode: 200, headers, body: JSON.stringify(docs) }
   } catch (e) {

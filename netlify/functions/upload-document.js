@@ -5,6 +5,17 @@ const { verifySession } = require('./_auth')
 const VALID_CATEGORIES = new Set(['Labor Contract', 'SOPs', 'Recall Policy', 'Memos', 'Rules & Regs', 'Other'])
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 
+async function extractPdfText(buffer) {
+  try {
+    const pdfParse = require('pdf-parse')
+    const result = await pdfParse(buffer)
+    return (result.text || '').trim()
+  } catch (e) {
+    console.error('pdf-parse error:', e.message)
+    return null
+  }
+}
+
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
@@ -36,14 +47,24 @@ exports.handler = async (event) => {
 
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
+    // Decode base64
+    const fileBuffer = Buffer.from(b64, 'base64')
+
+    // Auto-extract text from PDFs; fall back to manually entered content_text
+    let storedText = (content_text || '').trim() || null
+    const isPdf = (file_type === 'application/pdf') || file_name.toLowerCase().endsWith('.pdf')
+    if (isPdf) {
+      const extracted = await extractPdfText(fileBuffer)
+      if (extracted) storedText = extracted
+    }
+
     // Build a unique storage path
-    const ts    = Date.now()
-    const safe  = file_name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const ts     = Date.now()
+    const safe   = file_name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const folder = category.replace(/[^a-zA-Z0-9]/g, '_')
     const filePath = `${folder}/${ts}_${safe}`
 
-    // Decode base64 and upload to Supabase Storage
-    const fileBuffer = Buffer.from(b64, 'base64')
+    // Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from('fd-documents')
       .upload(filePath, fileBuffer, { contentType: file_type || 'application/octet-stream', upsert: false })
@@ -57,7 +78,7 @@ exports.handler = async (event) => {
         title: title.trim(),
         category,
         description: (description || '').trim() || null,
-        content_text: (content_text || '').trim() || null,
+        content_text: storedText,
         file_path: filePath,
         file_name: file_name,
         file_size: file_size || fileBuffer.length,
