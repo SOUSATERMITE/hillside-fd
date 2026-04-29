@@ -35,7 +35,7 @@
         <a href="/vacation" class="hover:text-red-200 pb-1">Vacation</a>
         <a href="/admin"    class="hover:text-red-200 pb-1">Admin</a>
       </div>
-      <span id="authSlot" class="flex items-center gap-2 text-sm"></span>
+      <span id="authSlot" class="hidden sm:flex items-center gap-2 text-sm"></span>
       <button onclick="toggleMobileMenu()" class="sm:hidden p-2 rounded hover:bg-red-700 transition" style="min-height:0;line-height:1;" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
@@ -49,6 +49,7 @@
       <a href="/search"   class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Search</a>
       <a href="/vacation" class="block py-3 text-sm text-white hover:text-red-200 border-b border-red-800">Vacation</a>
       <a href="/admin"    class="block py-3 text-sm text-white hover:text-red-200">Admin</a>
+      <div id="mobileMenuAuth"></div>
     </div>
   </div>
 

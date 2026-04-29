@@ -33,17 +33,35 @@ const AUTH = (() => {
 
   function updateNav() {
     const slot = document.getElementById('authSlot')
-    if (!slot) return
+    const mobileSlot = document.getElementById('mobileMenuAuth')
     const s = getSession()
-    if (s) {
-      slot.innerHTML = `
-        <span class="text-white text-xs font-semibold opacity-90 hidden sm:inline max-w-[140px] truncate">${s.display_name}</span>
-        <button onclick="AUTH.logout()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log Out</button>
-      `
-    } else {
-      slot.innerHTML = `
-        <button onclick="AUTH.showLoginModal()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log In</button>
-      `
+    if (slot) {
+      if (s) {
+        slot.innerHTML = `
+          <span class="text-white text-xs font-semibold opacity-90 max-w-[140px] truncate">${s.display_name}</span>
+          <button onclick="AUTH.logout()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log Out</button>
+        `
+      } else {
+        slot.innerHTML = `
+          <button onclick="AUTH.showLoginModal()" style="min-height:32px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-3 py-1 rounded-lg transition">Log In</button>
+        `
+      }
+    }
+    if (mobileSlot) {
+      if (s) {
+        mobileSlot.innerHTML = `
+          <div class="border-t border-red-800 mt-1 pt-2 pb-2 flex items-center justify-between">
+            <span class="text-xs text-red-300 font-semibold truncate max-w-[180px]">${s.display_name}</span>
+            <button onclick="AUTH.logout()" style="min-height:36px" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-xs font-bold px-4 py-1 rounded-lg transition">Log Out</button>
+          </div>
+        `
+      } else {
+        mobileSlot.innerHTML = `
+          <div class="border-t border-red-800 mt-1 pt-2 pb-2">
+            <button onclick="AUTH.showLoginModal()" style="min-height:40px" class="w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white text-sm font-bold rounded-xl py-2 transition">Log In</button>
+          </div>
+        `
+      }
     }
   }
 
