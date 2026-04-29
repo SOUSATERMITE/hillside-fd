@@ -488,6 +488,13 @@
               Deny
             </button>
           </div>` : ''}
+          ${isAdm ? `
+          <div class="mt-2">
+            <button onclick="deleteVacationRequest('${r.id}', '${esc(r.ff_name)}', this)"
+              class="text-xs text-gray-400 hover:text-red-600 font-semibold transition" style="min-height:0;">
+              Delete submission
+            </button>
+          </div>` : ''}
         </div>`
     }
 
@@ -595,6 +602,32 @@
       } catch (e) {
         alert('Network error: ' + e.message)
         confirmBtn.disabled = false
+      }
+    }
+
+    // ── DELETE SUBMISSION ────────────────────────────────────────────────────
+    async function deleteVacationRequest(id, ffName, btn) {
+      if (!confirm(`Delete the vacation request submitted by ${ffName}? This cannot be undone.`)) return
+      btn.disabled = true
+      btn.textContent = 'Deleting…'
+      try {
+        const res = await fetch('/.netlify/functions/delete-vacation-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ id })
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          alert('Error: ' + (data.error || res.status))
+          btn.disabled = false
+          btn.textContent = 'Delete submission'
+          return
+        }
+        loadOfficerRequests()
+      } catch (e) {
+        alert('Network error: ' + e.message)
+        btn.disabled = false
+        btn.textContent = 'Delete submission'
       }
     }
 
