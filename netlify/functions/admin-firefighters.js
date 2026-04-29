@@ -31,14 +31,14 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'POST') {
-      const { name, rank, group_number } = JSON.parse(event.body || '{}')
-      if (!name || !rank || !group_number) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'name, rank, and group_number are required' }) }
+      const { name, rank, group_number, email } = JSON.parse(event.body || '{}')
+      if (!name || !rank) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'name and rank are required' }) }
       }
 
       const { data: newFF, error: insertError } = await supabase
         .from('firefighters')
-        .insert({ name, rank, group_number })
+        .insert({ name, rank, group_number: group_number || null, email: email || null })
         .select()
         .single()
       if (insertError) throw insertError
@@ -64,13 +64,14 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'PUT') {
-      const { id, name, rank, group_number, active } = JSON.parse(event.body || '{}')
+      const { id, name, rank, group_number, active, email } = JSON.parse(event.body || '{}')
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id is required' }) }
       const updates = {}
       if (name !== undefined) updates.name = name
       if (rank !== undefined) updates.rank = rank
       if (group_number !== undefined) updates.group_number = group_number
       if (active !== undefined) updates.active = active
+      if (email !== undefined) updates.email = email || null
       const { data: updated, error } = await supabase.from('firefighters').update(updates).eq('id', id).select().single()
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(updated) }

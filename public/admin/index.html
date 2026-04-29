@@ -99,8 +99,10 @@
     <div id="tab-ff">
       <div class="bg-white rounded-2xl shadow p-5 mb-5">
         <h2 class="font-bold text-gray-800 text-base mb-3 uppercase tracking-wide">Add Firefighter</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <input id="addName" type="text" placeholder="Full name"
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <input id="addName" type="text" placeholder="Full name (e.g. J. Smith)"
+            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          <input id="addEmail" type="email" placeholder="Email (e.g. jsmith@hillsidefire.org)"
             class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
           <select id="addRank" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
             <option value="">Rank...</option>
@@ -109,14 +111,14 @@
             <option value="DC">DC</option>
           </select>
           <select id="addGroup" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
-            <option value="">Group...</option>
+            <option value="">Group (leave blank for non-tour)</option>
             <option value="1">Group 1</option>
             <option value="2">Group 2</option>
             <option value="3">Group 3</option>
             <option value="4">Group 4</option>
           </select>
-          <button onclick="addFirefighter()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2 transition">Add</button>
         </div>
+        <button onclick="addFirefighter()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2 transition w-full sm:w-auto">Add Firefighter</button>
         <div id="addFFResult" class="text-sm font-semibold text-center mt-2"></div>
       </div>
       <div class="bg-white rounded-2xl shadow overflow-hidden">
@@ -273,7 +275,8 @@
         if (editingFFId === f.id) {
           return `
             <tr class="bg-yellow-50">
-              <td class="px-4 py-2"><input id="edit-name-${f.id}" value="${f.name}" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px"></td>
+              <td class="px-4 py-2"><input id="edit-name-${f.id}" value="${f.name}" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px;min-width:120px"></td>
+              <td class="px-4 py-2"><input id="edit-email-${f.id}" type="email" value="${f.email||''}" placeholder="email@hillsidefire.org" class="border rounded px-2 py-1 text-sm w-full" style="min-height:36px;min-width:180px"></td>
               <td class="px-4 py-2">
                 <select id="edit-rank-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
                   <option ${f.rank==='FF'?'selected':''} value="FF">FF</option>
@@ -283,6 +286,7 @@
               </td>
               <td class="px-4 py-2">
                 <select id="edit-group-${f.id}" class="border rounded px-2 py-1 text-sm" style="min-height:36px">
+                  <option value="">—</option>
                   ${[1,2,3,4].map(g=>`<option ${f.group_number===g?'selected':''} value="${g}">${g}</option>`).join('')}
                 </select>
               </td>
@@ -296,7 +300,8 @@
         return `
           <tr class="border-t border-gray-100 hover:bg-gray-50">
             <td class="px-4 py-3 text-sm font-semibold text-gray-800">${f.name}</td>
-            <td class="px-4 py-3 text-sm text-gray-600">${f.group_number}</td>
+            <td class="px-4 py-3 text-sm text-gray-500">${f.email ? `<a href="mailto:${f.email}" class="text-blue-600 hover:underline">${f.email}</a>` : '<span class="text-red-400 text-xs">no email</span>'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">${f.group_number || '—'}</td>
             <td class="px-4 py-3 text-sm text-gray-600">${f.rank}</td>
             <td class="px-4 py-3">${f.active?'<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">Active</span>':'<span class="bg-gray-100 text-gray-500 text-xs font-bold px-2 py-0.5 rounded">Inactive</span>'}</td>
             <td class="px-4 py-3 flex gap-2 flex-wrap">
@@ -308,9 +313,10 @@
           </tr>`
       }).join('')
       container.innerHTML = `
-        <table class="w-full text-left min-w-[600px]">
+        <table class="w-full text-left min-w-[800px]">
           <thead class="bg-gray-50"><tr>
             <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Name</th>
+            <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Email</th>
             <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Group</th>
             <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Rank</th>
             <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">Status</th>
@@ -325,14 +331,16 @@
 
     async function saveEditFF(id) {
       const name  = document.getElementById(`edit-name-${id}`).value.trim()
+      const email = document.getElementById(`edit-email-${id}`).value.trim()
       const rank  = document.getElementById(`edit-rank-${id}`).value
-      const group = parseInt(document.getElementById(`edit-group-${id}`).value, 10)
-      if (!name || !rank || !group) { showError('Name, rank, and group are required.'); return }
+      const groupVal = document.getElementById(`edit-group-${id}`).value
+      const group = groupVal ? parseInt(groupVal, 10) : null
+      if (!name || !rank) { showError('Name and rank are required.'); return }
       try {
         const res = await fetch(`${API}/admin-firefighters`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ id, name, rank, group_number: group })
+          body: JSON.stringify({ id, name, rank, group_number: group, email: email || null })
         })
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
         editingFFId = null
@@ -367,11 +375,13 @@
 
     async function addFirefighter() {
       const name  = document.getElementById('addName').value.trim()
+      const email = document.getElementById('addEmail').value.trim()
       const rank  = document.getElementById('addRank').value
-      const group = parseInt(document.getElementById('addGroup').value, 10)
+      const groupVal = document.getElementById('addGroup').value
+      const group = groupVal ? parseInt(groupVal, 10) : null
       const resultEl = document.getElementById('addFFResult')
-      if (!name || !rank || !group) {
-        resultEl.textContent = 'Name, rank, and group are required.'
+      if (!name || !rank) {
+        resultEl.textContent = 'Name and rank are required.'
         resultEl.className = 'text-sm font-semibold text-center text-orange-600'
         return
       }
@@ -381,13 +391,14 @@
         const res = await fetch(`${API}/admin-firefighters`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ name, rank, group_number: group })
+          body: JSON.stringify({ name, rank, group_number: group, email: email || null })
         })
         const data = await res.json()
         if (!res.ok) { resultEl.textContent = data.error || 'Error adding.'; resultEl.className = 'text-sm font-semibold text-center text-red-600'; return }
         resultEl.textContent = `Added ${data.name} successfully.`
         resultEl.className = 'text-sm font-semibold text-center text-green-600'
         document.getElementById('addName').value = ''
+        document.getElementById('addEmail').value = ''
         document.getElementById('addRank').value = ''
         document.getElementById('addGroup').value = ''
         loadFirefighters()
