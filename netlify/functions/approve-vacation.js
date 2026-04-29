@@ -21,6 +21,7 @@ async function sendEmail({ to, subject, html, text }) {
   try {
     const result = await makeTransport().sendMail({
       from: '"Hillside Fire Department" <sousa@sousapest.com>',
+      replyTo: 'noreply@hillsidefire.org',
       to, subject, html, text
     })
     console.log(`[SMTP] OK → to: ${to} | messageId: ${result.messageId}`)

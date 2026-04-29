@@ -42,6 +42,7 @@ exports.handler = async (event) => {
       })
       const result = await transport.sendMail({
         from: `"Hillside Fire Department" <${smtpUser}>`,
+        replyTo: 'noreply@hillsidefire.org',
         to,
         subject: 'TEST — Hillside FD SMTP Connection Test',
         text: `This is a test email from hillside-fd.netlify.app to verify the Zoho SMTP connection is working.\n\nFrom address: ${smtpUser}\nTimestamp: ${timestamp}`,
