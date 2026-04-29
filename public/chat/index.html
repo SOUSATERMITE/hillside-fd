@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Ask AI — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button, input, textarea { min-height: 44px; }
+    #chatMessages { scroll-behavior: smooth; }
+    .msg-bubble { max-width: 85%; }
+    .typing-dot {
+      width: 8px; height: 8px;
+      background: #9ca3af;
+      border-radius: 50%;
+      display: inline-block;
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+    .ai-text p { margin-bottom: 0.5rem; }
+    .ai-text p:last-child { margin-bottom: 0; }
+    .ai-text strong { font-weight: 700; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+  <div id="authModal"></div>
+
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="/sick"   class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/docs"   class="hover:text-red-200 pb-1">Docs</a>
+      <a href="/chat"   class="nav-active pb-1">Ask AI</a>
+      <a href="/admin"  class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
+    </div>
+  </nav>
+
+  <!-- Chat area fills remaining screen -->
+  <div class="flex flex-col flex-1 max-w-2xl mx-auto w-full">
+
+    <!-- Header -->
+    <div class="px-4 pt-5 pb-3">
+      <h1 class="text-2xl font-extrabold text-gray-800">AI Document Assistant</h1>
+      <p class="text-sm text-gray-500 mt-1">Ask questions about Hillside FD documents. Answers are based only on uploaded documents.</p>
+    </div>
+
+    <!-- Chat messages -->
+    <div id="chatMessages" class="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-3 min-h-0" style="max-height: calc(100vh - 260px);">
+      <!-- Welcome bubble -->
+      <div class="flex items-start gap-2">
+        <div class="w-8 h-8 rounded-full bg-red-700 flex items-center justify-center shrink-0 text-white text-sm font-bold mt-0.5">AI</div>
+        <div class="msg-bubble bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+          <p class="text-sm text-gray-800">Hi! I can answer questions about Hillside FD's labor contract, SOPs, recall policy, memos, and other uploaded documents.</p>
+          <p class="text-sm text-gray-500 mt-1">What would you like to know?</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested questions -->
+    <div id="suggestions" class="px-4 pb-2">
+      <div class="flex flex-wrap gap-2">
+        <button onclick="sendSuggestion(this)" class="text-xs bg-white border border-gray-300 hover:border-red-400 hover:text-red-700 text-gray-600 font-medium px-3 py-1.5 rounded-full transition">
+          What is the recall policy?
+        </button>
+        <button onclick="sendSuggestion(this)" class="text-xs bg-white border border-gray-300 hover:border-red-400 hover:text-red-700 text-gray-600 font-medium px-3 py-1.5 rounded-full transition">
+          How many sick days do I get?
+        </button>
+        <button onclick="sendSuggestion(this)" class="text-xs bg-white border border-gray-300 hover:border-red-400 hover:text-red-700 text-gray-600 font-medium px-3 py-1.5 rounded-full transition">
+          What is the overtime rate?
+        </button>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="px-4 pb-5 pt-2 border-t border-gray-200 bg-gray-100">
+      <div class="flex gap-2 items-end">
+        <textarea id="questionInput"
+          placeholder="Ask a question about FD documents..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+          class="flex-1 border border-gray-300 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none overflow-hidden bg-white shadow-sm"
+          style="min-height:44px; max-height:120px;"></textarea>
+        <button id="sendBtn" onclick="sendQuestion()"
+          class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-2xl px-4 py-3 transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+          style="min-height:44px;">
+          Send
+        </button>
+      </div>
+      <p class="text-xs text-gray-400 mt-2 text-center">Answers are based only on uploaded Hillside FD documents.</p>
+    </div>
+
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const API = '/.netlify/functions'
+    let chatHistory = []
+    let isWaiting = false
+
+    function autoResize(el) {
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        sendQuestion()
+      }
+    }
+
+    function sendSuggestion(btn) {
+      const q = btn.textContent.trim()
+      document.getElementById('questionInput').value = q
+      // Hide suggestions after first use
+      document.getElementById('suggestions').classList.add('hidden')
+      sendQuestion()
+    }
+
+    function appendMessage(role, text) {
+      const container = document.getElementById('chatMessages')
+
+      if (role === 'user') {
+        const div = document.createElement('div')
+        div.className = 'flex items-end justify-end gap-2'
+        div.innerHTML = `
+          <div class="msg-bubble bg-red-700 text-white rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
+            <p class="text-sm">${escHtml(text)}</p>
+          </div>`
+        container.appendChild(div)
+      } else {
+        const div = document.createElement('div')
+        div.className = 'flex items-start gap-2'
+        div.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-red-700 flex items-center justify-center shrink-0 text-white text-sm font-bold mt-0.5">AI</div>
+          <div class="msg-bubble bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+            <div class="text-sm text-gray-800 ai-text">${formatAIText(text)}</div>
+          </div>`
+        container.appendChild(div)
+      }
+
+      scrollToBottom()
+    }
+
+    function showTypingIndicator() {
+      const container = document.getElementById('chatMessages')
+      const div = document.createElement('div')
+      div.id = 'typingIndicator'
+      div.className = 'flex items-start gap-2'
+      div.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-red-700 flex items-center justify-center shrink-0 text-white text-sm font-bold mt-0.5">AI</div>
+        <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-1" style="height:44px;">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+        </div>`
+      container.appendChild(div)
+      scrollToBottom()
+    }
+
+    function removeTypingIndicator() {
+      const el = document.getElementById('typingIndicator')
+      if (el) el.remove()
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('chatMessages')
+      container.scrollTop = container.scrollHeight
+    }
+
+    function escHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+    }
+
+    function formatAIText(text) {
+      // Convert basic markdown-like formatting
+      return escHtml(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>')
+    }
+
+    async function sendQuestion() {
+      if (isWaiting) return
+      const input = document.getElementById('questionInput')
+      const question = input.value.trim()
+      if (!question) return
+
+      // Hide suggestions
+      document.getElementById('suggestions').classList.add('hidden')
+
+      // Lock UI
+      isWaiting = true
+      document.getElementById('sendBtn').disabled = true
+      input.value = ''
+      input.style.height = '44px'
+
+      // Show user message
+      appendMessage('user', question)
+
+      // Show typing indicator
+      showTypingIndicator()
+
+      try {
+        const res = await fetch(`${API}/chat-ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            history: chatHistory.slice(-8)
+          })
+        })
+
+        const data = await res.json()
+        removeTypingIndicator()
+
+        if (!res.ok) {
+          appendError(data.error || 'Something went wrong. Please try again.')
+        } else {
+          const answer = data.answer || 'No response received.'
+          appendMessage('assistant', answer)
+          // Update history
+          chatHistory.push({ role: 'user', content: question })
+          chatHistory.push({ role: 'assistant', content: answer })
+          // Keep last 16 turns (8 exchanges)
+          if (chatHistory.length > 16) chatHistory = chatHistory.slice(-16)
+        }
+      } catch (e) {
+        removeTypingIndicator()
+        appendError('Network error. Please check your connection and try again.')
+      }
+
+      isWaiting = false
+      document.getElementById('sendBtn').disabled = false
+      input.focus()
+    }
+
+    function appendError(msg) {
+      const container = document.getElementById('chatMessages')
+      const div = document.createElement('div')
+      div.className = 'flex items-start gap-2'
+      div.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0 text-white text-sm font-bold mt-0.5">!</div>
+        <div class="msg-bubble bg-red-50 border border-red-200 rounded-2xl rounded-tl-sm px-4 py-3">
+          <p class="text-sm text-red-700">${escHtml(msg)}</p>
+        </div>`
+      container.appendChild(div)
+      scrollToBottom()
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
+    }
+  </script>
+</body>
+</html>

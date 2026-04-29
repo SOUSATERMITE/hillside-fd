@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Documents — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button, input { min-height: 44px; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="authModal"></div>
+
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="/sick"  class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall" class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/docs"  class="nav-active pb-1">Docs</a>
+      <a href="/chat"  class="hover:text-red-200 pb-1">Ask AI</a>
+      <a href="/admin" class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-2"></span>
+    </div>
+  </nav>
+
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <div class="max-w-4xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <h1 class="text-2xl font-extrabold text-gray-800">Document Library</h1>
+      <button id="uploadToggleBtn" onclick="toggleUploadForm()" class="hidden bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2 text-sm transition">
+        + Upload Document
+      </button>
+    </div>
+
+    <!-- Upload Form (officers only, hidden by default) -->
+    <div id="uploadForm" class="hidden bg-white rounded-2xl shadow p-5 mb-6 border-l-4 border-red-700">
+      <h2 class="font-bold text-gray-800 text-base mb-4 uppercase tracking-wide">Upload New Document</h2>
+      <div class="flex flex-col gap-3">
+        <input id="docTitle" type="text" placeholder="Document title (required)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+        <select id="docCategory" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Select category...</option>
+          <option value="Memos">Memos</option>
+          <option value="Labor Contract">Labor Contract</option>
+          <option value="SOPs">SOPs</option>
+          <option value="Recall Policy">Recall Policy</option>
+          <option value="Rules & Regs">Rules & Regs</option>
+          <option value="Other">Other</option>
+        </select>
+        <textarea id="docDescription" rows="2" placeholder="Brief description (optional)"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+        <div>
+          <label class="block text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">
+            Document Text for AI Assistant
+          </label>
+          <textarea id="docContentText" rows="4" placeholder="Paste the full text or key sections of this document so the AI assistant can answer questions about it (optional but recommended)..."
+            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-y w-full"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">
+            File (PDF, Word, Image — max 5MB)
+          </label>
+          <input id="docFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+            onchange="onFileChange(this)"
+            class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-bold file:bg-red-50 file:text-red-700 hover:file:bg-red-100">
+          <div id="fileSizeWarn" class="hidden text-xs text-red-600 mt-1 font-semibold">File exceeds 5MB limit.</div>
+        </div>
+        <button onclick="uploadDocument()"
+          class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-3 transition">
+          Upload Document
+        </button>
+        <div id="uploadResult" class="text-sm font-semibold text-center"></div>
+      </div>
+    </div>
+
+    <!-- Search + Filter -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-5">
+      <input id="searchInput" type="search" placeholder="Search documents..."
+        oninput="applyFilters()"
+        class="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+      <select id="categoryFilter" onchange="applyFilters()"
+        class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 sm:w-48">
+        <option value="">All categories</option>
+        <option value="Memos">Memos</option>
+        <option value="Labor Contract">Labor Contract</option>
+        <option value="SOPs">SOPs</option>
+        <option value="Recall Policy">Recall Policy</option>
+        <option value="Rules & Regs">Rules & Regs</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <!-- Document List -->
+    <div id="docList">
+      <div class="text-gray-400 text-sm text-center py-12">Loading documents...</div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const API = '/.netlify/functions'
+    let allDocs = []
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 6000)
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return ''
+      if (bytes < 1024) return bytes + ' B'
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB'
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+    }
+
+    const CATEGORY_COLORS = {
+      'Memos':          'bg-amber-100 text-amber-800',
+      'Labor Contract': 'bg-blue-100 text-blue-800',
+      'SOPs':           'bg-green-100 text-green-800',
+      'Recall Policy':  'bg-purple-100 text-purple-800',
+      'Rules & Regs':   'bg-red-100 text-red-800',
+      'Other':          'bg-gray-100 text-gray-600'
+    }
+
+    async function loadDocuments() {
+      try {
+        const res = await fetch(`${API}/get-documents`)
+        if (!res.ok) throw new Error('Failed to load documents')
+        allDocs = await res.json()
+        applyFilters()
+      } catch (e) {
+        document.getElementById('docList').innerHTML =
+          `<div class="text-red-500 text-sm text-center py-12">${e.message}</div>`
+      }
+    }
+
+    function applyFilters() {
+      const search   = document.getElementById('searchInput').value.trim().toLowerCase()
+      const catFilter = document.getElementById('categoryFilter').value
+
+      let filtered = allDocs
+      if (catFilter) filtered = filtered.filter(d => d.category === catFilter)
+      if (search)    filtered = filtered.filter(d =>
+        d.title.toLowerCase().includes(search) ||
+        (d.description || '').toLowerCase().includes(search)
+      )
+
+      renderDocs(filtered)
+    }
+
+    function renderDocs(docs) {
+      const container = document.getElementById('docList')
+      const isAdmin = AUTH.isAdmin()
+
+      if (docs.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-12 bg-white rounded-2xl border border-gray-200">No documents found.</div>'
+        return
+      }
+
+      // Memos pinned first, then everything else sorted by category + date
+      const memos  = docs.filter(d => d.category === 'Memos')
+      const others = docs.filter(d => d.category !== 'Memos')
+
+      const renderCard = d => {
+        const catColor = CATEGORY_COLORS[d.category] || 'bg-gray-100 text-gray-600'
+        const ext = (d.file_name || '').split('.').pop().toUpperCase()
+        return `
+          <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm">
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <div class="flex-1 min-w-0">
+                <div class="font-bold text-gray-800 text-base leading-tight">${d.title}</div>
+                ${d.description ? `<div class="text-sm text-gray-500 mt-1">${d.description}</div>` : ''}
+              </div>
+              <span class="shrink-0 text-xs font-bold px-2 py-0.5 rounded ${catColor}">${d.category}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400 mb-3">
+              <span>${d.file_name}${ext ? '' : ''} ${d.file_size ? '· ' + formatSize(d.file_size) : ''}</span>
+              <span>·</span>
+              <span>Uploaded by ${d.uploaded_by}</span>
+              <span>·</span>
+              <span>${formatDate(d.created_at)}</span>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+              <a href="${d.download_url}" target="_blank" rel="noopener"
+                class="inline-flex items-center bg-red-700 hover:bg-red-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition">
+                ↓ Download ${ext}
+              </a>
+              ${isAdmin ? `<button onclick="deleteDocument('${d.id}', this)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg">Remove</button>` : ''}
+            </div>
+          </div>`
+      }
+
+      let html = ''
+      if (memos.length) {
+        html += `<div class="mb-2"><div class="flex items-center gap-2 mb-3"><span class="text-xs font-bold text-amber-700 uppercase tracking-wide">📌 Memos</span><div class="flex-1 h-px bg-amber-200"></div></div>`
+        html += memos.map(renderCard).join('')
+        html += '</div>'
+        if (others.length) html += '<div class="h-4"></div>'
+      }
+      if (others.length) {
+        // Group remaining by category
+        const cats = [...new Set(others.map(d => d.category))]
+        for (const cat of cats) {
+          const group = others.filter(d => d.category === cat)
+          const catColor = CATEGORY_COLORS[cat] || 'bg-gray-100 text-gray-600'
+          html += `<div class="mb-2"><div class="flex items-center gap-2 mb-3"><span class="text-xs font-bold text-gray-500 uppercase tracking-wide">${cat}</span><div class="flex-1 h-px bg-gray-200"></div></div>`
+          html += group.map(renderCard).join('')
+          html += '</div>'
+        }
+      }
+
+      container.innerHTML = html
+    }
+
+    function toggleUploadForm() {
+      const form = document.getElementById('uploadForm')
+      const btn  = document.getElementById('uploadToggleBtn')
+      const hidden = form.classList.contains('hidden')
+      form.classList.toggle('hidden', !hidden)
+      btn.textContent = hidden ? '✕ Cancel' : '+ Upload Document'
+    }
+
+    function onFileChange(input) {
+      const warn = document.getElementById('fileSizeWarn')
+      if (input.files[0] && input.files[0].size > 5 * 1024 * 1024) {
+        warn.classList.remove('hidden')
+        input.value = ''
+      } else {
+        warn.classList.add('hidden')
+      }
+    }
+
+    async function uploadDocument() {
+      const title       = document.getElementById('docTitle').value.trim()
+      const category    = document.getElementById('docCategory').value
+      const description = document.getElementById('docDescription').value.trim()
+      const contentText = document.getElementById('docContentText').value.trim()
+      const fileInput   = document.getElementById('docFile')
+      const resultEl    = document.getElementById('uploadResult')
+      const file        = fileInput.files[0]
+
+      if (!title)    { resultEl.textContent = 'Title is required.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!category) { resultEl.textContent = 'Please select a category.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+      if (!file)     { resultEl.textContent = 'Please select a file.'; resultEl.className = 'text-sm font-semibold text-center text-orange-600'; return }
+
+      if (!AUTH.isOfficer()) {
+        AUTH.showLoginModal(() => uploadDocument())
+        return
+      }
+
+      resultEl.textContent = 'Uploading...'
+      resultEl.className = 'text-sm font-semibold text-center text-gray-500'
+
+      try {
+        // Read file as base64
+        const b64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.readAsDataURL(file)
+          reader.onload  = () => resolve(reader.result.split(',')[1])
+          reader.onerror = reject
+        })
+
+        const res = await fetch(`${API}/upload-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({
+            title, category, description, content_text: contentText,
+            file_name: file.name, file_type: file.type, file_size: file.size,
+            data: b64
+          })
+        })
+        const data = await res.json()
+        if (!res.ok) { resultEl.textContent = data.error || 'Upload failed.'; resultEl.className = 'text-sm font-semibold text-center text-red-600'; return }
+
+        resultEl.textContent = 'Uploaded successfully!'
+        resultEl.className = 'text-sm font-semibold text-center text-green-600'
+        document.getElementById('docTitle').value = ''
+        document.getElementById('docCategory').value = ''
+        document.getElementById('docDescription').value = ''
+        document.getElementById('docContentText').value = ''
+        fileInput.value = ''
+        toggleUploadForm()
+        await loadDocuments()
+      } catch (e) {
+        resultEl.textContent = 'Error: ' + e.message
+        resultEl.className = 'text-sm font-semibold text-center text-red-600'
+      }
+    }
+
+    async function deleteDocument(id, btn) {
+      if (!confirm('Remove this document from the library?')) return
+      btn.disabled = true; btn.textContent = '...'
+      try {
+        const res = await fetch(`${API}/delete-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ id })
+        })
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Error') }
+        await loadDocuments()
+      } catch (e) { showError('Error: ' + e.message); btn.disabled = false; btn.textContent = 'Remove' }
+    }
+
+    // Show upload button to officers after auth loads
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (AUTH.isOfficer()) document.getElementById('uploadToggleBtn').classList.remove('hidden')
+      }, 100)
+    })
+
+    loadDocuments()
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
+    }
+  </script>
+</body>
+</html>
