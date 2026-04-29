@@ -50,8 +50,9 @@ exports.handler = async (event) => {
       query = query.eq('status', params.status)
     }
 
-    // Non-admin officers: filter to own tour
-    if (officer.role !== 'admin' && officerFF?.group_number) {
+    // Non-admin, non-Chief officers: filter to own tour
+    const isChief = officerFF?.rank === 'Chief'
+    if (officer.role !== 'admin' && !isChief && officerFF?.group_number) {
       query = query.eq('ff_group', officerFF.group_number)
     }
 

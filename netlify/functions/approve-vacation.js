@@ -198,6 +198,40 @@ exports.handler = async (event) => {
           })
         }
 
+        // FYI email to Chief(s)
+        const { data: chiefs } = await supabase
+          .from('firefighters')
+          .select('name, email')
+          .eq('rank', 'Chief')
+          .eq('active', true)
+
+        const chiefRows = [
+          row('Firefighter', vacReq.ff_name),
+          row('Group', `Group ${vacReq.ff_group}`, true),
+          row('Cancelled Dates', cancelledStr),
+          row('New Dates', newStr, true),
+          row('Captain Approved By', vacReq.captain_name),
+          row('DC Approved By', officer.display_name, true)
+        ].join('')
+
+        const chiefHtml = baseEmail(
+          `FYI — Vacation Change Approved: ${vacReq.ff_name}`,
+          '#6b7280', chiefRows,
+          `<p style="color:#6b7280;">This vacation change request has been fully approved. No action required from you.</p>`,
+          request_id
+        )
+
+        for (const chief of (chiefs || [])) {
+          if (chief.email) {
+            await sendEmail({
+              to: chief.email,
+              subject: `FYI — Vacation Change Approved: ${vacReq.ff_name}`,
+              html: chiefHtml,
+              text: `FYI: Vacation change for ${vacReq.ff_name} (Group ${vacReq.ff_group}) has been fully approved. Cancelled: ${cancelledStr}. New: ${newStr}. Captain: ${vacReq.captain_name}. DC: ${officer.display_name}. No action required.`
+            })
+          }
+        }
+
       } else {
         // DC denies
         await supabase.from('vacation_requests').update({
