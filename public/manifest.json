@@ -1,7 +1,7 @@
 {
   "name": "Hillside Fire Department",
   "short_name": "Hillside FD",
-  "description": "Sick Tracking, Recall List, Document Library, and Policy Search",
+  "description": "Sick Tracking, Recall List, Document Library, Policy Search, and Vacation Requests",
   "start_url": "/sick",
   "scope": "/",
   "display": "standalone",
@@ -11,29 +11,10 @@
     { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    {
-      "name": "Sick Tracking",
-      "short_name": "Sick",
-      "url": "/sick",
-      "description": "View sick list and mark firefighters sick"
-    },
-    {
-      "name": "Recall List",
-      "short_name": "Recall",
-      "url": "/recall",
-      "description": "Record and view recall assignments"
-    },
-    {
-      "name": "Document Library",
-      "short_name": "Docs",
-      "url": "/docs",
-      "description": "View and upload department documents"
-    },
-    {
-      "name": "Policy Search",
-      "short_name": "Search",
-      "url": "/search",
-      "description": "Search policies and documents"
-    }
+    { "name": "Sick Tracking",      "short_name": "Sick",     "url": "/sick",     "description": "View sick list and mark firefighters sick" },
+    { "name": "Recall List",        "short_name": "Recall",   "url": "/recall",   "description": "Record and view recall assignments" },
+    { "name": "Document Library",   "short_name": "Docs",     "url": "/docs",     "description": "View and upload department documents" },
+    { "name": "Policy Search",      "short_name": "Search",   "url": "/search",   "description": "Search policies and documents" },
+    { "name": "Vacation Requests",  "short_name": "Vacation", "url": "/vacation", "description": "Submit and track vacation change requests" }
   ]
 }

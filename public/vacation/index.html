@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Vacation Change Request — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 3px solid white; font-weight: 700; }
+    select, button, input, textarea { min-height: 44px; }
+    .tab-active   { background: #b91c1c; color: white; border-color: #b91c1c; }
+    .tab-inactive { background: white; color: #374151; border: 1px solid #d1d5db; }
+    .status-pending           { background:#fef9c3; color:#854d0e; }
+    .status-captain_approved  { background:#dbeafe; color:#1e40af; }
+    .status-approved          { background:#dcfce7; color:#166534; }
+    .status-denied            { background:#fee2e2; color:#991b1b; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="authModal"></div>
+
+  <nav class="bg-red-800 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-lg tracking-wide">🔥 HILLSIDE FD</span>
+    <div class="flex items-center gap-2 text-sm flex-wrap justify-end">
+      <a href="/sick"     class="hover:text-red-200 pb-1">Sick</a>
+      <a href="/recall"   class="hover:text-red-200 pb-1">Recall</a>
+      <a href="/docs"     class="hover:text-red-200 pb-1">Docs</a>
+      <a href="/search"   class="hover:text-red-200 pb-1">Search</a>
+      <a href="/vacation" class="nav-active pb-1">Vacation</a>
+      <a href="/admin"    class="hover:text-red-200 pb-1">Admin</a>
+      <span id="authSlot" class="flex items-center gap-2 ml-1"></span>
+    </div>
+  </nav>
+
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-extrabold text-gray-800 mb-1">Vacation Change Request</h1>
+    <p class="text-sm text-gray-500 mb-5">Submit a request to change your vacation dates. Both your Captain and DC must approve.</p>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6">
+      <button onclick="showTab('submit')" id="tabSubmit"
+        class="tab-active flex-1 font-bold rounded-xl px-4 py-2.5 text-sm transition border">
+        Submit Request
+      </button>
+      <button onclick="showTab('status')" id="tabStatus"
+        class="tab-inactive flex-1 font-bold rounded-xl px-4 py-2.5 text-sm transition">
+        Check Status
+      </button>
+      <button onclick="showTab('officer')" id="tabOfficer"
+        class="tab-inactive flex-1 font-bold rounded-xl px-4 py-2.5 text-sm transition hidden" id="officerTab">
+        Officer Review
+      </button>
+    </div>
+
+    <!-- ── SUBMIT TAB ──────────────────────────────────────────────────────── -->
+    <div id="panelSubmit">
+      <div class="bg-white rounded-2xl shadow p-5 border-l-4 border-red-700">
+        <h2 class="font-bold text-gray-800 text-base mb-4 uppercase tracking-wide">New Vacation Change Request</h2>
+
+        <!-- FF Name -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Your Name</label>
+          <select id="ffSelect" onchange="onFFSelect()"
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+            <option value="">Select your name...</option>
+          </select>
+        </div>
+
+        <!-- Email (read-only) -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Your Email (auto-filled)</label>
+          <input id="ffEmail" type="email" readonly placeholder="Select your name above"
+            class="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-500 cursor-not-allowed focus:outline-none">
+        </div>
+
+        <!-- Date of Request -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Date of Request</label>
+          <input id="requestDate" type="date" readonly
+            class="w-full border border-gray-200 bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-500 cursor-not-allowed focus:outline-none">
+        </div>
+
+        <!-- Cancelled Dates -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Dates Being Cancelled <span class="text-gray-400 font-normal normal-case">(up to 6)</span>
+          </label>
+          <div id="cancelledDates" class="flex flex-col gap-2">
+            <input type="date" class="cancelled-date border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-56">
+          </div>
+          <button onclick="addDatePicker('cancelledDates','cancelled-date')"
+            class="mt-2 text-xs text-red-700 font-bold hover:underline" style="min-height:0;">+ Add date</button>
+        </div>
+
+        <!-- New Dates -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            New Dates Requested <span class="text-gray-400 font-normal normal-case">(up to 6)</span>
+          </label>
+          <div id="newDates" class="flex flex-col gap-2">
+            <input type="date" class="new-date border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-56">
+          </div>
+          <button onclick="addDatePicker('newDates','new-date')"
+            class="mt-2 text-xs text-red-700 font-bold hover:underline" style="min-height:0;">+ Add date</button>
+        </div>
+
+        <!-- Staffing Impact -->
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Will this affect minimum staffing?</label>
+          <div class="flex gap-3">
+            <button onclick="setImpact(false)" id="impactNo"
+              class="flex-1 border-2 border-green-500 bg-green-50 text-green-700 font-bold rounded-xl py-2.5 text-sm transition">
+              No
+            </button>
+            <button onclick="setImpact(true)" id="impactYes"
+              class="flex-1 border-2 border-gray-300 bg-white text-gray-500 font-bold rounded-xl py-2.5 text-sm transition">
+              Yes
+            </button>
+          </div>
+        </div>
+
+        <!-- Explanation (conditional) -->
+        <div id="explanationBlock" class="hidden mb-4">
+          <label class="block text-xs font-semibold text-red-600 uppercase tracking-wide mb-1">
+            Explain why you are requesting this change *
+          </label>
+          <textarea id="impactExplanation" rows="3" placeholder="Explain how this will affect staffing and why the change is still needed..."
+            class="w-full border border-red-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+        </div>
+
+        <!-- Signature -->
+        <div class="mb-5">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Type your full name as signature confirmation
+          </label>
+          <input id="ffSignature" type="text" placeholder="Type your name to confirm this request"
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+        </div>
+
+        <button onclick="submitRequest()" id="submitBtn"
+          class="w-full bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition text-sm">
+          Submit Vacation Change Request
+        </button>
+        <div id="submitResult" class="text-sm font-semibold text-center mt-3"></div>
+      </div>
+    </div>
+
+    <!-- ── STATUS TAB ──────────────────────────────────────────────────────── -->
+    <div id="panelStatus" class="hidden">
+      <div class="bg-white rounded-2xl shadow p-5 mb-5">
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Select your name to see your requests</label>
+        <select id="statusFFSelect" onchange="loadMyRequests()"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="">Select your name...</option>
+        </select>
+      </div>
+      <div id="myRequests"></div>
+    </div>
+
+    <!-- ── OFFICER REVIEW TAB ──────────────────────────────────────────────── -->
+    <div id="panelOfficer" class="hidden">
+      <!-- Filter -->
+      <div class="flex gap-2 mb-4 flex-wrap">
+        <select id="officerStatusFilter" onchange="loadOfficerRequests()"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending (Needs Captain)</option>
+          <option value="captain_approved">Captain Approved (Needs DC)</option>
+          <option value="approved">Fully Approved</option>
+          <option value="denied">Denied</option>
+        </select>
+      </div>
+      <div id="officerRequests">
+        <div class="text-gray-400 text-sm text-center py-10">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approve/Deny Modal -->
+  <div id="actionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
+      <h2 class="font-bold text-gray-800 text-lg mb-4" id="actionModalTitle">Review Request</h2>
+      <div id="actionModalBody"></div>
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeActionModal()" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+        <button id="actionModalConfirm" class="flex-1 font-bold rounded-xl py-3 transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const API = '/.netlify/functions'
+    let firefighters = []
+    let staffingImpact = false
+    let currentRequestId = null
+    let currentActionType = null
+    let currentOfficerRank = null
+
+    // ── BOOT ──────────────────────────────────────────────────────────────────
+    async function boot() {
+      // Set today's date
+      document.getElementById('requestDate').value = new Date().toISOString().slice(0, 10)
+
+      // Load firefighters for dropdowns
+      try {
+        const res = await fetch(`${API}/get-firefighters`)
+        if (res.ok) {
+          firefighters = await res.json()
+          populateDropdowns()
+        }
+      } catch (e) { console.error(e) }
+
+      // Show officer tab if logged in
+      setTimeout(() => {
+        if (AUTH.isOfficer()) {
+          document.getElementById('tabOfficer').classList.remove('hidden')
+          detectOfficerRank()
+        }
+      }, 150)
+    }
+
+    function populateDropdowns() {
+      const opts = firefighters
+        .filter(f => f.active)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(f => `<option value="${f.id}" data-email="${f.email || ''}" data-name="${f.name}">${f.rank} ${f.name} (Group ${f.group_number || '—'})</option>`)
+        .join('')
+
+      const base = '<option value="">Select your name...</option>'
+      document.getElementById('ffSelect').innerHTML = base + opts
+      document.getElementById('statusFFSelect').innerHTML = base + opts
+    }
+
+    async function detectOfficerRank() {
+      // Get officer's own FF record rank for UI hints
+      const officers = await AUTH.loadOfficers().catch(() => [])
+      currentOfficerRank = null // determined server-side on approve/deny
+    }
+
+    // ── TABS ──────────────────────────────────────────────────────────────────
+    function showTab(tab) {
+      ['submit','status','officer'].forEach(t => {
+        document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden')
+        const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))
+        if (btn) { btn.classList.remove('tab-active'); btn.classList.add('tab-inactive') }
+      })
+      document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden')
+      const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1))
+      if (activeBtn) { activeBtn.classList.remove('tab-inactive'); activeBtn.classList.add('tab-active') }
+      if (tab === 'officer') loadOfficerRequests()
+    }
+
+    // ── SUBMIT FORM ───────────────────────────────────────────────────────────
+    function onFFSelect() {
+      const sel = document.getElementById('ffSelect')
+      const opt = sel.options[sel.selectedIndex]
+      document.getElementById('ffEmail').value = opt.dataset.email || ''
+    }
+
+    function addDatePicker(containerId, cls) {
+      const container = document.getElementById(containerId)
+      const count = container.querySelectorAll('.' + cls).length
+      if (count >= 6) return
+      const input = document.createElement('input')
+      input.type = 'date'
+      input.className = cls + ' border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-56'
+      container.appendChild(input)
+    }
+
+    function setImpact(val) {
+      staffingImpact = val
+      document.getElementById('impactYes').className = val
+        ? 'flex-1 border-2 border-red-600 bg-red-50 text-red-700 font-bold rounded-xl py-2.5 text-sm transition'
+        : 'flex-1 border-2 border-gray-300 bg-white text-gray-500 font-bold rounded-xl py-2.5 text-sm transition'
+      document.getElementById('impactNo').className = !val
+        ? 'flex-1 border-2 border-green-500 bg-green-50 text-green-700 font-bold rounded-xl py-2.5 text-sm transition'
+        : 'flex-1 border-2 border-gray-300 bg-white text-gray-500 font-bold rounded-xl py-2.5 text-sm transition'
+      document.getElementById('explanationBlock').classList.toggle('hidden', !val)
+    }
+
+    async function submitRequest() {
+      const ffId       = document.getElementById('ffSelect').value
+      const signature  = document.getElementById('ffSignature').value.trim()
+      const explanation = document.getElementById('impactExplanation').value.trim()
+      const resultEl   = document.getElementById('submitResult')
+
+      const cancelled = [...document.querySelectorAll('.cancelled-date')].map(i => i.value).filter(Boolean)
+      const newDates  = [...document.querySelectorAll('.new-date')].map(i => i.value).filter(Boolean)
+
+      if (!ffId)            { showResult(resultEl, 'Please select your name.', 'orange'); return }
+      if (!cancelled.length){ showResult(resultEl, 'Please enter at least one cancelled date.', 'orange'); return }
+      if (!newDates.length) { showResult(resultEl, 'Please enter at least one new date.', 'orange'); return }
+      if (staffingImpact && !explanation) { showResult(resultEl, 'Please explain the staffing impact.', 'orange'); return }
+      if (!signature)       { showResult(resultEl, 'Please type your name as signature.', 'orange'); return }
+
+      const btn = document.getElementById('submitBtn')
+      btn.disabled = true; btn.textContent = 'Submitting...'
+      showResult(resultEl, '', '')
+
+      try {
+        const res = await fetch(`${API}/submit-vacation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firefighter_id: ffId,
+            cancelled_dates: cancelled,
+            new_dates: newDates,
+            staffing_impact: staffingImpact,
+            impact_explanation: explanation || null,
+            ff_signature: signature
+          })
+        })
+        const data = await res.json()
+        if (!res.ok) { showResult(resultEl, data.error || 'Submission failed.', 'red'); btn.disabled = false; btn.textContent = 'Submit Vacation Change Request'; return }
+
+        showResult(resultEl, '✓ Request submitted! Your Captain will receive an email notification.', 'green')
+        btn.textContent = 'Submitted'
+      } catch (e) {
+        showResult(resultEl, 'Network error. Please try again.', 'red')
+        btn.disabled = false; btn.textContent = 'Submit Vacation Change Request'
+      }
+    }
+
+    // ── STATUS TAB ────────────────────────────────────────────────────────────
+    async function loadMyRequests() {
+      const ffId = document.getElementById('statusFFSelect').value
+      const container = document.getElementById('myRequests')
+      if (!ffId) { container.innerHTML = ''; return }
+
+      container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">Loading...</div>'
+      try {
+        const res = await fetch(`${API}/get-vacation-requests?firefighter_id=${ffId}`)
+        const data = await res.json()
+        if (!data.length) {
+          container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-2xl border border-gray-200">No requests found for this firefighter.</div>'
+          return
+        }
+        container.innerHTML = data.map(renderStatusCard).join('')
+      } catch (e) {
+        container.innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function renderStatusCard(r) {
+      const badge = statusBadge(r.status)
+      const cancelled = formatDates(r.cancelled_dates)
+      const newD      = formatDates(r.new_dates)
+      return `
+        <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-bold text-gray-800 text-sm">${fmtDate(r.created_at)}</span>
+            ${badge}
+          </div>
+          <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">Cancelled:</span> ${cancelled}</div>
+          <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
+          ${r.staffing_impact ? `<div class="text-sm text-red-600 mb-1"><span class="font-semibold">Staffing Impact:</span> Yes — ${esc(r.impact_explanation)}</div>` : ''}
+          <div class="mt-3 flex flex-col gap-1 text-xs text-gray-400">
+            ${r.captain_name ? `<span>Captain: ${esc(r.captain_name)} ${r.captain_overtime_acknowledged ? '✓ Overtime acknowledged' : ''} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</span>` : ''}
+            ${r.dc_name ? `<span>DC: ${esc(r.dc_name)} ${r.dc_action ? '· ' + r.dc_action : ''} ${r.dc_action_date ? '· ' + fmtDate(r.dc_action_date) : ''}</span>` : ''}
+            ${r.denial_reason ? `<span class="text-red-500">Denial reason: ${esc(r.denial_reason)}</span>` : ''}
+          </div>
+        </div>`
+    }
+
+    // ── OFFICER REVIEW ────────────────────────────────────────────────────────
+    async function loadOfficerRequests() {
+      if (!AUTH.isOfficer()) return
+      const status = document.getElementById('officerStatusFilter').value
+      const container = document.getElementById('officerRequests')
+      container.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Loading...</div>'
+
+      try {
+        const res = await fetch(`${API}/get-vacation-requests?status=${status}`, {
+          headers: AUTH.getHeaders()
+        })
+        if (res.status === 401) { container.innerHTML = '<div class="text-red-500 text-sm text-center py-10">Login required. Use the login button in the nav.</div>'; return }
+        const data = await res.json()
+        if (!data.length) {
+          container.innerHTML = '<div class="text-gray-400 text-sm text-center py-10 bg-white rounded-2xl border border-gray-200">No requests found.</div>'
+          return
+        }
+        container.innerHTML = data.map(renderOfficerCard).join('')
+      } catch (e) {
+        container.innerHTML = `<div class="text-red-500 text-sm text-center py-10">${e.message}</div>`
+      }
+    }
+
+    function renderOfficerCard(r) {
+      const badge     = statusBadge(r.status)
+      const cancelled = formatDates(r.cancelled_dates)
+      const newD      = formatDates(r.new_dates)
+      const canAct    = r.status === 'pending' || r.status === 'captain_approved'
+
+      return `
+        <div class="bg-white border border-gray-200 rounded-xl p-4 mb-3 shadow-sm">
+          <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+            <div>
+              <div class="font-bold text-gray-800">${esc(r.ff_name)}</div>
+              <div class="text-xs text-gray-400">Group ${r.ff_group || '—'} · Submitted ${fmtDate(r.created_at)}</div>
+            </div>
+            ${badge}
+          </div>
+          <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">Cancelled:</span> ${cancelled}</div>
+          <div class="text-sm text-gray-600 mb-1"><span class="font-semibold">New Dates:</span> ${newD}</div>
+          ${r.staffing_impact ? `<div class="text-sm text-red-600 font-semibold mb-1">⚠ Staffing Impact: ${esc(r.impact_explanation)}</div>` : ''}
+          ${r.captain_name ? `<div class="text-xs text-gray-400 mb-1">Captain approved by ${esc(r.captain_name)} ${r.captain_action_date ? '· ' + fmtDate(r.captain_action_date) : ''}</div>` : ''}
+          ${r.denial_reason ? `<div class="text-xs text-red-500 mb-1">Denied by ${esc(r.denied_by_name)}: ${esc(r.denial_reason)}</div>` : ''}
+          ${canAct ? `
+          <div class="flex gap-2 mt-3">
+            <button onclick="openApprove('${r.id}', '${r.status}')"
+              class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg transition">
+              Approve
+            </button>
+            <button onclick="openDeny('${r.id}')"
+              class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg transition">
+              Deny
+            </button>
+          </div>` : ''}
+        </div>`
+    }
+
+    // ── ACTION MODAL ──────────────────────────────────────────────────────────
+    function openApprove(reqId, currentStatus) {
+      currentRequestId  = reqId
+      currentActionType = 'approve'
+
+      const isPending = currentStatus === 'pending'
+      document.getElementById('actionModalTitle').textContent = isPending ? 'Captain Approval' : 'DC Approval'
+
+      const ackHtml = isPending ? `
+        <div class="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-4">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="overtimeAck" class="mt-0.5 accent-red-700" style="min-height:0;width:18px;height:18px;">
+            <span class="text-sm text-amber-900 font-semibold leading-snug">
+              I have verified this vacation change will not cause overtime, or have confirmed overtime is authorized.
+            </span>
+          </label>
+        </div>` : `
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-800">
+          This request has been approved by the Captain. As DC, your approval completes the process and notifies the firefighter.
+        </div>`
+
+      document.getElementById('actionModalBody').innerHTML = ackHtml
+      const confirmBtn = document.getElementById('actionModalConfirm')
+      confirmBtn.textContent = 'Approve'
+      confirmBtn.className = 'flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition'
+      confirmBtn.onclick = confirmAction
+
+      document.getElementById('actionModal').classList.remove('hidden')
+    }
+
+    function openDeny(reqId) {
+      currentRequestId  = reqId
+      currentActionType = 'deny'
+      document.getElementById('actionModalTitle').textContent = 'Deny Request'
+      document.getElementById('actionModalBody').innerHTML = `
+        <div class="mb-3">
+          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Reason for denial *</label>
+          <textarea id="denialReason" rows="3" placeholder="Explain why this request is being denied..."
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+        </div>`
+      const confirmBtn = document.getElementById('actionModalConfirm')
+      confirmBtn.textContent = 'Deny Request'
+      confirmBtn.className = 'flex-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition'
+      confirmBtn.onclick = confirmAction
+      document.getElementById('actionModal').classList.remove('hidden')
+    }
+
+    function closeActionModal() {
+      document.getElementById('actionModal').classList.add('hidden')
+      currentRequestId = null; currentActionType = null
+    }
+
+    async function confirmAction() {
+      const confirmBtn = document.getElementById('actionModalConfirm')
+      confirmBtn.disabled = true; confirmBtn.textContent = 'Saving...'
+
+      const body = { request_id: currentRequestId, action: currentActionType }
+
+      if (currentActionType === 'approve') {
+        const ackEl = document.getElementById('overtimeAck')
+        if (ackEl && !ackEl.checked) {
+          alert('You must check the overtime acknowledgment before approving.')
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Approve'; return
+        }
+        if (ackEl) body.captain_overtime_acknowledged = true
+      } else {
+        const reason = document.getElementById('denialReason')?.value.trim()
+        if (!reason) { alert('Please enter a reason for denial.'); confirmBtn.disabled = false; confirmBtn.textContent = 'Deny Request'; return }
+        body.denial_reason = reason
+      }
+
+      try {
+        const res = await fetch(`${API}/approve-vacation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify(body)
+        })
+        const data = await res.json()
+        if (!res.ok) { alert(data.error || 'Action failed.'); confirmBtn.disabled = false; confirmBtn.textContent = currentActionType === 'approve' ? 'Approve' : 'Deny Request'; return }
+        closeActionModal()
+        loadOfficerRequests()
+      } catch (e) {
+        alert('Network error: ' + e.message)
+        confirmBtn.disabled = false
+      }
+    }
+
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+    function showResult(el, msg, color) {
+      el.textContent = msg
+      el.className = 'text-sm font-semibold text-center mt-3 ' + (color === 'green' ? 'text-green-600' : color === 'red' ? 'text-red-600' : color === 'orange' ? 'text-orange-600' : 'text-gray-500')
+    }
+
+    function statusBadge(status) {
+      const map = {
+        pending:          ['Pending — Awaiting Captain', 'status-pending'],
+        captain_approved: ['Captain Approved — Awaiting DC', 'status-captain_approved'],
+        approved:         ['Fully Approved', 'status-approved'],
+        denied:           ['Denied', 'status-denied']
+      }
+      const [label, cls] = map[status] || [status, 'bg-gray-100 text-gray-600']
+      return `<span class="text-xs font-bold px-2 py-1 rounded-full ${cls}">${label}</span>`
+    }
+
+    function formatDates(arr) {
+      if (!arr || !arr.length) return '—'
+      return arr.map(d => {
+        const dt = new Date(d + 'T12:00:00')
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      }).join(', ')
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '—'
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    boot()
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
+    }
+  </script>
+</body>
+</html>
