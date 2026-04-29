@@ -490,7 +490,8 @@
           </div>` : ''}
           ${isAdm ? `
           <div class="mt-2">
-            <button onclick="deleteVacationRequest('${r.id}', '${esc(r.ff_name)}', this)"
+            <button data-del-id="${r.id}" data-del-name="${esc(r.ff_name)}"
+              onclick="deleteVacationRequest(this.dataset.delId, this.dataset.delName, this)"
               class="text-xs text-gray-400 hover:text-red-600 font-semibold transition" style="min-height:0;">
               Delete submission
             </button>
@@ -607,25 +608,27 @@
 
     // ── DELETE SUBMISSION ────────────────────────────────────────────────────
     async function deleteVacationRequest(id, ffName, btn) {
-      if (!confirm(`Delete the vacation request submitted by ${ffName}? This cannot be undone.`)) return
+      if (!AUTH.isAdmin()) { alert('Admin login required.'); return }
+      if (!confirm(`Delete the vacation request submitted by ${ffName}?\nThis cannot be undone.`)) return
       btn.disabled = true
       btn.textContent = 'Deleting…'
       try {
-        const res = await fetch('/.netlify/functions/delete-vacation-request', {
+        const res = await fetch(`${API}/delete-vacation-request`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
           body: JSON.stringify({ id })
         })
-        const data = await res.json()
+        let data = {}
+        try { data = await res.json() } catch {}
         if (!res.ok) {
-          alert('Error: ' + (data.error || res.status))
+          alert('Delete failed: ' + (data.error || `HTTP ${res.status}`))
           btn.disabled = false
           btn.textContent = 'Delete submission'
           return
         }
         loadOfficerRequests()
       } catch (e) {
-        alert('Network error: ' + e.message)
+        alert('Delete failed: ' + e.message)
         btn.disabled = false
         btn.textContent = 'Delete submission'
       }
