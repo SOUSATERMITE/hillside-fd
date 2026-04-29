@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-const { verifySession } = require('./_auth')
+const { verifySession, findOfficerInFirefighters } = require('./_auth')
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
@@ -32,37 +32,8 @@ exports.handler = async (event) => {
     const officer = await verifySession(event)
     if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
 
-    // Look up officer in firefighters table to get rank + group.
-    // Strategy: exact → ilike exact → wildcard on name → wildcard on display_name → last-word wildcard
-    let officerFF = null
-
-    async function ffLookup(pattern) {
-      const { data } = await supabase
-        .from('firefighters')
-        .select('rank, group_number, name')
-        .ilike('name', pattern)
-        .eq('active', true)
-        .limit(1)
-      return data?.[0] || null
-    }
-
-    // 1. Exact case-insensitive match on officer.name
-    officerFF = await ffLookup(officer.name)
-
-    // 2. Wildcard: firefighter name contains officer.name (e.g. "Gwidzz" inside "John Gwidzz")
-    if (!officerFF) officerFF = await ffLookup(`%${officer.name}%`)
-
-    // 3. Wildcard on display_name (e.g. display_name "Capt. Gwidzz" → try "Gwidzz")
-    if (!officerFF && officer.display_name) {
-      officerFF = await ffLookup(`%${officer.display_name}%`)
-    }
-
-    // 4. Last-word fallback: extract last name token from officer.name or display_name
-    if (!officerFF) {
-      const nameSrc = officer.display_name || officer.name
-      const lastName = nameSrc.trim().split(/[\s,\.]+/).filter(Boolean).pop()
-      if (lastName && lastName.length > 2) officerFF = await ffLookup(`%${lastName}%`)
-    }
+    // Look up officer in firefighters table to get rank + group (shared helper tries 4 strategies)
+    const officerFF = await findOfficerInFirefighters(supabase, officer)
 
     const rank    = officerFF?.rank || ''
     const isChief = rank === 'Chief' || officer.role === 'admin'

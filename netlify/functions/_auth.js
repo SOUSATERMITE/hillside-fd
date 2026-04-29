@@ -39,4 +39,32 @@ async function checkAdmin(event) {
   return null
 }
 
-module.exports = { verifySession, checkAdmin }
+// Find an officer's firefighter record by name, trying progressively looser matches.
+// Returns { rank, group_number, name } or null.
+async function findOfficerInFirefighters(supabase, officer) {
+  async function attempt(pattern) {
+    const { data } = await supabase
+      .from('firefighters')
+      .select('rank, group_number, name')
+      .ilike('name', pattern)
+      .eq('active', true)
+      .limit(1)
+    return data?.[0] || null
+  }
+
+  // 1. Exact case-insensitive
+  let ff = await attempt(officer.name)
+  // 2. Wildcard: FF name contains officer.name  e.g. "Gwidzz" inside "John Gwidzz"
+  if (!ff) ff = await attempt(`%${officer.name}%`)
+  // 3. Wildcard on display_name
+  if (!ff && officer.display_name) ff = await attempt(`%${officer.display_name}%`)
+  // 4. Last-word (last name) fallback
+  if (!ff) {
+    const src = (officer.display_name || officer.name).trim()
+    const last = src.split(/[\s,\.]+/).filter(Boolean).pop()
+    if (last && last.length > 2) ff = await attempt(`%${last}%`)
+  }
+  return ff
+}
+
+module.exports = { verifySession, checkAdmin, findOfficerInFirefighters }

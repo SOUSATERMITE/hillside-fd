@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 const { allowOrigin } = require('./_cors')
-const { verifySession } = require('./_auth')
+const { verifySession, findOfficerInFirefighters } = require('./_auth')
 
 function sanitize(v) { return (v || '').replace(/[\r\n\t]/g, ' ').trim() }
 
@@ -117,12 +117,7 @@ exports.handler = async (event) => {
       .single()
     if (reqErr || !vacReq) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Request not found' }) }
 
-    const { data: officerFF } = await supabase
-      .from('firefighters')
-      .select('rank, group_number')
-      .eq('name', officer.name)
-      .eq('active', true)
-      .maybeSingle()
+    const officerFF = await findOfficerInFirefighters(supabase, officer)
 
     const isAdmin   = officer.role === 'admin'
     const rank      = officerFF?.rank || ''
