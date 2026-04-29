@@ -234,8 +234,36 @@
       // Set today's date
       document.getElementById('requestDate').value = new Date().toISOString().slice(0, 10)
 
-      // Check for deep-linked request in URL
-      const deepRequestId = new URLSearchParams(window.location.search).get('request')
+      const params = new URLSearchParams(window.location.search)
+      const deepRequestId = params.get('request')
+      const magicToken    = params.get('token')
+
+      // Auto-login via magic token from email link (single-use, 7-day expiry)
+      if (magicToken && !AUTH.isLoggedIn()) {
+        try {
+          const res = await fetch(`${API}/redeem-magic-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: magicToken })
+          })
+          if (res.ok) {
+            const data = await res.json()
+            localStorage.setItem('hfd_session', JSON.stringify(data))
+            AUTH.updateNav()
+            console.log(`[magic-token] Auto-logged in as ${data.display_name}`)
+          } else {
+            const err = await res.json().catch(() => ({}))
+            console.warn('[magic-token] Redemption failed:', err.error || res.status)
+            showInfo('This email link has expired. Please log in with your PIN.')
+          }
+        } catch (e) {
+          console.error('[magic-token] Network error:', e)
+        }
+        // Remove token from URL so it can't be shared or replayed
+        const cleanUrl = new URL(window.location)
+        cleanUrl.searchParams.delete('token')
+        window.history.replaceState({}, '', cleanUrl)
+      }
 
       // Load firefighters for dropdowns
       try {
@@ -247,25 +275,23 @@
       } catch (e) { console.error(e) }
 
       // Show officer tab if logged in; handle deep link
-      setTimeout(() => {
-        if (AUTH.isOfficer()) {
-          document.getElementById('tabOfficer').classList.remove('hidden')
-          detectOfficerRank()
-          if (deepRequestId) {
-            pendingDeepRequestId = deepRequestId
+      if (AUTH.isOfficer()) {
+        document.getElementById('tabOfficer').classList.remove('hidden')
+        detectOfficerRank()
+        if (deepRequestId) {
+          pendingDeepRequestId = deepRequestId
+          showTab('officer')
+        }
+      } else if (deepRequestId) {
+        pendingDeepRequestId = deepRequestId
+        showInfo('Please log in to review this vacation request.')
+        AUTH.showLoginModal((session) => {
+          if (AUTH.isOfficer()) {
+            document.getElementById('tabOfficer').classList.remove('hidden')
             showTab('officer')
           }
-        } else if (deepRequestId) {
-          pendingDeepRequestId = deepRequestId
-          showInfo('Please log in to review this vacation request.')
-          AUTH.showLoginModal((session) => {
-            if (AUTH.isOfficer()) {
-              document.getElementById('tabOfficer').classList.remove('hidden')
-              showTab('officer')
-            }
-          })
-        }
-      }, 150)
+        })
+      }
     }
 
     function populateDropdowns() {
