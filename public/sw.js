@@ -1,5 +1,5 @@
-const CACHE = 'hillside-fd-v2'
-const SHELL = ['/sick/', '/recall/', '/admin/', '/docs/', '/search/', '/vacation/', '/manifest.json', '/auth.js']
+const CACHE = 'hillside-fd-v3'
+const SHELL = ['/', '/sick/', '/recall/', '/admin/', '/docs/', '/search/', '/vacation/', '/manifest.json', '/auth.js']
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)))
