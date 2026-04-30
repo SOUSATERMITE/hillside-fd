@@ -41,7 +41,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -85,7 +85,13 @@ exports.handler = async (event) => {
         .select('id, name, title, phone, email, category, notes')
         .eq('active', true)
         .order('category')
-        .order('name')
+        .order('name'),
+
+      supabase
+        .from('apparatus')
+        .select('id, unit_name, unit_type, status, location, last_updated, updated_by')
+        .eq('active', true)
+        .order('unit_name', { ascending: true })
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -117,6 +123,7 @@ exports.handler = async (event) => {
         events,
         workOrders:          workOrderRes.data || [],
         contacts:            contactRes.data   || [],
+        apparatus:           apparatusRes.data || [],
         schedule
       })
     }

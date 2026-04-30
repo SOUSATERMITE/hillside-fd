@@ -15,6 +15,7 @@
     { "name": "Recall List",        "short_name": "Recall",   "url": "/recall",   "description": "Record and view recall assignments" },
     { "name": "Document Library",   "short_name": "Docs",     "url": "/docs",     "description": "View and upload department documents" },
     { "name": "Policy Search",      "short_name": "Search",   "url": "/search",   "description": "Search policies and documents" },
-    { "name": "Vacation Requests",  "short_name": "Vacation", "url": "/vacation", "description": "Submit and track vacation change requests" }
+    { "name": "Vacation Requests",  "short_name": "Vacation",  "url": "/vacation",  "description": "Submit and track vacation change requests" },
+    { "name": "Apparatus Status",   "short_name": "Apparatus", "url": "/apparatus", "description": "View and update apparatus status" }
   ]
 }

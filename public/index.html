@@ -37,8 +37,9 @@
     <a href="/recall"  class="hover:text-green-200 pb-0.5">Recall</a>
     <a href="/docs"    class="hover:text-green-200 pb-0.5">Docs</a>
     <a href="/search"  class="hover:text-green-200 pb-0.5">Search</a>
-    <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
-    <a href="/admin"   class="hover:text-green-200 pb-0.5">Admin</a>
+    <a href="/vacation"   class="hover:text-green-200 pb-0.5">Vacation</a>
+    <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
+    <a href="/admin"     class="hover:text-green-200 pb-0.5">Admin</a>
   </div>
   <div class="flex items-center gap-2">
     <span id="authSlot" class="flex items-center gap-2"></span>
@@ -52,8 +53,9 @@
   <a href="/recall"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
   <a href="/docs"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
   <a href="/search"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
-  <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
-  <a href="/admin"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+  <a href="/vacation"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/apparatus" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Apparatus</a>
+  <a href="/admin"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
 </div>
 
 <div class="max-w-3xl mx-auto px-3 py-4 space-y-4">
@@ -195,7 +197,19 @@
     </details>
   </div>
 
-  <!-- SECTION 5: CONTACTS -->
+  <!-- SECTION 5: APPARATUS STATUS -->
+  <div class="section-card">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-gray-800 text-base">🚒 Apparatus Status</h2>
+      <a href="/apparatus" class="text-sm font-bold text-green-700 hover:text-green-800">View All →</a>
+    </div>
+    <div id="apparatusOOSBanner" class="hidden px-4 py-2 bg-red-50 border-b border-red-200 text-sm font-bold text-red-700"></div>
+    <div id="apparatusGrid" class="px-3 py-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div class="text-center py-4 text-gray-400 text-sm col-span-full">Loading...</div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: CONTACTS -->
   <div class="section-card mb-6">
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
       <h2 class="font-extrabold text-gray-800 text-base">📞 Contact Directory</h2>
@@ -278,6 +292,13 @@ function fmtTime(t) {
   return `${hr === 0 ? 12 : hr > 12 ? hr-12 : hr}:${m}${hr < 12 ? 'am' : 'pm'}`
 }
 
+const APPARATUS_STATUS = {
+  in_service:      { label: 'In Service',     cls: 'bg-green-100 text-green-800',  dot: 'bg-green-500' },
+  out_of_service:  { label: 'Out of Service', cls: 'bg-red-100 text-red-800',     dot: 'bg-red-500' },
+  maintenance:     { label: 'At Shop',        cls: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500' },
+  reserve:         { label: 'Reserve',        cls: 'bg-yellow-100 text-yellow-800', dot: 'bg-yellow-500' }
+}
+
 const CAT_COLORS = {
   general:'bg-gray-100 text-gray-600', safety:'bg-red-100 text-red-700',
   equipment:'bg-blue-100 text-blue-700', training:'bg-green-100 text-green-700',
@@ -303,6 +324,7 @@ async function loadDashboard() {
     renderBulletins()
     renderEvents()
     renderWorkOrders()
+    renderApparatus()
     renderContacts()
     showOfficerButtons()
   } catch (e) {
@@ -638,7 +660,43 @@ async function updateWOStatus(id, status) {
   } catch(e) { alert(e.message) }
 }
 
-// ── SECTION 5: CONTACTS ──────────────────────────────────────────────────────
+// ── SECTION 5: APPARATUS ────────────────────────────────────────────────────
+function renderApparatus() {
+  const grid   = document.getElementById('apparatusGrid')
+  const banner = document.getElementById('apparatusOOSBanner')
+  const units  = dashData.apparatus || []
+
+  if (!units.length) {
+    grid.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm col-span-full">No apparatus found.</div>'
+    return
+  }
+
+  // OOS units first, then rest
+  const oos   = units.filter(u => u.status === 'out_of_service')
+  const rest  = units.filter(u => u.status !== 'out_of_service')
+  const sorted = [...oos, ...rest]
+
+  if (oos.length) {
+    banner.classList.remove('hidden')
+    banner.textContent = `⚠️ OUT OF SERVICE: ${oos.map(u => u.unit_name).join(', ')}`
+  } else {
+    banner.classList.add('hidden')
+  }
+
+  grid.innerHTML = sorted.map(u => {
+    const st = APPARATUS_STATUS[u.status] || APPARATUS_STATUS.in_service
+    return `<a href="/apparatus" class="block border rounded-xl px-3 py-2.5 ${u.status === 'out_of_service' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-sm transition">
+      <div class="flex items-center gap-1.5 mb-1">
+        <span class="w-2 h-2 rounded-full flex-shrink-0 ${st.dot}"></span>
+        <span class="font-extrabold text-gray-800 text-sm">${esc(u.unit_name)}</span>
+      </div>
+      <div class="text-xs text-gray-500">${esc(u.unit_type)}</div>
+      <span class="inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>
+    </a>`
+  }).join('')
+}
+
+// ── SECTION 6: CONTACTS ──────────────────────────────────────────────────────
 function renderContacts(filter) {
   const list     = document.getElementById('contactList')
   const q        = (filter || '').toLowerCase()

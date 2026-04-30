@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Apparatus — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    select, button, input, textarea { min-height: 44px; }
+    nav { padding-top: max(12px, env(safe-area-inset-top)); background: #1a5c2a; }
+    nav button, nav a { min-height: 0 !important; }
+    #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); background: #1a5c2a; }
+    .nav-active  { font-weight:700; border-bottom:2px solid rgba(255,255,255,0.85); }
+    .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
+    details > summary { list-style:none; cursor:pointer; }
+    details > summary::-webkit-details-marker { display:none; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<div id="authModal"></div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
+    <h2 class="font-bold text-gray-800 text-lg mb-4" id="editModalTitle">Update Apparatus</h2>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Status</label>
+      <select id="editStatus" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+        <option value="in_service">In Service</option>
+        <option value="out_of_service">Out of Service</option>
+        <option value="maintenance">At Shop / Maintenance</option>
+        <option value="reserve">Reserve In Service</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Location</label>
+      <input id="editLocation" type="text" placeholder="e.g. Station 1, Township Garage, Mutual Aid" maxlength="200"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Findings / Notes</label>
+      <textarea id="editNotes" placeholder="Describe issue, repair, or reason for status change..." maxlength="1000" rows="3"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;resize:vertical;"></textarea>
+    </div>
+    <div id="editErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-3">
+      <button onclick="closeEditModal()" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitUpdate()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition">Update</button>
+    </div>
+  </div>
+</div>
+
+<nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-40">
+  <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
+  <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
+    <a href="/"          class="hover:text-green-200 pb-0.5">Dashboard</a>
+    <a href="/sick"       class="hover:text-green-200 pb-0.5">Sick</a>
+    <a href="/recall"     class="hover:text-green-200 pb-0.5">Recall</a>
+    <a href="/docs"       class="hover:text-green-200 pb-0.5">Docs</a>
+    <a href="/search"     class="hover:text-green-200 pb-0.5">Search</a>
+    <a href="/vacation"   class="hover:text-green-200 pb-0.5">Vacation</a>
+    <a href="/apparatus"  class="nav-active pb-0.5">Apparatus</a>
+    <a href="/admin"      class="hover:text-green-200 pb-0.5">Admin</a>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="authSlot" class="flex items-center gap-2"></span>
+    <button onclick="toggleMobileMenu()" class="sm:hidden text-white rounded px-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;font-size:22px;line-height:1;background:none;border:none;cursor:pointer;" aria-label="Menu">&#9776;</button>
+  </div>
+</nav>
+<div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
+<div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 80px);">
+  <a href="/"          onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+  <a href="/sick"       onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+  <a href="/recall"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+  <a href="/docs"       onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+  <a href="/search"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
+  <a href="/vacation"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/apparatus"  onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Apparatus</a>
+  <a href="/admin"      onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+</div>
+
+<!-- OOS Banner -->
+<div id="oosBanner" class="hidden bg-red-700 text-white text-sm font-bold px-4 py-3 text-center"></div>
+
+<div class="max-w-4xl mx-auto px-3 py-4 space-y-4">
+
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-extrabold text-gray-800">🚒 Apparatus Status</h1>
+    <button onclick="loadApparatus()" class="text-sm text-green-700 font-semibold hover:text-green-900" style="min-height:0;">↻ Refresh</button>
+  </div>
+
+  <!-- Grid of apparatus cards -->
+  <div id="apparatusGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="text-center py-8 text-gray-400 col-span-full">Loading...</div>
+  </div>
+
+</div>
+
+<script src="/auth.js"></script>
+<script>
+const API = '/.netlify/functions'
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+function timeAgo(iso) {
+  if (!iso) return 'never'
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000)
+  if (s < 60)    return 'just now'
+  if (s < 3600)  return `${Math.floor(s/60)}m ago`
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  })
+}
+
+const STATUS_CONFIG = {
+  in_service:     { label: 'In Service',           cls: 'bg-green-100 text-green-800',   dot: 'bg-green-500',  border: 'border-green-200' },
+  out_of_service: { label: 'Out of Service',        cls: 'bg-red-100 text-red-800',       dot: 'bg-red-500',    border: 'border-red-400' },
+  maintenance:    { label: 'At Shop / Maintenance', cls: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500', border: 'border-orange-300' },
+  reserve:        { label: 'Reserve In Service',    cls: 'bg-yellow-100 text-yellow-800', dot: 'bg-yellow-500', border: 'border-yellow-300' }
+}
+
+let apparatusData = []
+let editingId = null
+
+async function loadApparatus() {
+  try {
+    const res = await fetch(`${API}/get-apparatus`)
+    if (!res.ok) throw new Error('Failed to load')
+    apparatusData = await res.json()
+    renderApparatus()
+  } catch (e) {
+    document.getElementById('apparatusGrid').innerHTML =
+      `<div class="col-span-full text-center py-8 text-red-600 text-sm font-semibold">Failed to load apparatus data.</div>`
+  }
+}
+
+function renderApparatus() {
+  const grid   = document.getElementById('apparatusGrid')
+  const banner = document.getElementById('oosBanner')
+  const isOff  = AUTH.isOfficer()
+
+  if (!apparatusData.length) {
+    grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-400">No apparatus found.</div>'
+    return
+  }
+
+  const oos  = apparatusData.filter(u => u.status === 'out_of_service')
+  const rest = apparatusData.filter(u => u.status !== 'out_of_service')
+  const sorted = [...oos, ...rest]
+
+  if (oos.length) {
+    banner.classList.remove('hidden')
+    banner.textContent = `⚠️ OUT OF SERVICE: ${oos.map(u => u.unit_name).join(', ')} — Notify D/C immediately`
+  } else {
+    banner.classList.add('hidden')
+  }
+
+  grid.innerHTML = sorted.map(u => renderCard(u, isOff)).join('')
+}
+
+function renderCard(u, isOff) {
+  const st = STATUS_CONFIG[u.status] || STATUS_CONFIG.in_service
+  const log = u.log || []
+
+  const editBtn = isOff ? `
+    <button onclick="openEditModal('${esc(u.id)}','${esc(u.unit_name)}','${esc(u.status)}','${esc(u.location||'')}','${esc(u.notes||'')}')"
+      class="text-xs font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1.5 hover:bg-green-50 transition" style="min-height:0;">
+      Edit Status
+    </button>` : ''
+
+  const logHtml = log.length ? `
+    <details class="mt-3">
+      <summary class="text-xs font-semibold text-gray-400 hover:text-gray-600 flex items-center gap-1">
+        <span>▶</span> <span>Change Log (${log.length})</span>
+      </summary>
+      <div class="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
+        ${log.slice(0, 20).map(entry => {
+          const from = STATUS_CONFIG[entry.previous_status]?.label || entry.previous_status || '—'
+          const to   = STATUS_CONFIG[entry.new_status]?.label || entry.new_status
+          return `<div class="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+            <div class="font-semibold">${esc(from)} → ${esc(to)}</div>
+            ${entry.location ? `<div class="text-gray-400">📍 ${esc(entry.location)}</div>` : ''}
+            ${entry.finding  ? `<div class="text-gray-500 mt-0.5">${esc(entry.finding)}</div>` : ''}
+            ${entry.notes    ? `<div class="text-gray-500 mt-0.5">${esc(entry.notes)}</div>` : ''}
+            <div class="text-gray-400 mt-0.5">${esc(entry.changed_by)} · ${fmtDateTime(entry.created_at)}</div>
+          </div>`
+        }).join('')}
+        ${log.length > 20 ? `<div class="text-xs text-gray-400 text-center py-1">Showing 20 of ${log.length} entries</div>` : ''}
+      </div>
+    </details>` : '<div class="mt-2 text-xs text-gray-400">No change history.</div>'
+
+  return `<div class="bg-white rounded-2xl border-2 ${st.border} shadow-sm p-4 ${u.status === 'out_of_service' ? 'bg-red-50' : ''}">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="w-3 h-3 rounded-full flex-shrink-0 ${st.dot}"></span>
+          <span class="font-extrabold text-gray-900 text-lg">${esc(u.unit_name)}</span>
+        </div>
+        <div class="text-sm text-gray-500">${esc(u.unit_type)}</div>
+      </div>
+      ${editBtn}
+    </div>
+    <div class="mb-3">
+      <span class="inline-block text-sm font-bold px-3 py-1 rounded-full ${st.cls}">${st.label}</span>
+    </div>
+    ${u.location ? `<div class="text-xs text-gray-500 mb-1">📍 ${esc(u.location)}</div>` : ''}
+    ${u.notes    ? `<div class="text-xs text-gray-500 mb-1">📝 ${esc(u.notes)}</div>` : ''}
+    <div class="text-xs text-gray-400">Updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
+    ${logHtml}
+  </div>`
+}
+
+// ── EDIT MODAL ────────────────────────────────────────────────────────────────
+function openEditModal(id, name, status, location, notes) {
+  editingId = id
+  document.getElementById('editModalTitle').textContent = `Update ${name}`
+  document.getElementById('editStatus').value   = status
+  document.getElementById('editLocation').value = location
+  document.getElementById('editNotes').value    = notes
+  document.getElementById('editErr').classList.add('hidden')
+  document.getElementById('editModal').classList.remove('hidden')
+  document.getElementById('editStatus').focus()
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.add('hidden')
+  editingId = null
+}
+
+async function submitUpdate() {
+  const err = document.getElementById('editErr')
+  err.classList.add('hidden')
+  const status   = document.getElementById('editStatus').value
+  const location = document.getElementById('editLocation').value.trim()
+  const finding  = document.getElementById('editNotes').value.trim()
+
+  try {
+    const res = await fetch(`${API}/manage-apparatus`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({ action: 'update_status', id: editingId, status, location: location || undefined, finding: finding || undefined })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      err.textContent = data.error || 'Update failed'
+      err.classList.remove('hidden')
+      return
+    }
+    closeEditModal()
+    await loadApparatus()
+  } catch (e) {
+    err.textContent = e.message
+    err.classList.remove('hidden')
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await AUTH.init
+  AUTH.updateNav()
+  loadApparatus()
+})
+
+// Close modal on backdrop click
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal()
+})
+</script>
+</body>
+</html>
