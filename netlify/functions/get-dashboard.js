@@ -122,6 +122,7 @@ exports.handler = async (event) => {
     }
   } catch (e) {
     console.error('[get-dashboard]', e.message)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[get-dashboard] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

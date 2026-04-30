@@ -126,6 +126,7 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
   } catch (e) {
     console.error('[admin-officers] error:', e.message)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[admin-officers] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

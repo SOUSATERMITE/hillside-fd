@@ -92,6 +92,7 @@ exports.handler = async (event) => {
     const download_url = `${process.env.SUPABASE_URL}/storage/v1/object/public/fd-documents/${filePath}`
     return { statusCode: 200, headers, body: JSON.stringify({ ...doc, download_url }) }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[upload-document] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

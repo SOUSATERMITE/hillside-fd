@@ -66,7 +66,7 @@ exports.handler = async (event) => {
     statusCode: 200, headers,
     body: JSON.stringify({
       allOk,
-      smtpUser,
+      smtpConfigured: true,
       timestamp,
       results
     })

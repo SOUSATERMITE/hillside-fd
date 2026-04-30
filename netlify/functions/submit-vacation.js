@@ -283,6 +283,7 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
   } catch (e) {
     console.error('[submit-vacation] Error:', e)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[submit-vacation] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

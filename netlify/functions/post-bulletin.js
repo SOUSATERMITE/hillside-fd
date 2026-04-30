@@ -13,13 +13,15 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
 
+  // Auth check first — before touching body
+  const officer = await verifySession(event)
+  if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
+
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   const body = JSON.parse(event.body || '{}')
   const { action } = body
 
   if (action === 'post') {
-    const officer = await verifySession(event)
-    if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
 
     const { title, content, category } = body
     if (!title?.trim() || !content?.trim()) {

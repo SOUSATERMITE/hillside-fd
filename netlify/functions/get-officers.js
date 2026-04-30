@@ -42,6 +42,7 @@ exports.handler = async (event) => {
 
     return { statusCode: 200, headers, body: JSON.stringify(data || []) }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[get-officers] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

@@ -53,6 +53,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ currently_sick: currentlySick, recently_cleared: recentlyCleared })
     }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[get-sick] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

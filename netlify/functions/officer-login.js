@@ -86,6 +86,7 @@ exports.handler = async (event) => {
       })
     }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[officer-login] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

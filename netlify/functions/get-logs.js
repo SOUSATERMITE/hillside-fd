@@ -48,6 +48,7 @@ exports.handler = async (event) => {
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'type must be sick or recall' }) }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[get-logs] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

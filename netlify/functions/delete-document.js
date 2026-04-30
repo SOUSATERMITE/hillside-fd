@@ -31,6 +31,7 @@ exports.handler = async (event) => {
     if (error) throw error
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
   } catch (e) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    console.error('[delete-document] error:', e.message)
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }

@@ -465,15 +465,6 @@
         const requests    = Array.isArray(payload) ? payload : (payload.requests || [])
         const officerRank = Array.isArray(payload) ? null    : (payload.officerRank || null)
 
-        // Debug: log what the server resolved for this officer
-        if (payload._debug) {
-          console.log('[vacation] Officer lookup:', payload._debug)
-          console.log(`[vacation] officerRank="${officerRank}" requests=${requests.length}`)
-          if (!payload._debug.ffMatch) {
-            console.warn(`[vacation] WARNING: officer "${payload._debug.officerName}" was NOT found in the firefighters table — rank will be empty and no action buttons will show`)
-          }
-        }
-
         if (!requests.length) {
           container.innerHTML = '<div class="text-gray-400 text-sm text-center py-10 bg-white rounded-2xl border border-gray-200">No requests found.</div>'
           return

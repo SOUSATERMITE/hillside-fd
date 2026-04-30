@@ -65,13 +65,11 @@ exports.handler = async (event) => {
       statusCode: 200, headers,
       body: JSON.stringify({
         requests: data || [],
-        officerRank: rank,
-        // Debug fields — client logs these, never shown in UI
-        _debug: { officerName: officer.name, ffMatch: officerFF?.name || null, rank, group: officerFF?.group_number ?? null }
+        officerRank: rank
       })
     }
   } catch (e) {
     console.error('[get-vacation-requests] error:', e.message)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }
 }
