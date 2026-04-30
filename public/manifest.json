@@ -1,8 +1,8 @@
 {
   "name": "Hillside Fire Department",
   "short_name": "Hillside FD",
-  "description": "Sick Tracking, Recall List, Document Library, Policy Search, and Vacation Requests",
-  "start_url": "/sick",
+  "description": "Operational Dashboard — Sick Tracking, Recall, Documents, Vacation Requests, Bulletins, Work Orders",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#b71c1c",

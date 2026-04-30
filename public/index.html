@@ -1,4 +1,777 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="refresh" content="0;url=/sick" /><title>Hillside FD</title></head>
-<body><script>window.location.replace('/sick')</script></body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a5c2a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Dashboard — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    select, button, input, textarea { min-height: 44px; }
+    nav { padding-top: max(12px, env(safe-area-inset-top)); background: #1a5c2a; }
+    nav button, nav a { min-height: 0 !important; }
+    #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); background: #1a5c2a; }
+    .nav-active  { font-weight:700; border-bottom:2px solid rgba(255,255,255,0.85); }
+    .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
+    .section-card { background:#fff; border-radius:1rem; box-shadow:0 1px 4px rgba(0,0,0,0.08); border:1px solid #e5e7eb; }
+    .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:.04em; }
+    .pin-icon { display:inline-block; width:18px; height:18px; margin-right:4px; vertical-align:middle; }
+    details > summary { list-style:none; cursor:pointer; }
+    details > summary::-webkit-details-marker { display:none; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<div id="authModal"></div>
+
+<nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+  <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
+  <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
+    <a href="/"        class="nav-active pb-0.5">Dashboard</a>
+    <a href="/sick"    class="hover:text-green-200 pb-0.5">Sick</a>
+    <a href="/recall"  class="hover:text-green-200 pb-0.5">Recall</a>
+    <a href="/docs"    class="hover:text-green-200 pb-0.5">Docs</a>
+    <a href="/search"  class="hover:text-green-200 pb-0.5">Search</a>
+    <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
+    <a href="/admin"   class="hover:text-green-200 pb-0.5">Admin</a>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="authSlot" class="flex items-center gap-2"></span>
+    <button onclick="toggleMobileMenu()" class="sm:hidden text-white rounded px-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;font-size:22px;line-height:1;background:none;border:none;cursor:pointer;" aria-label="Menu">&#9776;</button>
+  </div>
+</nav>
+<div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
+<div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 80px);">
+  <a href="/"        onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Dashboard</a>
+  <a href="/sick"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+  <a href="/recall"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+  <a href="/docs"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+  <a href="/search"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
+  <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/admin"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+</div>
+
+<div class="max-w-3xl mx-auto px-3 py-4 space-y-4">
+
+  <!-- SECTION 1: SHIFT STATUS -->
+  <div id="shiftCard" class="section-card overflow-hidden">
+    <div id="shiftBanner" class="px-4 py-3 flex items-center justify-between">
+      <div>
+        <div id="shiftTitle" class="text-lg font-extrabold text-white">Loading...</div>
+        <div id="shiftSub"   class="text-sm text-white text-opacity-80 mt-0.5"></div>
+      </div>
+      <div id="statusDot" class="w-5 h-5 rounded-full border-2 border-white flex-shrink-0"></div>
+    </div>
+    <div id="shiftDetails" class="px-4 py-3 grid grid-cols-3 gap-3 text-center border-t border-gray-100">
+      <div>
+        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sick</div>
+        <div id="sickCount" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Recalled Today</div>
+        <div id="recallCount" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Pending Vacation</div>
+        <div id="vacCount" class="text-2xl font-extrabold text-gray-800">—</div>
+        <a href="/vacation" class="text-xs text-blue-600 font-semibold">Review →</a>
+      </div>
+    </div>
+    <div id="sickList" class="hidden px-4 pb-3 border-t border-gray-100"></div>
+  </div>
+
+  <!-- SECTION 2: BULLETIN BOARD -->
+  <div class="section-card">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-gray-800 text-base">📋 Bulletin Board</h2>
+      <button id="bulletinToggle" onclick="toggleBulletinForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Post</button>
+    </div>
+    <div id="bulletinForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
+      <input id="bTitle"   type="text"    placeholder="Title" maxlength="200"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <select id="bCat" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="general">General</option>
+        <option value="safety">Safety</option>
+        <option value="equipment">Equipment</option>
+        <option value="training">Training</option>
+        <option value="reminder">Reminder</option>
+      </select>
+      <textarea id="bContent" placeholder="Message..." maxlength="2000" rows="3"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;resize:vertical;"></textarea>
+      <div class="flex gap-2">
+        <button onclick="postBulletin()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Post</button>
+        <button onclick="toggleBulletinForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+      </div>
+      <div id="bErr" class="hidden text-red-600 text-xs mt-1"></div>
+    </div>
+    <div id="bulletinList" class="divide-y divide-gray-50">
+      <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: UPCOMING EVENTS -->
+  <div class="section-card">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-gray-800 text-base">📅 Upcoming Events <span class="text-xs font-normal text-gray-400">(next 14 days)</span></h2>
+      <button id="eventToggle" onclick="toggleEventForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Add</button>
+    </div>
+    <div id="eventForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
+      <input id="evTitle" type="text" placeholder="Event title" maxlength="200"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="evDate" type="date" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <input id="evTime" type="time" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <select id="evGroup" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="">All Groups</option>
+          <option value="1">Group 1</option>
+          <option value="2">Group 2</option>
+          <option value="3">Group 3</option>
+          <option value="4">Group 4</option>
+        </select>
+        <select id="evCat" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="training">Training</option>
+          <option value="inspection">Inspection</option>
+          <option value="drill">Drill</option>
+          <option value="meeting">Meeting</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <textarea id="evDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+      <div class="flex gap-2">
+        <button onclick="addEvent()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Add Event</button>
+        <button onclick="toggleEventForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+      </div>
+      <div id="evErr" class="hidden text-red-600 text-xs mt-1"></div>
+    </div>
+    <div id="eventList" class="divide-y divide-gray-50">
+      <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: WORK ORDERS -->
+  <div class="section-card">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-gray-800 text-base">🔧 DPW Work Orders</h2>
+      <button id="woToggle" onclick="toggleWOForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Submit</button>
+    </div>
+    <div id="woForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
+      <div id="woDupWarn" class="hidden bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-2 text-xs text-yellow-800 font-semibold mb-2"></div>
+      <input id="woTitle" type="text" placeholder="Issue title" maxlength="200" oninput="checkWODuplicate()"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="woLocation" type="text" placeholder="Location (optional)" maxlength="200"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <select id="woPriority" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+      <textarea id="woDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+      <div class="flex gap-2">
+        <button onclick="submitWO()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Submit</button>
+        <button onclick="toggleWOForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+      </div>
+      <div id="woErr" class="hidden text-red-600 text-xs mt-1"></div>
+    </div>
+    <div id="woList" class="divide-y divide-gray-50">
+      <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+    </div>
+    <details id="woArchive" class="hidden">
+      <summary class="px-4 py-3 text-sm font-semibold text-gray-400 border-t border-gray-100 hover:text-gray-600 flex items-center gap-1">
+        <span id="woArchiveCount"></span> completed / cancelled — tap to view
+      </summary>
+      <div id="woArchiveList" class="divide-y divide-gray-50 border-t border-gray-100"></div>
+    </details>
+  </div>
+
+  <!-- SECTION 5: CONTACTS -->
+  <div class="section-card mb-6">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-extrabold text-gray-800 text-base">📞 Contact Directory</h2>
+      <button id="contactToggle" onclick="toggleContactForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Add</button>
+    </div>
+    <div class="px-4 pt-3 pb-2">
+      <input id="contactSearch" type="search" placeholder="Search contacts..." oninput="filterContacts()"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div id="contactForm" class="hidden px-4 py-3 border-t border-gray-100 bg-green-50">
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="ctName"  type="text"  placeholder="Name *" maxlength="100"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <input id="ctTitle" type="text"  placeholder="Title" maxlength="100"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="ctPhone" type="tel"   placeholder="Phone" maxlength="30"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <input id="ctEmail" type="email" placeholder="Email" maxlength="150"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <select id="ctCat" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="emergency">Emergency</option>
+          <option value="staff">Staff</option>
+          <option value="vendor">Vendor</option>
+          <option value="utility">Utility</option>
+          <option value="other">Other</option>
+        </select>
+        <input id="ctNotes" type="text" placeholder="Notes" maxlength="500"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div id="ctEditId" data-id=""></div>
+      <div class="flex gap-2">
+        <button onclick="saveContact()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
+        <button onclick="cancelContactForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+      </div>
+      <div id="ctErr" class="hidden text-red-600 text-xs mt-1"></div>
+    </div>
+    <div id="contactList" class="divide-y divide-gray-50 border-t border-gray-100">
+      <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+    </div>
+  </div>
+
+</div><!-- /max-w -->
+
+<script src="/auth.js"></script>
+<script>
+const API = '/.netlify/functions'
+
+// Shift calculator (matches server)
+const SHIFT_ANCHOR = new Date('2026-04-30T11:30:00Z')
+const ROTATION = [3, 4, 1, 2]
+function groupForDate(d) {
+  const shifts = Math.floor((d - SHIFT_ANCHOR) / 86400000)
+  return ROTATION[((shifts % 4) + 4) % 4]
+}
+function shiftStartFor(d) {
+  const shifts = Math.floor((d - SHIFT_ANCHOR) / 86400000)
+  return new Date(SHIFT_ANCHOR.getTime() + shifts * 86400000)
+}
+
+// Helpers
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function timeAgo(iso) {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000)
+  if (s < 60)   return 'just now'
+  if (s < 3600) return `${Math.floor(s/60)}m ago`
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
+}
+function fmtDate(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })
+}
+function fmtTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  const hr = parseInt(h)
+  return `${hr === 0 ? 12 : hr > 12 ? hr-12 : hr}:${m}${hr < 12 ? 'am' : 'pm'}`
+}
+
+const CAT_COLORS = {
+  general:'bg-gray-100 text-gray-600', safety:'bg-red-100 text-red-700',
+  equipment:'bg-blue-100 text-blue-700', training:'bg-green-100 text-green-700',
+  reminder:'bg-yellow-100 text-yellow-700',
+  training_ev:'bg-green-100 text-green-700', inspection:'bg-blue-100 text-blue-700',
+  drill:'bg-orange-100 text-orange-700', meeting:'bg-purple-100 text-purple-700', other:'bg-gray-100 text-gray-600',
+  vendor:'bg-indigo-100 text-indigo-700', staff:'bg-teal-100 text-teal-700',
+  emergency:'bg-red-100 text-red-700', utility:'bg-yellow-100 text-yellow-700'
+}
+const PRI_COLORS = { urgent:'bg-red-100 text-red-700', high:'bg-orange-100 text-orange-700', medium:'bg-yellow-100 text-yellow-700', low:'bg-gray-100 text-gray-600' }
+const STATUS_COLORS = { submitted:'bg-blue-100 text-blue-700', in_progress:'bg-yellow-100 text-yellow-700', completed:'bg-green-100 text-green-700', cancelled:'bg-gray-100 text-gray-500' }
+
+// ── State ────────────────────────────────────────────────────────────────────
+let dashData = null
+
+// ── LOAD DASHBOARD ───────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const res = await fetch(`${API}/get-dashboard`)
+    if (!res.ok) throw new Error('Failed to load')
+    dashData = await res.json()
+    renderShift()
+    renderBulletins()
+    renderEvents()
+    renderWorkOrders()
+    renderContacts()
+    showOfficerButtons()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+// ── SECTION 1: SHIFT ─────────────────────────────────────────────────────────
+function renderShift() {
+  const { shift, sick, recalledToday, pendingVacation } = dashData
+  const g = shift.currentGroup
+  const start = new Date(shift.shiftStart)
+  const startET = start.toLocaleDateString('en-US', { timeZone:'America/New_York', weekday:'short', month:'short', day:'numeric' })
+
+  document.getElementById('shiftTitle').textContent = `Group ${g} On Duty`
+  document.getElementById('shiftSub').textContent   = `Tour started ${startET} at 07:30`
+
+  const sickCount   = sick.length
+  const recallCount = recalledToday.length
+  const vacCount    = pendingVacation.length
+
+  document.getElementById('sickCount').textContent   = sickCount
+  document.getElementById('recallCount').textContent = recallCount
+  document.getElementById('vacCount').textContent    = vacCount
+
+  // Status: red = uncovered sick, yellow = covered or pending, green = all clear
+  const uncovered = sickCount - recallCount
+  let bannerColor, dotColor
+  if (uncovered > 0)                       { bannerColor = 'bg-red-700';    dotColor = 'bg-red-300' }
+  else if (sickCount > 0 || vacCount > 0)  { bannerColor = 'bg-yellow-600'; dotColor = 'bg-yellow-200' }
+  else                                      { bannerColor = 'bg-green-700';  dotColor = 'bg-green-300' }
+
+  document.getElementById('shiftBanner').className = `px-4 py-3 flex items-center justify-between ${bannerColor}`
+  document.getElementById('statusDot').className   = `w-5 h-5 rounded-full border-2 border-white flex-shrink-0 ${dotColor}`
+
+  // Sick list
+  if (sickCount > 0) {
+    const sl = document.getElementById('sickList')
+    sl.classList.remove('hidden')
+    sl.innerHTML = '<div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Currently Out Sick</div>' +
+      sick.map(s => {
+        const ff = s.firefighters
+        const days = Math.floor((Date.now() - new Date(s.marked_sick_date)) / 86400000)
+        return `<div class="flex items-center justify-between py-1">
+          <span class="text-sm font-semibold text-gray-800">${esc(ff?.name || '—')} <span class="text-xs font-normal text-gray-400">${esc(ff?.rank||'')}</span></span>
+          <span class="text-xs text-gray-500">${days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`}</span>
+        </div>`
+      }).join('')
+  }
+}
+
+// ── SECTION 2: BULLETINS ──────────────────────────────────────────────────────
+function renderBulletins() {
+  const list = document.getElementById('bulletinList')
+  const bulletins = dashData.bulletins
+  const isAdm = AUTH.isAdmin()
+
+  if (!bulletins.length) {
+    list.innerHTML = '<div class="px-4 py-6 text-center text-gray-400 text-sm">No bulletins posted yet.</div>'
+    return
+  }
+
+  list.innerHTML = bulletins.map(b => {
+    const pinHtml = b.pinned ? `<span class="text-yellow-500 mr-1">📌</span>` : ''
+    const catCls  = CAT_COLORS[b.category] || CAT_COLORS.general
+    const adminBtns = isAdm ? `
+      <button onclick="pinBulletin('${b.id}',${!b.pinned})" class="text-xs text-gray-400 hover:text-yellow-600 ml-2" style="min-height:0;">${b.pinned?'Unpin':'Pin'}</button>
+      <button onclick="deleteBulletin('${b.id}')" class="text-xs text-red-400 hover:text-red-600 ml-2" style="min-height:0;">Delete</button>
+    ` : ''
+    return `<div class="px-4 py-3 ${b.pinned ? 'bg-yellow-50' : ''}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-gray-800 text-sm">${pinHtml}${esc(b.title)}</div>
+          <p class="text-sm text-gray-600 mt-1 whitespace-pre-wrap">${esc(b.content)}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        <span class="badge ${catCls}">${b.category}</span>
+        <span class="text-xs text-gray-400">${esc(b.posted_by)} · ${timeAgo(b.created_at)}</span>
+        ${adminBtns}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function toggleBulletinForm() {
+  const f = document.getElementById('bulletinForm')
+  f.classList.toggle('hidden')
+  if (!f.classList.contains('hidden')) document.getElementById('bTitle').focus()
+}
+
+async function postBulletin() {
+  const err = document.getElementById('bErr')
+  err.classList.add('hidden')
+  const title   = document.getElementById('bTitle').value.trim()
+  const content = document.getElementById('bContent').value.trim()
+  const category= document.getElementById('bCat').value
+  if (!title || !content) { err.textContent='Title and message required'; err.classList.remove('hidden'); return }
+
+  try {
+    const res = await fetch(`${API}/post-bulletin`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'post', title, content, category })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    dashData.bulletins.unshift(data)
+    document.getElementById('bTitle').value = ''
+    document.getElementById('bContent').value = ''
+    toggleBulletinForm()
+    renderBulletins()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+async function pinBulletin(id, pin) {
+  await fetch(`${API}/post-bulletin`, {
+    method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+    body: JSON.stringify({ action: pin?'pin':'unpin', id })
+  })
+  const b = dashData.bulletins.find(x => x.id === id)
+  if (b) b.pinned = pin
+  dashData.bulletins.sort((a,b) => (b.pinned?1:0)-(a.pinned?1:0) || new Date(b.created_at)-new Date(a.created_at))
+  renderBulletins()
+}
+
+async function deleteBulletin(id) {
+  if (!confirm('Delete this bulletin?')) return
+  await fetch(`${API}/post-bulletin`, {
+    method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+    body: JSON.stringify({ action:'delete', id })
+  })
+  dashData.bulletins = dashData.bulletins.filter(b => b.id !== id)
+  renderBulletins()
+}
+
+// ── SECTION 3: EVENTS ────────────────────────────────────────────────────────
+function renderEvents() {
+  const list   = document.getElementById('eventList')
+  const events = dashData.events
+  if (!events.length) {
+    list.innerHTML = '<div class="px-4 py-6 text-center text-gray-400 text-sm">No events in the next 14 days.</div>'
+    return
+  }
+
+  // Group by date
+  const byDate = {}
+  for (const e of events) {
+    if (!byDate[e.event_date]) byDate[e.event_date] = []
+    byDate[e.event_date].push(e)
+  }
+
+  list.innerHTML = Object.entries(byDate).map(([date, evs]) => {
+    const g = groupForDate(new Date(date + 'T11:30:00Z'))
+    const isToday = date === dashData.shift.todayStr
+    return `<div class="px-4 py-2 ${isToday ? 'bg-green-50' : ''}">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-extrabold uppercase tracking-wide ${isToday?'text-green-700':'text-gray-400'}">${fmtDate(date)}${isToday?' — TODAY':''}</span>
+        <span class="badge bg-gray-100 text-gray-500">Grp ${g} on duty</span>
+      </div>
+      ${evs.map(e => {
+        const catCls = CAT_COLORS[e.category] || CAT_COLORS.other
+        const groupBadge = e.group_number ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Group ${e.group_number} only</span>` : ''
+        return `<div class="flex items-start gap-2 py-1.5">
+          <div class="text-xs text-gray-400 w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-gray-800">${esc(e.title)}</div>
+            ${e.description ? `<div class="text-xs text-gray-500 mt-0.5">${esc(e.description)}</div>`:''}
+            <div class="flex items-center gap-1 mt-1 flex-wrap">
+              <span class="badge ${catCls}">${e.category}</span>${groupBadge}
+              <span class="text-xs text-gray-400">— ${esc(e.created_by)}</span>
+            </div>
+          </div>
+        </div>`
+      }).join('')}
+    </div>`
+  }).join('')
+}
+
+function toggleEventForm() {
+  const f = document.getElementById('eventForm')
+  f.classList.toggle('hidden')
+  if (!f.classList.contains('hidden')) {
+    const today = new Date().toISOString().split('T')[0]
+    document.getElementById('evDate').min = today
+    document.getElementById('evDate').value = today
+    document.getElementById('evTitle').focus()
+  }
+}
+
+async function addEvent() {
+  const err = document.getElementById('evErr')
+  err.classList.add('hidden')
+  const title        = document.getElementById('evTitle').value.trim()
+  const event_date   = document.getElementById('evDate').value
+  const event_time   = document.getElementById('evTime').value || null
+  const group_number = document.getElementById('evGroup').value || null
+  const category     = document.getElementById('evCat').value
+  const description  = document.getElementById('evDesc').value.trim() || null
+  if (!title || !event_date) { err.textContent='Title and date required'; err.classList.remove('hidden'); return }
+
+  try {
+    const res = await fetch(`${API}/manage-events`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ title, event_date, event_time, group_number, category, description })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    data.on_duty_group = groupForDate(new Date(data.event_date + 'T11:30:00Z'))
+    dashData.events.push(data)
+    dashData.events.sort((a,b) => a.event_date.localeCompare(b.event_date) || (a.event_time||'').localeCompare(b.event_time||''))
+    document.getElementById('evTitle').value = ''
+    document.getElementById('evDesc').value  = ''
+    toggleEventForm()
+    renderEvents()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// ── SECTION 4: WORK ORDERS ───────────────────────────────────────────────────
+const PRI_ORDER = { urgent:0, high:1, medium:2, low:3 }
+
+function renderWorkOrders() {
+  const list = document.getElementById('woList')
+  const open  = dashData.workOrders.filter(w => w.status !== 'completed' && w.status !== 'cancelled')
+  const done  = dashData.workOrders.filter(w => w.status === 'completed' || w.status === 'cancelled')
+  const isOff = AUTH.isOfficer()
+
+  open.sort((a,b) => (PRI_ORDER[a.priority]||2)-(PRI_ORDER[b.priority]||2))
+
+  if (!open.length) {
+    list.innerHTML = '<div class="px-4 py-6 text-center text-gray-400 text-sm">No open work orders.</div>'
+  } else {
+    list.innerHTML = open.map(w => renderWOCard(w, isOff, false)).join('')
+  }
+
+  const arch = document.getElementById('woArchive')
+  if (done.length) {
+    arch.classList.remove('hidden')
+    document.getElementById('woArchiveCount').textContent = done.length
+    document.getElementById('woArchiveList').innerHTML = done.map(w => renderWOCard(w, isOff, true)).join('')
+  } else {
+    arch.classList.add('hidden')
+  }
+}
+
+function renderWOCard(w, isOff, archived) {
+  const priCls = PRI_COLORS[w.priority] || PRI_COLORS.medium
+  const stsCls = STATUS_COLORS[w.status] || STATUS_COLORS.submitted
+  const dateStr = new Date(w.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+
+  const statusSelect = isOff && !archived ? `
+    <select onchange="updateWOStatus('${w.id}',this.value)" class="text-xs border border-gray-200 rounded px-2 py-1 ml-1 focus:outline-none" style="min-height:0;">
+      <option value="submitted"   ${w.status==='submitted'?'selected':''}>Submitted</option>
+      <option value="in_progress" ${w.status==='in_progress'?'selected':''}>In Progress</option>
+      <option value="completed"   ${w.status==='completed'?'selected':''}>Completed</option>
+      <option value="cancelled"   ${w.status==='cancelled'?'selected':''}>Cancelled</option>
+    </select>
+  ` : ''
+
+  return `<div class="px-4 py-3">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-gray-800">${esc(w.title)}</div>
+        ${w.location ? `<div class="text-xs text-gray-500 mt-0.5">📍 ${esc(w.location)}</div>` : ''}
+        ${w.description ? `<div class="text-xs text-gray-500 mt-0.5">${esc(w.description)}</div>` : ''}
+      </div>
+    </div>
+    <div class="flex items-center gap-1 mt-2 flex-wrap">
+      <span class="badge ${priCls}">${w.priority}</span>
+      <span class="badge ${stsCls}">${w.status.replace('_',' ')}</span>
+      ${statusSelect}
+      <span class="text-xs text-gray-400 ml-auto">${esc(w.submitted_by)} · ${dateStr}</span>
+    </div>
+  </div>`
+}
+
+function toggleWOForm() {
+  const f = document.getElementById('woForm')
+  f.classList.toggle('hidden')
+  if (!f.classList.contains('hidden')) document.getElementById('woTitle').focus()
+  document.getElementById('woDupWarn').classList.add('hidden')
+}
+
+function checkWODuplicate() {
+  const title = document.getElementById('woTitle').value.toLowerCase()
+  const warn  = document.getElementById('woDupWarn')
+  if (!dashData || title.length < 4) { warn.classList.add('hidden'); return }
+  const words = title.split(/\s+/).filter(w => w.length > 3)
+  const open  = (dashData.workOrders || []).filter(w => w.status !== 'completed' && w.status !== 'cancelled')
+  const match = open.find(w => words.some(word => w.title.toLowerCase().includes(word)))
+  if (match) {
+    warn.textContent = `⚠️ Similar open order exists: "${match.title}"`
+    warn.classList.remove('hidden')
+  } else {
+    warn.classList.add('hidden')
+  }
+}
+
+async function submitWO() {
+  const err = document.getElementById('woErr')
+  err.classList.add('hidden')
+  const title    = document.getElementById('woTitle').value.trim()
+  const location = document.getElementById('woLocation').value.trim() || null
+  const priority = document.getElementById('woPriority').value
+  const description = document.getElementById('woDesc').value.trim() || null
+  if (!title) { err.textContent='Title required'; err.classList.remove('hidden'); return }
+
+  try {
+    const res = await fetch(`${API}/manage-work-orders`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'submit', title, location, priority, description })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    dashData.workOrders.unshift(data)
+    document.getElementById('woTitle').value    = ''
+    document.getElementById('woLocation').value = ''
+    document.getElementById('woDesc').value     = ''
+    toggleWOForm()
+    renderWorkOrders()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+async function updateWOStatus(id, status) {
+  try {
+    const res = await fetch(`${API}/manage-work-orders`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'update', id, status })
+    })
+    if (!res.ok) { alert('Failed to update'); return }
+    const wo = dashData.workOrders.find(w => w.id === id)
+    if (wo) wo.status = status
+    renderWorkOrders()
+  } catch(e) { alert(e.message) }
+}
+
+// ── SECTION 5: CONTACTS ──────────────────────────────────────────────────────
+function renderContacts(filter) {
+  const list     = document.getElementById('contactList')
+  const q        = (filter || '').toLowerCase()
+  let contacts   = dashData.contacts
+  if (q) contacts = contacts.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    (c.title||'').toLowerCase().includes(q) ||
+    (c.phone||'').includes(q) ||
+    (c.category||'').toLowerCase().includes(q)
+  )
+
+  if (!contacts.length) {
+    list.innerHTML = `<div class="px-4 py-6 text-center text-gray-400 text-sm">${q ? 'No contacts match.' : 'No contacts yet.'}</div>`
+    return
+  }
+
+  // Group by category
+  const groups = {}
+  for (const c of contacts) {
+    const cat = c.category || 'other'
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(c)
+  }
+  const catOrder = ['emergency','staff','vendor','utility','other']
+  const isOff = AUTH.isOfficer()
+
+  list.innerHTML = catOrder.filter(c => groups[c]).map(cat => `
+    <div>
+      <div class="px-4 py-1.5 bg-gray-50 border-b border-gray-100">
+        <span class="text-xs font-extrabold uppercase tracking-wider text-gray-400">${cat}</span>
+      </div>
+      ${groups[cat].map(c => `
+        <div class="px-4 py-3 flex items-start justify-between gap-2 border-b border-gray-50">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-gray-800">${esc(c.name)}</div>
+            ${c.title ? `<div class="text-xs text-gray-500">${esc(c.title)}</div>` : ''}
+            <div class="flex items-center gap-3 mt-1 flex-wrap">
+              ${c.phone ? `<a href="tel:${esc(c.phone)}" class="text-sm text-blue-600 font-semibold">${esc(c.phone)}</a>` : ''}
+              ${c.email ? `<a href="mailto:${esc(c.email)}" class="text-xs text-gray-500 hover:text-blue-600">${esc(c.email)}</a>` : ''}
+            </div>
+            ${c.notes ? `<div class="text-xs text-gray-400 mt-0.5">${esc(c.notes)}</div>` : ''}
+          </div>
+          ${isOff ? `<button onclick="editContact(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0" style="min-height:0;">Edit</button>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `).join('')
+}
+
+function filterContacts() {
+  renderContacts(document.getElementById('contactSearch').value)
+}
+
+function toggleContactForm() {
+  const f = document.getElementById('contactForm')
+  f.classList.toggle('hidden')
+  document.getElementById('ctEditId').dataset.id = ''
+  if (!f.classList.contains('hidden')) document.getElementById('ctName').focus()
+}
+
+function cancelContactForm() {
+  document.getElementById('contactForm').classList.add('hidden')
+  document.getElementById('ctEditId').dataset.id = ''
+  ;['ctName','ctTitle','ctPhone','ctEmail','ctNotes'].forEach(id => document.getElementById(id).value = '')
+}
+
+function editContact(c) {
+  document.getElementById('contactForm').classList.remove('hidden')
+  document.getElementById('ctEditId').dataset.id = c.id
+  document.getElementById('ctName').value  = c.name  || ''
+  document.getElementById('ctTitle').value = c.title || ''
+  document.getElementById('ctPhone').value = c.phone || ''
+  document.getElementById('ctEmail').value = c.email || ''
+  document.getElementById('ctCat').value   = c.category || 'other'
+  document.getElementById('ctNotes').value = c.notes || ''
+  document.getElementById('contactForm').scrollIntoView({ behavior:'smooth', block:'start' })
+}
+
+async function saveContact() {
+  const err = document.getElementById('ctErr')
+  err.classList.add('hidden')
+  const id       = document.getElementById('ctEditId').dataset.id
+  const name     = document.getElementById('ctName').value.trim()
+  const title    = document.getElementById('ctTitle').value.trim() || null
+  const phone    = document.getElementById('ctPhone').value.trim() || null
+  const email    = document.getElementById('ctEmail').value.trim() || null
+  const category = document.getElementById('ctCat').value
+  const notes    = document.getElementById('ctNotes').value.trim() || null
+  if (!name) { err.textContent='Name required'; err.classList.remove('hidden'); return }
+
+  const action = id ? 'edit' : 'add'
+  try {
+    const res = await fetch(`${API}/manage-contacts`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action, id:id||undefined, name, title, phone, email, category, notes })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+
+    if (action === 'add') {
+      dashData.contacts.push(data)
+      dashData.contacts.sort((a,b) => a.category.localeCompare(b.category)||a.name.localeCompare(b.name))
+    } else {
+      const idx = dashData.contacts.findIndex(c => c.id === id)
+      if (idx >= 0) dashData.contacts[idx] = { ...dashData.contacts[idx], name, title, phone, email, category, notes }
+    }
+    cancelContactForm()
+    renderContacts()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// ── OFFICER BUTTONS ───────────────────────────────────────────────────────────
+function showOfficerButtons() {
+  if (AUTH.isOfficer()) {
+    document.getElementById('bulletinToggle').classList.remove('hidden')
+    document.getElementById('eventToggle').classList.remove('hidden')
+    document.getElementById('woToggle').classList.remove('hidden')
+    document.getElementById('contactToggle').classList.remove('hidden')
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await AUTH.init
+  AUTH.updateNav()
+  showOfficerButtons()
+  loadDashboard()
+
+  // Refresh shift status every 5 minutes
+  setInterval(() => {
+    if (dashData) renderShift()
+  }, 300000)
+})
+</script>
+</body>
 </html>
