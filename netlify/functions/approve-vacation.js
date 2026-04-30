@@ -122,7 +122,7 @@ exports.handler = async (event) => {
     const isAdmin   = officer.role === 'admin'
     const rank      = officerFF?.rank || ''
     const isCaptain = rank === 'Captain' || isAdmin
-    const isDC      = rank === 'DC'      || isAdmin
+    const isDC      = /^D[\s/]?C/i.test(rank) || isAdmin   // DC, D/C, D/C 1-4
     const isChief   = rank === 'Chief'   || isAdmin
 
     const now          = new Date().toISOString()
@@ -151,7 +151,7 @@ exports.handler = async (event) => {
           .from('firefighters')
           .select('name, email')
           .eq('group_number', vacReq.ff_group)
-          .eq('rank', 'DC')
+          .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4'])
           .eq('active', true)
 
         const rows = [
@@ -348,7 +348,7 @@ exports.handler = async (event) => {
           .from('firefighters')
           .select('name, email')
           .eq('group_number', vacReq.ff_group)
-          .eq('rank', 'DC')
+          .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4'])
           .eq('active', true)
 
         const dcRows = [

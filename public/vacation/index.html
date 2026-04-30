@@ -500,9 +500,10 @@
       const isAdm     = AUTH.isAdmin()
 
       // Rank-based canAct — only the right rank sees action buttons for each status
+      const rankIsDC = /^D[\s/]?C/i.test(officerRank)   // DC, D/C, D/C 1-4
       let canAct = false
       if (r.status === 'pending')          canAct = officerRank === 'Captain' || isAdm
-      if (r.status === 'captain_approved') canAct = officerRank === 'DC'      || isAdm
+      if (r.status === 'captain_approved') canAct = rankIsDC                  || isAdm
       if (r.status === 'dc_approved')      canAct = officerRank === 'Chief'   || isAdm
       if (r.status === 'chief_review')     canAct = officerRank === 'Chief'   || isAdm
 
