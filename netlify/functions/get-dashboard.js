@@ -65,7 +65,9 @@ exports.handler = async (event) => {
       supabase
         .from('recall_log')
         .select('id, shift_date, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
-        .eq('shift_date', todayStr),
+        .eq('shift_date', todayStr)
+        .in('recall_type', ['full_shift', 'short_min', 'substitution'])
+        .eq('deleted', false),
 
       supabase
         .from('vacation_requests')

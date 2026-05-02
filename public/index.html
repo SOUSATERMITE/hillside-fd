@@ -241,14 +241,22 @@
       </div>
       <div class="grid grid-cols-2 gap-2 mb-2">
         <select id="ctCat" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
-          <option value="emergency">Emergency</option>
-          <option value="staff">Staff</option>
-          <option value="vendor">Vendor</option>
-          <option value="utility">Utility</option>
-          <option value="other">Other</option>
+          <option value="officer">Officers</option>
+          <option value="firefighter">Firefighters</option>
+          <option value="staff">Admin Staff</option>
+          <option value="external">Vendors/Other</option>
         </select>
+        <select id="ctTour" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="">No Tour</option>
+          <option value="1">Tour 1</option>
+          <option value="2">Tour 2</option>
+          <option value="3">Tour 3</option>
+          <option value="4">Tour 4</option>
+        </select>
+      </div>
+      <div class="mb-2">
         <input id="ctNotes" type="text" placeholder="Notes" maxlength="500"
-          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
       </div>
       <div id="ctEditId" data-id=""></div>
       <div class="flex gap-2">
@@ -263,6 +271,103 @@
   </div>
 
 </div><!-- /max-w -->
+
+<!-- ── BULLETIN EDIT MODAL ───────────────────────���─────────────────────── -->
+<div id="bulletinEditModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-extrabold text-gray-800 text-base">Edit Bulletin</h3>
+      <button onclick="closeBulletinEdit()" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <input id="beTitle" type="text" placeholder="Title" maxlength="200"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <select id="beCat" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <option value="general">General</option>
+      <option value="safety">Safety</option>
+      <option value="equipment">Equipment</option>
+      <option value="training">Training</option>
+      <option value="reminder">Reminder</option>
+    </select>
+    <textarea id="beContent" maxlength="1950" rows="5" placeholder="Message..."
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:100px;resize:vertical;"></textarea>
+    <div class="flex gap-2">
+      <button onclick="saveBulletinEdit()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
+      <button onclick="closeBulletinEdit()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+    </div>
+    <div id="beErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <input type="hidden" id="beId">
+  </div>
+</div>
+
+<!-- ── EVENT EDIT MODAL ─────────────────────────────────���─────────────── -->
+<div id="eventEditModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-extrabold text-gray-800 text-base">Edit Event</h3>
+      <button onclick="closeEventEdit()" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <input id="eeTitle" type="text" placeholder="Event title" maxlength="200"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <input id="eeDate" type="date" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <input id="eeTime" type="time" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <select id="eeGroup" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="">All Groups</option>
+        <option value="1">Group 1</option>
+        <option value="2">Group 2</option>
+        <option value="3">Group 3</option>
+        <option value="4">Group 4</option>
+      </select>
+      <select id="eeCat" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="training">Training</option>
+        <option value="inspection">Inspection</option>
+        <option value="drill">Drill</option>
+        <option value="meeting">Meeting</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <textarea id="eeDesc" placeholder="Description (optional)" maxlength="950" rows="3"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:70px;resize:vertical;"></textarea>
+    <div class="flex gap-2">
+      <button onclick="saveEventEdit()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
+      <button onclick="closeEventEdit()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+    </div>
+    <div id="eeErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <input type="hidden" id="eeId">
+  </div>
+</div>
+
+<!-- ── WORK ORDER EDIT MODAL ─────────────────────────────────────────── -->
+<div id="woEditModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-extrabold text-gray-800 text-base">Edit Work Order</h3>
+      <button onclick="closeWOEdit()" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <input id="weTitle" type="text" placeholder="Issue title" maxlength="200"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <input id="weLocation" type="text" placeholder="Location (optional)" maxlength="200"
+        class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <select id="wePriority" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+    </div>
+    <textarea id="weDesc" placeholder="Description (optional)" maxlength="950" rows="3"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:70px;resize:vertical;"></textarea>
+    <div class="flex gap-2">
+      <button onclick="saveWOEdit()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
+      <button onclick="closeWOEdit()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+    </div>
+    <div id="weErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <input type="hidden" id="weId">
+  </div>
+</div>
 
 <script src="/auth.js"></script>
 <script>
@@ -397,29 +502,38 @@ function renderBulletins() {
     return
   }
 
+  const isOff = AUTH.isOfficer()
+  const myName = AUTH.getDisplayName()
   list.innerHTML = bulletins.map(b => {
-    const pinHtml  = b.pinned ? `<span class="text-yellow-500 mr-1">📌</span>` : ''
-    const catCls   = CAT_COLORS[b.category] || CAT_COLORS.general
-    const adminBtns = isAdm ? `
-      <button onclick="pinBulletin('${b.id}',${!b.pinned})" class="text-xs text-gray-400 hover:text-yellow-600 ml-2" style="min-height:0;">${b.pinned?'Unpin':'Pin'}</button>
-      <button onclick="deleteBulletin('${b.id}')" class="text-xs text-red-400 hover:text-red-600 ml-2" style="min-height:0;">Delete</button>
-    ` : ''
-    const full     = esc(b.content)
-    const short    = b.content.length > 100 ? esc(b.content.slice(0, 100)) : null
+    const pinHtml = b.pinned ? `<span class="text-yellow-500 mr-1">📌</span>` : ''
+    const catCls  = CAT_COLORS[b.category] || CAT_COLORS.general
+    const canEdit = isOff && (isAdm || b.posted_by === myName)
+    const canDel  = isAdm || (isOff && b.posted_by === myName)
+    const pinBtn  = isAdm ? `<button onclick="pinBulletin('${b.id}',${!b.pinned})" class="text-xs text-gray-400 hover:text-yellow-600 ml-2" style="min-height:0;">${b.pinned?'Unpin':'Pin'}</button>` : ''
+    const editBtn = canEdit ? `<button onclick="openBulletinEdit('${b.id}')" class="text-xs text-blue-500 hover:text-blue-700 ml-2" style="min-height:0;">✏️</button>` : ''
+    const delBtn  = canDel  ? `<button onclick="deleteBulletin('${b.id}')" class="text-xs text-red-400 hover:text-red-600 ml-1" style="min-height:0;">🗑️</button>` : ''
+    // Strip edit mark for display
+    const rawContent = b.content || ''
+    const editMarkIdx = rawContent.lastIndexOf('\n\n— Edited by ')
+    const displayContent = editMarkIdx >= 0 ? rawContent.slice(0, editMarkIdx).trim() : rawContent
+    const editNote = editMarkIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawContent.slice(editMarkIdx).trim())}</div>` : ''
+    const full  = esc(displayContent)
+    const short = displayContent.length > 100 ? esc(displayContent.slice(0, 100)) : null
     const contentHtml = short
       ? `<p class="text-sm text-gray-600 mt-1" id="bc-${b.id}">${short}<span id="bmore-${b.id}">… <button onclick="expandBulletin('${b.id}')" class="text-green-700 font-semibold text-xs" style="min-height:0;">Read more</button></span><span id="bfull-${b.id}" class="hidden whitespace-pre-wrap">${full.slice(short.length)}</span></p>`
       : `<p class="text-sm text-gray-600 mt-1 whitespace-pre-wrap">${full}</p>`
     return `<div class="px-4 py-3 ${b.pinned ? 'bg-yellow-50' : ''}">
       <div class="flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-gray-800 text-sm">${pinHtml}${esc(b.title)}${newBadge(b.created_at)}</div>
+          <div style="font-size:1.1rem;font-weight:700;color:#1a5c2a;">${pinHtml}${esc(b.title)}${newBadge(b.created_at)}</div>
           ${contentHtml}
+          ${editNote}
         </div>
       </div>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
         <span class="badge ${catCls}">${b.category}</span>
         <span class="text-xs text-gray-400">${esc(b.posted_by)} · ${timeAgo(b.created_at)}</span>
-        ${adminBtns}
+        ${pinBtn}${editBtn}${delBtn}
       </div>
     </div>`
   }).join('')
@@ -471,11 +585,13 @@ function expandBulletin(id) {
 }
 
 async function deleteBulletin(id) {
-  if (!confirm('Delete this bulletin?')) return
-  await fetch(`${API}/post-bulletin`, {
+  const b = dashData.bulletins.find(x => x.id === id)
+  if (!confirm(`Delete bulletin: "${b?.title || 'this bulletin'}"?`)) return
+  const res = await fetch(`${API}/post-bulletin`, {
     method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
     body: JSON.stringify({ action:'delete', id })
   })
+  if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed to delete'); return }
   dashData.bulletins = dashData.bulletins.filter(b => b.id !== id)
   renderBulletins()
 }
@@ -519,11 +635,25 @@ function renderEvents() {
       ${evs.map(e => {
         const catCls = CAT_COLORS[e.category] || CAT_COLORS.other
         const groupBadge = e.group_number ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Group ${e.group_number} only</span>` : ''
+        const evIsOff = AUTH.isOfficer(), evMyName = AUTH.getDisplayName(), evIsAdm = AUTH.isAdmin()
+        const evCanEdit = evIsOff && (evIsAdm || e.created_by === evMyName)
+        const evCanDel  = evIsAdm || (evIsOff && e.created_by === evMyName)
+        const evEditBtn = evCanEdit ? `<button onclick="openEventEdit('${e.id}')" class="text-xs text-blue-500 hover:text-blue-700" style="min-height:0;">✏️</button>` : ''
+        const evDelBtn  = evCanDel  ? `<button onclick="deleteEvent('${e.id}','${esc(e.title).replace(/'/g,"&#39;")}')" class="text-xs text-red-400 hover:text-red-600" style="min-height:0;">🗑️</button>` : ''
+        // Strip edit mark from description
+        const rawDesc = e.description || ''
+        const descEditIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
+        const cleanDesc = descEditIdx >= 0 ? rawDesc.slice(0, descEditIdx).trim() : rawDesc
+        const descEditNote = descEditIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawDesc.slice(descEditIdx).trim())}</div>` : ''
         return `<div class="flex items-start gap-2 py-1.5">
           <div class="text-xs text-gray-600 font-semibold w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-gray-800">${esc(e.title)}${newBadge(e.created_at)}</div>
-            ${e.description ? `<div class="text-xs text-gray-600 mt-0.5">${esc(e.description)}</div>` : ''}
+            <div class="flex items-center gap-1">
+              <span style="font-size:1.1rem;font-weight:700;color:#1e3a5f;">${esc(e.title)}${newBadge(e.created_at)}</span>
+              ${evEditBtn}${evDelBtn}
+            </div>
+            ${cleanDesc ? `<div class="text-xs text-gray-600 mt-0.5">${esc(cleanDesc)}</div>` : ''}
+            ${descEditNote}
             <div class="flex items-center gap-1 mt-1 flex-wrap">
               <span class="badge ${catCls}">${e.category}</span>${groupBadge}
               <span class="text-xs text-gray-500">— ${esc(e.created_by)}</span>
@@ -607,6 +737,9 @@ function renderWOCard(w, isOff, archived) {
   const priCls = PRI_COLORS[w.priority] || PRI_COLORS.medium
   const stsCls = STATUS_COLORS[w.status] || STATUS_COLORS.submitted
   const dateStr = new Date(w.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+  const isAdm  = AUTH.isAdmin()
+  const myName = AUTH.getDisplayName()
+  const sess   = AUTH.getSession()
 
   const statusSelect = isOff && !archived ? `
     <select onchange="updateWOStatus('${w.id}',this.value)" class="text-xs border border-gray-200 rounded px-2 py-1 ml-1 focus:outline-none" style="min-height:0;">
@@ -617,12 +750,27 @@ function renderWOCard(w, isOff, archived) {
     </select>
   ` : ''
 
+  const canEdit = isOff && !archived && (isAdm || w.submitted_by === myName)
+  const canDel  = !archived && (isAdm || (isOff && w.submitted_by === myName))
+  const editBtn = canEdit ? `<button onclick="openWOEdit('${w.id}')" class="text-xs text-blue-500 hover:text-blue-700 ml-1" style="min-height:0;">✏️</button>` : ''
+  const delBtn  = canDel  ? `<button onclick="deleteWO('${w.id}','${esc(w.title).replace(/'/g,"&#39;")}')" class="text-xs text-red-400 hover:text-red-600 ml-1" style="min-height:0;">🗑️</button>` : ''
+
+  // Strip edit mark from description
+  const rawDesc = w.description || ''
+  const descEditIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
+  const cleanDesc = descEditIdx >= 0 ? rawDesc.slice(0, descEditIdx).trim() : rawDesc
+  const descEditNote = descEditIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawDesc.slice(descEditIdx).trim())}</div>` : ''
+
   return `<div class="px-4 py-3">
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold text-gray-800">${esc(w.title)}${newBadge(w.created_at)}</div>
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="text-sm font-semibold text-gray-800">${esc(w.title)}${newBadge(w.created_at)}</span>
+          ${editBtn}${delBtn}
+        </div>
         ${w.location ? `<div class="text-xs text-gray-500 mt-0.5">📍 ${esc(w.location)}</div>` : ''}
-        ${w.description ? `<div class="text-xs text-gray-500 mt-0.5">${esc(w.description)}</div>` : ''}
+        ${cleanDesc ? `<div class="text-xs text-gray-500 mt-0.5">${esc(cleanDesc)}</div>` : ''}
+        ${descEditNote}
       </div>
     </div>
     <div class="flex items-center gap-1 mt-2 flex-wrap">
@@ -742,12 +890,20 @@ const OFFICER_TITLES = ['chief','captain','dc','d/c','deputy chief','lieutenant'
 const FF_TITLES = ['firefighter','ff ']
 
 function isOfficerContact(c) {
+  if (c.category === 'officer') return true
   const t = (c.title || '').toLowerCase()
   return OFFICER_TITLES.some(k => t.includes(k))
 }
 function isFFContact(c) {
+  if (c.category === 'firefighter') return true
   const t = (c.title || '').toLowerCase()
-  return FF_TITLES.some(k => t.startsWith(k) || t === 'ff') || (c.category === 'staff' && !isOfficerContact(c))
+  return FF_TITLES.some(k => t.startsWith(k) || t === 'ff')
+}
+function isExternalContact(c) {
+  return ['external','vendor','utility','emergency','other'].includes(c.category) && !isOfficerContact(c) && !isFFContact(c)
+}
+function isAdminStaff(c) {
+  return c.category === 'staff' && !isOfficerContact(c) && !isFFContact(c)
 }
 
 function setContactFilter(f) {
@@ -787,11 +943,11 @@ function renderContacts() {
     if (contactFilter === 'officers') {
       contacts = contacts.filter(isOfficerContact)
     } else if (contactFilter === 'firefighters') {
-      contacts = contacts.filter(c => !isOfficerContact(c) && c.category === 'staff')
+      contacts = contacts.filter(isFFContact)
     } else if (contactFilter === 'staff') {
-      contacts = contacts.filter(c => c.category === 'staff')
+      contacts = contacts.filter(isAdminStaff)
     } else if (contactFilter === 'external') {
-      contacts = contacts.filter(c => ['vendor','utility','emergency','other'].includes(c.category))
+      contacts = contacts.filter(isExternalContact)
     }
   }
 
@@ -800,25 +956,37 @@ function renderContacts() {
     return
   }
 
+  const ctIsOff = AUTH.isOfficer(), ctIsAdm = AUTH.isAdmin()
   list.innerHTML = contacts.map(c => {
     const isExp = expandedContactId === c.id
+    // Parse tour from notes
+    const tourMatch = (c.notes||'').match(/\bTour\s*([1-4])\b/i)
+    const tourBadge = tourMatch ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Tour ${tourMatch[1]}</span>` : ''
+    const cleanNotes = (c.notes||'').replace(/\s*\bTour\s*[1-4]\b/i, '').trim()
     const expandedHtml = isExp ? `
       <div class="mt-1.5 text-xs space-y-0.5">
         ${c.email ? `<div><a href="mailto:${esc(c.email)}" class="text-blue-600 hover:underline">${esc(c.email)}</a></div>` : ''}
-        ${c.notes ? `<div class="text-gray-500">${esc(c.notes)}</div>` : ''}
-        ${isOff ? `<button onclick="editContact(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="mt-1 text-xs text-gray-400 hover:text-gray-600" style="min-height:0;">Edit</button>` : ''}
+        ${cleanNotes ? `<div class="text-gray-500">${esc(cleanNotes)}</div>` : ''}
       </div>` : ''
+    const editBtn = ctIsOff ? `<button onclick="editContactById('${c.id}')" class="flex-shrink-0 text-blue-400 hover:text-blue-600 text-sm" style="min-height:0;" title="Edit">✏️</button>` : ''
+    const delBtn  = ctIsOff ? `<button onclick="deleteContact('${c.id}','${esc(c.name).replace(/'/g,"&#39;")}')" class="flex-shrink-0 text-red-300 hover:text-red-600 text-sm" style="min-height:0;" title="Delete">🗑️</button>` : ''
 
-    return `<div class="px-4 py-2.5 flex items-start justify-between gap-2">
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-semibold text-gray-800">${highlightMatch(c.name, q)}${newBadge(c.created_at)}</span>
-          ${c.title ? `<span class="text-xs text-gray-500">${highlightMatch(c.title, q)}</span>` : ''}
+    return `<div class="px-4 py-2.5">
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1 flex-wrap">
+            <span class="text-sm font-semibold text-gray-800">${highlightMatch(c.name, q)}${newBadge(c.created_at)}</span>
+            ${c.title ? `<span class="text-xs text-gray-500">${highlightMatch(c.title, q)}</span>` : ''}
+            ${tourBadge}
+          </div>
+          ${c.phone ? `<a href="tel:${esc(c.phone)}" class="inline-block mt-1 text-sm text-blue-600 font-bold bg-blue-50 rounded-lg px-2 py-0.5" style="min-height:0;">${highlightMatch(c.phone, q)}</a>` : ''}
+          ${expandedHtml}
         </div>
-        ${c.phone ? `<a href="tel:${esc(c.phone)}" class="inline-block mt-1 text-sm text-blue-600 font-bold bg-blue-50 rounded-lg px-2 py-0.5" style="min-height:0;">${highlightMatch(c.phone, q)}</a>` : ''}
-        ${expandedHtml}
+        <div class="flex items-center gap-1 flex-shrink-0">
+          ${editBtn}${delBtn}
+          <button onclick="toggleContactExpand('${c.id}')" class="text-gray-400 text-lg hover:text-gray-600" style="min-height:0;">${isExp ? '▲' : '▼'}</button>
+        </div>
       </div>
-      <button onclick="toggleContactExpand('${c.id}')" class="text-gray-400 text-lg flex-shrink-0 hover:text-gray-600" style="min-height:0;">${isExp ? '▲' : '▼'}</button>
     </div>`
   }).join('')
 }
@@ -843,18 +1011,42 @@ function cancelContactForm() {
   document.getElementById('contactForm').classList.add('hidden')
   document.getElementById('ctEditId').dataset.id = ''
   ;['ctName','ctTitle','ctPhone','ctEmail','ctNotes'].forEach(id => document.getElementById(id).value = '')
+  document.getElementById('ctTour').value = ''
 }
 
-function editContact(c) {
+function editContactById(id) {
+  const c = dashData.contacts.find(x => x.id === id)
+  if (!c) return
+  // Map old categories to new ones
+  let cat = c.category || 'officer'
+  if (cat === 'vendor' || cat === 'utility' || cat === 'emergency' || cat === 'other') cat = 'external'
+  // Parse tour from notes
+  const tourMatch = (c.notes||'').match(/\bTour\s*([1-4])\b/i)
+  const cleanNotes = (c.notes||'').replace(/\s*\bTour\s*[1-4]\b/i, '').trim()
+
   document.getElementById('contactForm').classList.remove('hidden')
   document.getElementById('ctEditId').dataset.id = c.id
   document.getElementById('ctName').value  = c.name  || ''
   document.getElementById('ctTitle').value = c.title || ''
   document.getElementById('ctPhone').value = c.phone || ''
   document.getElementById('ctEmail').value = c.email || ''
-  document.getElementById('ctCat').value   = c.category || 'other'
-  document.getElementById('ctNotes').value = c.notes || ''
+  document.getElementById('ctCat').value   = cat
+  document.getElementById('ctTour').value  = tourMatch ? tourMatch[1] : ''
+  document.getElementById('ctNotes').value = cleanNotes
   document.getElementById('contactForm').scrollIntoView({ behavior:'smooth', block:'start' })
+}
+
+async function deleteContact(id, name) {
+  if (!confirm(`Remove ${name} from contacts?`)) return
+  try {
+    const res = await fetch(`${API}/manage-contacts`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    if (!res.ok) { alert('Failed to delete'); return }
+    dashData.contacts = dashData.contacts.filter(c => c.id !== id)
+    renderContacts()
+  } catch(e) { alert(e.message) }
 }
 
 async function saveContact() {
@@ -866,7 +1058,10 @@ async function saveContact() {
   const phone    = document.getElementById('ctPhone').value.trim() || null
   const email    = document.getElementById('ctEmail').value.trim() || null
   const category = document.getElementById('ctCat').value
-  const notes    = document.getElementById('ctNotes').value.trim() || null
+  const tour     = document.getElementById('ctTour').value
+  const baseNotes = document.getElementById('ctNotes').value.trim()
+  // Combine tour back into notes
+  const notes    = (baseNotes + (tour ? ` Tour ${tour}` : '')).trim() || null
   if (!name) { err.textContent='Name required'; err.classList.remove('hidden'); return }
 
   const action = id ? 'edit' : 'add'
@@ -888,6 +1083,157 @@ async function saveContact() {
     cancelContactForm()
     renderContacts()
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// ── BULLETIN EDIT ────────────────────────────────────────────────────���───────
+function openBulletinEdit(id) {
+  const b = dashData.bulletins.find(x => x.id === id)
+  if (!b) return
+  // Strip edit mark from content for editing
+  const raw = b.content || ''
+  const editIdx = raw.lastIndexOf('\n\n— Edited by ')
+  const clean = editIdx >= 0 ? raw.slice(0, editIdx).trim() : raw
+  document.getElementById('beId').value    = b.id
+  document.getElementById('beTitle').value = b.title || ''
+  document.getElementById('beCat').value   = b.category || 'general'
+  document.getElementById('beContent').value = clean
+  document.getElementById('beErr').classList.add('hidden')
+  document.getElementById('bulletinEditModal').classList.remove('hidden')
+}
+function closeBulletinEdit() {
+  document.getElementById('bulletinEditModal').classList.add('hidden')
+}
+async function saveBulletinEdit() {
+  const err = document.getElementById('beErr')
+  err.classList.add('hidden')
+  const id      = document.getElementById('beId').value
+  const title   = document.getElementById('beTitle').value.trim()
+  const content = document.getElementById('beContent').value.trim()
+  const category= document.getElementById('beCat').value
+  if (!title || !content) { err.textContent='Title and content required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/post-bulletin`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'edit', id, title, content, category })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    const b = dashData.bulletins.find(x => x.id === id)
+    if (b) { b.title = title; b.content = data.content || content; b.category = category }
+    closeBulletinEdit()
+    renderBulletins()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// ── EVENT EDIT ───────────────��────────────────────────��───────────────────────
+function openEventEdit(id) {
+  const e = dashData.events.find(x => x.id === id)
+  if (!e) return
+  const rawDesc = e.description || ''
+  const editIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
+  const cleanDesc = editIdx >= 0 ? rawDesc.slice(0, editIdx).trim() : rawDesc
+  document.getElementById('eeId').value    = e.id
+  document.getElementById('eeTitle').value = e.title || ''
+  document.getElementById('eeDate').value  = e.event_date || ''
+  document.getElementById('eeTime').value  = e.event_time ? e.event_time.slice(0,5) : ''
+  document.getElementById('eeGroup').value = e.group_number || ''
+  document.getElementById('eeCat').value   = e.category || 'other'
+  document.getElementById('eeDesc').value  = cleanDesc
+  document.getElementById('eeErr').classList.add('hidden')
+  document.getElementById('eventEditModal').classList.remove('hidden')
+}
+function closeEventEdit() {
+  document.getElementById('eventEditModal').classList.add('hidden')
+}
+async function saveEventEdit() {
+  const err = document.getElementById('eeErr')
+  err.classList.add('hidden')
+  const id          = document.getElementById('eeId').value
+  const title       = document.getElementById('eeTitle').value.trim()
+  const event_date  = document.getElementById('eeDate').value
+  const event_time  = document.getElementById('eeTime').value || null
+  const group_number= document.getElementById('eeGroup').value || null
+  const category    = document.getElementById('eeCat').value
+  const description = document.getElementById('eeDesc').value.trim() || null
+  if (!title || !event_date) { err.textContent='Title and date required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/manage-events`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'edit', id, title, event_date, event_time, group_number, category, description })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    const e = dashData.events.find(x => x.id === id)
+    if (e) { e.title=title; e.event_date=event_date; e.event_time=event_time; e.group_number=group_number?parseInt(group_number):null; e.category=category; e.description=data.description||description; e.on_duty_group=groupForDate(new Date(event_date+'T11:30:00Z')) }
+    dashData.events.sort((a,b) => a.event_date.localeCompare(b.event_date)||(a.event_time||'').localeCompare(b.event_time||''))
+    closeEventEdit()
+    renderEvents()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+async function deleteEvent(id, title) {
+  if (!confirm(`Delete event: "${title}"?`)) return
+  try {
+    const res = await fetch(`${API}/manage-events`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    if (!res.ok) { alert('Failed to delete'); return }
+    dashData.events = dashData.events.filter(e => e.id !== id)
+    renderEvents()
+  } catch(e) { alert(e.message) }
+}
+
+// ── WORK ORDER EDIT ───────────────────────���───────────────────────────────────
+function openWOEdit(id) {
+  const w = dashData.workOrders.find(x => x.id === id)
+  if (!w) return
+  const rawDesc = w.description || ''
+  const editIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
+  const cleanDesc = editIdx >= 0 ? rawDesc.slice(0, editIdx).trim() : rawDesc
+  document.getElementById('weId').value       = w.id
+  document.getElementById('weTitle').value    = w.title || ''
+  document.getElementById('weLocation').value = w.location || ''
+  document.getElementById('wePriority').value = w.priority || 'medium'
+  document.getElementById('weDesc').value     = cleanDesc
+  document.getElementById('weErr').classList.add('hidden')
+  document.getElementById('woEditModal').classList.remove('hidden')
+}
+function closeWOEdit() {
+  document.getElementById('woEditModal').classList.add('hidden')
+}
+async function saveWOEdit() {
+  const err = document.getElementById('weErr')
+  err.classList.add('hidden')
+  const id          = document.getElementById('weId').value
+  const title       = document.getElementById('weTitle').value.trim()
+  const location    = document.getElementById('weLocation').value.trim() || null
+  const priority    = document.getElementById('wePriority').value
+  const description = document.getElementById('weDesc').value.trim() || null
+  if (!title) { err.textContent='Title required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/manage-work-orders`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'edit', id, title, location, priority, description })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    const w = dashData.workOrders.find(x => x.id === id)
+    if (w) { w.title=title; w.location=location; w.priority=priority; w.description=data.description||description }
+    closeWOEdit()
+    renderWorkOrders()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+async function deleteWO(id, title) {
+  if (!confirm(`Delete work order: "${title}"?`)) return
+  try {
+    const res = await fetch(`${API}/manage-work-orders`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    if (!res.ok) { alert('Failed to delete'); return }
+    dashData.workOrders = dashData.workOrders.filter(w => w.id !== id)
+    renderWorkOrders()
+  } catch(e) { alert(e.message) }
 }
 
 // ── OFFICER BUTTONS ───────────────────────────────────────────────────────────
