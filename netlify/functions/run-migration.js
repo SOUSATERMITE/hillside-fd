@@ -4,6 +4,49 @@
 
 const { allowOrigin } = require('./_cors')
 
+const MIGRATION_SQL = `
+  create table if not exists personnel_documents (
+    id             uuid primary key default gen_random_uuid(),
+    firefighter_id uuid references firefighters(id) not null,
+    document_name  text not null,
+    document_type  text not null default 'other',
+    file_path      text not null,
+    file_name      text not null,
+    uploaded_by    text not null,
+    officer_id     uuid references officers(id),
+    notes          text,
+    created_at     timestamptz default now()
+  );
+  create table if not exists personnel_notes (
+    id             uuid primary key default gen_random_uuid(),
+    firefighter_id uuid references firefighters(id) not null,
+    note           text not null,
+    added_by       text not null,
+    officer_id     uuid references officers(id),
+    created_at     timestamptz default now()
+  );
+  create index if not exists idx_personnel_docs_ff  on personnel_documents(firefighter_id, created_at desc);
+  create index if not exists idx_personnel_notes_ff on personnel_notes(firefighter_id, created_at desc);
+  alter table personnel_documents enable row level security;
+  alter table personnel_notes      enable row level security;
+`
+
+async function tryPg(host, port, user, password, log) {
+  const { Client } = require('pg')
+  const client = new Client({
+    host, port,
+    database: 'postgres',
+    user, password,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000
+  })
+  await client.connect()
+  log.push(`Connected via pg (${host}:${port})`)
+  await client.query(MIGRATION_SQL)
+  log.push('Migration SQL executed successfully')
+  await client.end()
+}
+
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
@@ -14,7 +57,6 @@ exports.handler = async (event) => {
   }
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
 
-  // Protect with admin password
   const secret = event.queryStringParameters?.secret
   if (secret !== process.env.ADMIN_PASSWORD) {
     return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
@@ -25,70 +67,71 @@ exports.handler = async (event) => {
   const DB_PASS      = process.env.SUPABASE_DB_PASS
 
   const log = []
+  const ref  = SUPABASE_URL.match(/\/\/([^.]+)/)?.[1] || ''
+  const poolUser = `postgres.${ref}`
 
-  // ── Try pg connection if SUPABASE_DB_PASS is set ────────────────────────────
+  // ── Attempt 1: explicit DB_PASS via pooler ──────────────────────────────────
   if (DB_PASS) {
     try {
-      const { Client } = require('pg')
-      const client = new Client({
-        host: 'aws-1-us-east-1.pooler.supabase.com',
-        port: 6543,
-        database: 'postgres',
-        user: `postgres.${SUPABASE_URL.match(/\/\/([^.]+)/)?.[1] || ''}`,
-        password: DB_PASS,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000
-      })
-      await client.connect()
-      log.push('Connected to database via pooler')
-
-      const sql = `
-        create table if not exists personnel_documents (
-          id             uuid primary key default gen_random_uuid(),
-          firefighter_id uuid references firefighters(id) not null,
-          document_name  text not null,
-          document_type  text not null default 'other',
-          file_path      text not null,
-          file_name      text not null,
-          uploaded_by    text not null,
-          officer_id     uuid references officers(id),
-          notes          text,
-          created_at     timestamptz default now()
-        );
-        create table if not exists personnel_notes (
-          id             uuid primary key default gen_random_uuid(),
-          firefighter_id uuid references firefighters(id) not null,
-          note           text not null,
-          added_by       text not null,
-          officer_id     uuid references officers(id),
-          created_at     timestamptz default now()
-        );
-        create index if not exists idx_personnel_docs_ff  on personnel_documents(firefighter_id, created_at desc);
-        create index if not exists idx_personnel_notes_ff on personnel_notes(firefighter_id, created_at desc);
-        alter table personnel_documents enable row level security;
-        alter table personnel_notes      enable row level security;
-      `
-      await client.query(sql)
-      log.push('Migration SQL executed successfully')
-      await client.end()
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg', log }) }
+      await tryPg('aws-1-us-east-1.pooler.supabase.com', 6543, poolUser, DB_PASS, log)
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass', log }) }
     } catch (e) {
-      log.push('pg failed: ' + e.message)
+      log.push('pg (DB_PASS, pooler 6543) failed: ' + e.message)
     }
-  } else {
-    log.push('No SUPABASE_DB_PASS set — skipping pg connection')
   }
 
-  // ── Verify tables exist via REST ────────────────────────────────────────────
-  const check = await fetch(`${SUPABASE_URL}/rest/v1/personnel_documents?limit=0`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
-  })
-  const docsOk = check.ok || check.status === 206
+  // ── Attempt 2: service role JWT as password via pooler (Supavisor JWT auth) ─
+  try {
+    await tryPg('aws-1-us-east-1.pooler.supabase.com', 6543, poolUser, SERVICE_KEY, log)
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_pooler', log }) }
+  } catch (e) {
+    log.push('pg (JWT, pooler 6543) failed: ' + e.message)
+  }
 
-  const check2 = await fetch(`${SUPABASE_URL}/rest/v1/personnel_notes?limit=0`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
-  })
-  const notesOk = check2.ok || check2.status === 206
+  // ── Attempt 3: service role JWT via pooler session mode port 5432 ──────────
+  try {
+    await tryPg('aws-1-us-east-1.pooler.supabase.com', 5432, poolUser, SERVICE_KEY, log)
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_pooler_5432', log }) }
+  } catch (e) {
+    log.push('pg (JWT, pooler 5432) failed: ' + e.message)
+  }
+
+  // ── Attempt 4: direct host with JWT ────────────────────────────────────────
+  try {
+    await tryPg(`db.${ref}.supabase.co`, 5432, 'postgres', SERVICE_KEY, log)
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_direct', log }) }
+  } catch (e) {
+    log.push('pg (JWT, direct 5432) failed: ' + e.message)
+  }
+
+  // ── Attempt 5: DB_PASS via session pooler (port 5432) ──────────────────────
+  if (DB_PASS) {
+    try {
+      await tryPg('aws-1-us-east-1.pooler.supabase.com', 5432, poolUser, DB_PASS, log)
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass_5432', log }) }
+    } catch (e) {
+      log.push('pg (DB_PASS, pooler 5432) failed: ' + e.message)
+    }
+    // ── Attempt 6: DB_PASS via direct host ───────────────────────────────────
+    try {
+      await tryPg(`db.${ref}.supabase.co`, 5432, 'postgres', DB_PASS, log)
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass_direct', log }) }
+    } catch (e) {
+      log.push('pg (DB_PASS, direct 5432) failed: ' + e.message)
+    }
+  }
+
+  // ── Fallback: check if tables already exist via REST ───────────────────────
+  const [chk1, chk2] = await Promise.all([
+    fetch(`${SUPABASE_URL}/rest/v1/personnel_documents?limit=0`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
+    }),
+    fetch(`${SUPABASE_URL}/rest/v1/personnel_notes?limit=0`, {
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
+    })
+  ])
+  const docsOk  = chk1.ok  || chk1.status  === 206
+  const notesOk = chk2.ok  || chk2.status  === 206
 
   if (docsOk && notesOk) {
     log.push('Tables already exist — no migration needed')
@@ -100,7 +143,7 @@ exports.handler = async (event) => {
     headers,
     body: JSON.stringify({
       ok: false,
-      message: 'Cannot create tables without SUPABASE_DB_PASS env var. Set it to your Supabase postgres database password in Netlify dashboard, then call this endpoint again.',
+      message: 'All pg connection attempts failed. Go to Supabase dashboard → Project Settings → Database → Database password → copy it → set SUPABASE_DB_PASS in Netlify env vars → call this endpoint again.',
       personnel_documents_exists: docsOk,
       personnel_notes_exists: notesOk,
       log
