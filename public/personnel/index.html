@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personnel Files — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    .nav-active { color:#fff; border-bottom:2px solid #fff; font-weight:800; }
+    .nav-mobile-active { background:rgba(255,255,255,0.15); }
+    .section-card { background:#fff; border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,0.07); padding:20px; }
+    .tab-btn { padding:8px 16px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; border:none; background:transparent; color:#6b7280; transition:all .15s; white-space:nowrap; }
+    .tab-btn.active { background:#1a2e52; color:#fff; }
+    .tab-btn:hover:not(.active) { background:#f1f5f9; color:#374151; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-orange { background:#fff3cd; color:#b45309; }
+    .badge-red    { background:#fee2e2; color:#991b1b; }
+    .badge-blue   { background:#dbeafe; color:#1e40af; }
+    .badge-green  { background:#dcfce7; color:#166534; }
+    .badge-gray   { background:#f3f4f6; color:#374151; }
+    .stat-card { background:#f8fafc; border-radius:10px; padding:14px 18px; text-align:center; }
+    .stat-num  { font-size:28px; font-weight:800; color:#1a2e52; }
+    .stat-lbl  { font-size:11px; color:#6b7280; margin-top:2px; }
+    .ff-row { cursor:pointer; transition:background .1s; }
+    .ff-row:hover { background:#f0f4ff; }
+    .ff-row.selected { background:#eef2ff; border-left:3px solid #1a2e52; }
+    .modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px; }
+    .modal-box { background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:520px;max-height:90vh;overflow-y:auto; }
+    table.data-table { width:100%; border-collapse:collapse; font-size:13px; }
+    table.data-table th { background:#f8fafc; font-weight:700; color:#374151; padding:9px 12px; border-bottom:2px solid #e5e7eb; text-align:left; }
+    table.data-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; color:#374151; vertical-align:top; }
+    table.data-table tr:last-child td { border-bottom:none; }
+    table.data-table tr:hover td { background:#f9fafb; }
+    .refused-row td { background:#fff5f5 !important; }
+    .upload-zone { border:2px dashed #d1d5db; border-radius:12px; padding:24px; text-align:center; cursor:pointer; transition:border-color .2s; }
+    .upload-zone:hover, .upload-zone.drag-over { border-color:#1a2e52; background:#f0f4ff; }
+    input, select, textarea { border:1px solid #d1d5db; border-radius:10px; padding:9px 12px; font-size:13px; width:100%; outline:none; transition:border-color .2s; }
+    input:focus, select:focus, textarea:focus { border-color:#1a2e52; }
+    .btn-primary { background:#1a2e52; color:#fff; font-weight:700; border-radius:10px; padding:9px 20px; border:none; cursor:pointer; font-size:13px; transition:opacity .15s; }
+    .btn-primary:hover { opacity:.9; }
+    .btn-danger { background:#dc2626; color:#fff; font-weight:700; border-radius:10px; padding:6px 14px; border:none; cursor:pointer; font-size:12px; }
+    .btn-sm { padding:4px 12px; font-size:12px; border-radius:7px; border:none; cursor:pointer; font-weight:600; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- ── Nav ─────────────────────────────────────────────────────────────────── -->
+<nav class="sticky top-0 z-30 bg-green-900 text-white px-4 shadow-lg" style="min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+  <a href="/" class="font-extrabold text-lg tracking-tight whitespace-nowrap" style="color:inherit;text-decoration:none;">Hillside FD</a>
+  <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
+    <a href="/"         class="hover:text-green-200 pb-0.5">Dashboard</a>
+    <a href="/sick"     class="hover:text-green-200 pb-0.5">Sick Tracking</a>
+    <a href="/recall"   class="hover:text-green-200 pb-0.5">Recall List</a>
+    <a href="/docs"     class="hover:text-green-200 pb-0.5">Documents</a>
+    <a href="/search"   class="hover:text-green-200 pb-0.5">Search</a>
+    <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
+    <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
+    <a href="/personnel" data-admin-only class="nav-active pb-0.5">Personnel</a>
+    <a href="/admin"    class="hover:text-green-200 pb-0.5">Admin</a>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="authSlot" class="flex items-center gap-2"></span>
+    <button onclick="toggleMobileMenu()" class="sm:hidden text-white rounded px-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;font-size:22px;line-height:1;background:none;border:none;cursor:pointer;" aria-label="Menu">&#9776;</button>
+  </div>
+</nav>
+<div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
+<div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 64px);background:#14532d;">
+  <a href="/"         onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+  <a href="/sick"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+  <a href="/recall"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+  <a href="/docs"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+  <a href="/search"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
+  <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/apparatus" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Apparatus</a>
+  <a href="/personnel" data-admin-only onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Personnel</a>
+  <a href="/admin"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+</div>
+
+<div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+<!-- ── Main layout ──────────────────────────────────────────────────────────── -->
+<div class="max-w-7xl mx-auto px-3 py-4">
+  <div class="flex gap-4" id="mainLayout">
+
+    <!-- Left: member list -->
+    <div id="listPanel" class="w-full md:w-72 flex-shrink-0">
+      <div class="section-card">
+        <div class="flex items-center justify-between mb-3">
+          <h1 class="text-lg font-extrabold text-gray-800">Personnel Files</h1>
+          <span id="ffCount" class="badge badge-gray"></span>
+        </div>
+        <input id="searchInput" type="text" placeholder="Search name..." oninput="filterList()" class="mb-3" style="font-size:13px;padding:8px 12px;">
+        <div id="ffList" class="space-y-0.5 max-h-[calc(100vh-220px)] overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+    <!-- Right: file view -->
+    <div id="filePanel" class="hidden flex-1 min-w-0">
+      <!-- Header -->
+      <div class="section-card mb-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <button onclick="closeFile()" class="text-xs text-gray-400 hover:text-gray-600 mb-1 flex items-center gap-1">← Back to list</button>
+            <h2 id="ffName" class="text-xl font-extrabold text-gray-800"></h2>
+            <p id="ffMeta" class="text-sm text-gray-500 mt-0.5"></p>
+          </div>
+          <div id="ffStats" class="flex gap-3 flex-wrap"></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="section-card mb-4 p-2">
+        <div class="flex gap-1 overflow-x-auto">
+          <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+          <button class="tab-btn" onclick="switchTab('sick')">Sick History</button>
+          <button class="tab-btn" onclick="switchTab('recall')">Recall / OT</button>
+          <button class="tab-btn" onclick="switchTab('docs')">Document Vault</button>
+          <button class="tab-btn" onclick="switchTab('notes')">Notes</button>
+        </div>
+      </div>
+
+      <!-- Tab content -->
+      <div id="tab-overview" class="tab-content">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4" id="overviewStats"></div>
+        <div class="section-card">
+          <h3 class="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide">Member Information</h3>
+          <div id="overviewInfo" class="grid grid-cols-2 gap-3 text-sm"></div>
+        </div>
+      </div>
+
+      <div id="tab-sick" class="tab-content hidden">
+        <div class="section-card">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Sick History</h3>
+            <div id="sickTotals" class="text-xs text-gray-500"></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead><tr>
+                <th>Out Date</th><th>Back Date</th><th>Days</th><th>Flags</th><th>Recorded By</th><th>Notes</th>
+              </tr></thead>
+              <tbody id="sickTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-recall" class="tab-content hidden">
+        <div class="section-card">
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Recall / OT History</h3>
+            <div id="recallTotals" class="text-xs text-gray-500"></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead><tr>
+                <th>Date</th><th>Type</th><th>Hours</th><th>Tour</th><th>Recorded By</th>
+              </tr></thead>
+              <tbody id="recallTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-docs" class="tab-content hidden">
+        <div class="section-card">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Document Vault</h3>
+            <button id="uploadBtn" class="btn-primary hidden" onclick="showUploadModal()">+ Upload Document</button>
+          </div>
+          <div id="docList" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <div id="tab-notes" class="tab-content hidden">
+        <div class="section-card">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Private Notes</h3>
+          </div>
+          <div id="addNoteForm" class="hidden mb-4">
+            <textarea id="noteText" rows="3" placeholder="Add a note..." style="margin-bottom:8px;"></textarea>
+            <div class="flex gap-2">
+              <button class="btn-primary" onclick="submitNote()">Save Note</button>
+              <button class="btn-sm bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="toggleNoteForm(false)">Cancel</button>
+            </div>
+          </div>
+          <button id="addNoteBtn" class="btn-primary mb-4 hidden" onclick="toggleNoteForm(true)">+ Add Note</button>
+          <div id="notesList" class="space-y-3"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Upload Modal ──────────────────────────────────────────────────────────── -->
+<div id="uploadModal" class="hidden">
+  <div class="modal-overlay" onclick="if(event.target===this)closeUpload()">
+    <div class="modal-box p-6">
+      <h3 class="text-lg font-extrabold text-gray-800 mb-4">Upload Document</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Document Name *</label>
+          <input id="upDocName" type="text" placeholder="e.g. EMT Certification 2025">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Type</label>
+          <select id="upDocType">
+            <option value="certification">Certification</option>
+            <option value="medical">Medical</option>
+            <option value="disciplinary">Disciplinary</option>
+            <option value="commendation">Commendation</option>
+            <option value="training">Training</option>
+            <option value="other" selected>Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Notes</label>
+          <input id="upNotes" type="text" placeholder="Optional">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">File *</label>
+          <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <div class="text-gray-400 text-sm" id="dropLabel">Click to choose a file or drag and drop</div>
+          </div>
+          <input id="fileInput" type="file" class="hidden" onchange="handleFileSelect(this.files[0])">
+        </div>
+        <div id="upProgress" class="hidden">
+          <div class="bg-gray-200 rounded-full h-2 mt-2">
+            <div id="upProgressBar" class="bg-green-600 h-2 rounded-full transition-all" style="width:0%"></div>
+          </div>
+          <p id="upStatus" class="text-xs text-gray-500 mt-1 text-center"></p>
+        </div>
+        <div id="upError" class="hidden text-red-600 text-sm"></div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn-primary flex-1" onclick="doUpload()">Upload</button>
+        <button class="btn-sm bg-gray-100 text-gray-600 flex-1 py-2" onclick="closeUpload()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="authModal"></div>
+<script src="/auth.js"></script>
+<script>
+const API = '/.netlify/functions'
+let allFF = []
+let currentFF = null
+let currentFile = null
+let selectedFile = null
+let activeTab = 'overview'
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await AUTH.init?.() // auth.js calls init on DOMContentLoaded, may already run
+  const s = AUTH.getSession()
+  if (!s || s.role !== 'admin') {
+    window.location.href = '/'
+    return
+  }
+  // Show upload/note controls for admins
+  document.getElementById('uploadBtn').classList.remove('hidden')
+  document.getElementById('addNoteBtn').classList.remove('hidden')
+  loadPersonnel()
+})
+
+async function loadPersonnel() {
+  const res = await fetch(`${API}/get-personnel`, { headers: AUTH.getHeaders() })
+  if (!res.ok) { showError('Failed to load personnel'); return }
+  const data = await res.json()
+  allFF = data.firefighters || []
+  renderList(allFF)
+}
+
+// ── Member list ────────────────────────────────────────────────────────────────
+function filterList() {
+  const q = document.getElementById('searchInput').value.toLowerCase()
+  renderList(q ? allFF.filter(f => f.name.toLowerCase().includes(q)) : allFF)
+}
+
+function renderList(list) {
+  const el = document.getElementById('ffList')
+  document.getElementById('ffCount').textContent = list.length + ' members'
+  if (!list.length) { el.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No results</p>'; return }
+
+  // Group by tour (group_number)
+  const groups = {}
+  for (const f of list) {
+    const g = f.group_number || 0
+    if (!groups[g]) groups[g] = []
+    groups[g].push(f)
+  }
+  const sortedGroups = Object.keys(groups).sort((a,b) => +a - +b)
+
+  let html = ''
+  for (const g of sortedGroups) {
+    html += `<div class="text-[10px] font-bold text-gray-400 uppercase px-2 pt-2 pb-0.5">Tour ${g}</div>`
+    for (const f of groups[g]) {
+      const isSelected = currentFF && currentFF.id === f.id
+      const sickBadge  = f.ytd_sick_calls > 0 ? `<span class="badge badge-orange ml-1">${f.ytd_sick_calls}S</span>` : ''
+      html += `<div class="ff-row rounded-lg px-3 py-2 flex items-center justify-between ${isSelected ? 'selected' : ''}" onclick="openFile('${f.id}')">
+        <div>
+          <div class="font-semibold text-gray-800 text-sm">${f.name}</div>
+          <div class="text-xs text-gray-400">${f.rank || ''}${f.badge_number ? ' · #'+f.badge_number : ''}</div>
+        </div>
+        <div class="flex items-center gap-1">
+          ${sickBadge}
+          ${f.ytd_recalls > 0 ? `<span class="badge badge-blue">${f.ytd_recalls}R</span>` : ''}
+        </div>
+      </div>`
+    }
+  }
+  el.innerHTML = html
+}
+
+// ── Open member file ──────────────────────────────────────────────────────────
+async function openFile(ffId) {
+  currentFF = allFF.find(f => f.id === ffId)
+  if (!currentFF) return
+  renderList(document.getElementById('searchInput').value.toLowerCase()
+    ? allFF.filter(f => f.name.toLowerCase().includes(document.getElementById('searchInput').value.toLowerCase()))
+    : allFF
+  )
+  document.getElementById('filePanel').classList.remove('hidden')
+
+  // On mobile, hide list
+  if (window.innerWidth < 768) {
+    document.getElementById('listPanel').classList.add('hidden')
+  }
+
+  document.getElementById('ffName').textContent = currentFF.name
+  document.getElementById('ffMeta').textContent = [currentFF.rank, currentFF.badge_number ? 'Badge #'+currentFF.badge_number : '', 'Tour '+currentFF.group_number, currentFF.email].filter(Boolean).join(' · ')
+
+  // Loading state
+  for (const id of ['overviewStats','overviewInfo','sickTbody','recallTbody','docList','notesList']) {
+    document.getElementById(id).innerHTML = '<div class="text-sm text-gray-400 p-3">Loading...</div>'
+  }
+  document.getElementById('ffStats').innerHTML = ''
+
+  const res = await fetch(`${API}/get-personnel-file?id=${ffId}`, { headers: AUTH.getHeaders() })
+  if (!res.ok) { showError('Failed to load member file'); return }
+  currentFile = await res.json()
+  renderFile()
+}
+
+function closeFile() {
+  document.getElementById('filePanel').classList.add('hidden')
+  document.getElementById('listPanel').classList.remove('hidden')
+  currentFF = null
+  currentFile = null
+  renderList(allFF)
+}
+
+// ── Render file ────────────────────────────────────────────────────────────────
+function renderFile() {
+  if (!currentFile) return
+  const { firefighter: ff, sickHistory, recallHistory, documents, notes, stats } = currentFile
+
+  // Top stats
+  document.getElementById('ffStats').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${stats.ytd_sick_calls}</div><div class="stat-lbl">YTD Sick</div></div>
+    <div class="stat-card"><div class="stat-num">${stats.ytd_recalls}</div><div class="stat-lbl">YTD Recalls</div></div>
+    <div class="stat-card"><div class="stat-num">${stats.ytd_ot_hours}</div><div class="stat-lbl">OT Hours</div></div>
+  `
+
+  renderOverview(ff, stats)
+  renderSickHistory(sickHistory, stats)
+  renderRecallHistory(recallHistory, stats)
+  renderDocs(documents)
+  renderNotes(notes)
+}
+
+function renderOverview(ff, stats) {
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="stat-card"><div class="stat-num text-2xl">${stats.ytd_sick_calls}</div><div class="stat-lbl">YTD Sick Calls</div></div>
+    <div class="stat-card"><div class="stat-num text-2xl">${stats.ytd_sick_days}</div><div class="stat-lbl">YTD Sick Days</div></div>
+    <div class="stat-card"><div class="stat-num text-2xl">${stats.ytd_recalls}</div><div class="stat-lbl">YTD Recalls</div></div>
+    <div class="stat-card"><div class="stat-num text-2xl">${stats.ytd_ot_hours}</div><div class="stat-lbl">OT Hours</div></div>
+    <div class="stat-card"><div class="stat-num text-2xl" style="font-size:14px;margin-top:4px;">${stats.last_sick_date ? fmtDate(stats.last_sick_date) : '—'}</div><div class="stat-lbl">Last Sick Date</div></div>
+    <div class="stat-card"><div class="stat-num text-2xl" style="font-size:14px;margin-top:4px;">${stats.last_recall_date ? fmtDate(stats.last_recall_date) : '—'}</div><div class="stat-lbl">Last Recall</div></div>
+  `
+
+  document.getElementById('overviewInfo').innerHTML = `
+    <div><div class="text-xs text-gray-400 uppercase font-semibold mb-0.5">Name</div><div class="font-semibold">${ff.name}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold mb-0.5">Rank</div><div>${ff.rank || '—'}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold mb-0.5">Badge Number</div><div>${ff.badge_number || '—'}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold mb-0.5">Tour / Group</div><div>${ff.group_number ? 'Tour ' + ff.group_number : '—'}</div></div>
+    <div class="col-span-2"><div class="text-xs text-gray-400 uppercase font-semibold mb-0.5">Email</div><div>${ff.email ? `<a href="mailto:${ff.email}" class="text-blue-600">${ff.email}</a>` : '—'}</div></div>
+  `
+}
+
+function renderSickHistory(history, stats) {
+  const tbody = document.getElementById('sickTbody')
+  document.getElementById('sickTotals').textContent = `${stats.ytd_sick_calls} calls · ${stats.ytd_sick_days} days YTD`
+  if (!history.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-gray-400 italic text-center py-4">No sick history on record</td></tr>'; return }
+  tbody.innerHTML = history.map(s => {
+    const flags = [
+      s.weekendAdj ? '<span class="badge badge-orange">Weekend Adj</span>' : '',
+      s.holAdj     ? '<span class="badge badge-orange">Holiday Adj</span>' : ''
+    ].filter(Boolean).join(' ')
+    return `<tr>
+      <td>${fmtDate(s.out_date)}</td>
+      <td>${s.back_date ? fmtDate(s.back_date) : '<span class="text-orange-600 font-semibold">Still Out</span>'}</td>
+      <td>${s.days_out}</td>
+      <td>${flags || '<span class="badge badge-gray">—</span>'}</td>
+      <td>${s.marked_sick_by || '—'}</td>
+      <td class="text-gray-500 text-xs">${s.notes || ''}</td>
+    </tr>`
+  }).join('')
+}
+
+function renderRecallHistory(history, stats) {
+  const tbody = document.getElementById('recallTbody')
+  const worked  = history.filter(r => ['full_shift','short_min','substitution'].includes(r.recall_type))
+  const refused = history.filter(r => r.recall_type === 'refused')
+  document.getElementById('recallTotals').textContent = `${worked.length} worked · ${refused.length} refused · ${stats.ytd_ot_hours}h OT`
+  if (!history.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 italic text-center py-4">No recall history on record</td></tr>'; return }
+
+  const typeLabel = { full_shift:'Full Shift', short_min:'Short Min', substitution:'Substitution', refused:'Refused' }
+  tbody.innerHTML = history.map(r => {
+    const isRefused = r.recall_type === 'refused'
+    const badge = isRefused
+      ? '<span class="badge badge-red">Refused</span>'
+      : `<span class="badge badge-green">${typeLabel[r.recall_type] || r.recall_type}</span>`
+    return `<tr class="${isRefused ? 'refused-row' : ''}">
+      <td>${fmtDate(r.shift_date)}</td>
+      <td>${badge}</td>
+      <td>${r.hours_worked || '—'}</td>
+      <td>${r.tour_worked || '—'}</td>
+      <td>${r.recorded_by || '—'}</td>
+    </tr>`
+  }).join('')
+}
+
+function renderDocs(docs) {
+  const el = document.getElementById('docList')
+  if (!docs.length) { el.innerHTML = '<p class="text-gray-400 italic text-sm text-center py-4">No documents on file</p>'; return }
+  const typeLabel = { certification:'Certification', medical:'Medical', disciplinary:'Disciplinary', commendation:'Commendation', training:'Training', other:'Other' }
+  const typeBadgeClass = { disciplinary:'badge-red', commendation:'badge-green', medical:'badge-blue', certification:'badge-blue', training:'badge-blue', other:'badge-gray' }
+  el.innerHTML = docs.map(d => `
+    <div class="flex items-start justify-between gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm text-gray-800">${d.document_name}</div>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          <span class="badge ${typeBadgeClass[d.document_type] || 'badge-gray'}">${typeLabel[d.document_type] || d.document_type}</span>
+          <span class="text-xs text-gray-400">${fmtDate(d.created_at?.split('T')[0])} · ${d.uploaded_by}</span>
+        </div>
+        ${d.notes ? `<div class="text-xs text-gray-500 mt-1">${d.notes}</div>` : ''}
+      </div>
+      <div class="flex gap-1 flex-shrink-0">
+        <button class="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100" onclick="downloadDoc('${d.id}','${d.file_name}')">Download</button>
+        <button class="btn-sm bg-red-50 text-red-700 hover:bg-red-100" onclick="deleteDoc('${d.id}','${d.document_name}')">Delete</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+function renderNotes(notes) {
+  const el = document.getElementById('notesList')
+  if (!notes.length) { el.innerHTML = '<p class="text-gray-400 italic text-sm text-center py-4">No notes on file</p>'; return }
+  el.innerHTML = notes.map(n => `
+    <div class="p-3 bg-yellow-50 border border-yellow-100 rounded-lg relative">
+      <p class="text-sm text-gray-700 whitespace-pre-wrap">${n.note}</p>
+      <div class="flex items-center justify-between mt-2">
+        <span class="text-xs text-gray-400">${n.added_by} · ${fmtDate(n.created_at?.split('T')[0])}</span>
+        <button class="btn-sm bg-red-50 text-red-700 hover:bg-red-100" onclick="deleteNote('${n.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  activeTab = name
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'))
+  document.getElementById('tab-' + name).classList.remove('hidden')
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.onclick?.toString().includes("'"+name+"'"))
+  })
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function showUploadModal() {
+  selectedFile = null
+  document.getElementById('upDocName').value = ''
+  document.getElementById('upDocType').value = 'other'
+  document.getElementById('upNotes').value = ''
+  document.getElementById('dropLabel').textContent = 'Click to choose a file or drag and drop'
+  document.getElementById('upProgress').classList.add('hidden')
+  document.getElementById('upError').classList.add('hidden')
+  document.getElementById('uploadModal').classList.remove('hidden')
+}
+
+function closeUpload() {
+  document.getElementById('uploadModal').classList.add('hidden')
+  selectedFile = null
+}
+
+function handleFileSelect(file) {
+  if (!file) return
+  selectedFile = file
+  document.getElementById('dropLabel').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)'
+}
+
+// Drag/drop
+const dz = document.getElementById('dropZone')
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over') })
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'))
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over')
+    const f = e.dataTransfer.files[0]
+    if (f) { handleFileSelect(f); document.getElementById('fileInput').files = e.dataTransfer.files }
+  })
+}
+
+async function doUpload() {
+  const docName = document.getElementById('upDocName').value.trim()
+  const docType = document.getElementById('upDocType').value
+  const notes   = document.getElementById('upNotes').value.trim()
+  const errEl   = document.getElementById('upError')
+  errEl.classList.add('hidden')
+
+  if (!docName) { errEl.textContent = 'Document name is required'; errEl.classList.remove('hidden'); return }
+  if (!selectedFile) { errEl.textContent = 'Please select a file'; errEl.classList.remove('hidden'); return }
+
+  const progress  = document.getElementById('upProgress')
+  const bar       = document.getElementById('upProgressBar')
+  const statusTxt = document.getElementById('upStatus')
+  progress.classList.remove('hidden')
+  bar.style.width = '10%'
+  statusTxt.textContent = 'Getting upload URL...'
+
+  // Step 1: get signed URL
+  const r1 = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'upload_url', firefighter_id: currentFF.id, file_name: selectedFile.name, document_name: docName, document_type: docType, notes })
+  })
+  if (!r1.ok) { const e = await r1.json(); errEl.textContent = e.error || 'Upload failed'; errEl.classList.remove('hidden'); return }
+  const { upload_url, path } = await r1.json()
+
+  bar.style.width = '40%'
+  statusTxt.textContent = 'Uploading file...'
+
+  // Step 2: upload to storage
+  const r2 = await fetch(upload_url, { method: 'PUT', body: selectedFile, headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' } })
+  if (!r2.ok) { errEl.textContent = 'Storage upload failed'; errEl.classList.remove('hidden'); return }
+
+  bar.style.width = '80%'
+  statusTxt.textContent = 'Saving metadata...'
+
+  // Step 3: confirm
+  const r3 = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'upload_confirm', firefighter_id: currentFF.id, file_name: selectedFile.name, document_name: docName, document_type: docType, notes, path })
+  })
+  if (!r3.ok) { const e = await r3.json(); errEl.textContent = e.error || 'Metadata save failed'; errEl.classList.remove('hidden'); return }
+
+  bar.style.width = '100%'
+  statusTxt.textContent = 'Done!'
+
+  await openFile(currentFF.id)
+  closeUpload()
+  switchTab('docs')
+}
+
+// ── Download ───────────────────────────────────────────────────────────────────
+async function downloadDoc(docId, fileName) {
+  const res = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'download_url', doc_id: docId })
+  })
+  if (!res.ok) { showError('Download failed'); return }
+  const { url } = await res.json()
+  const a = document.createElement('a')
+  a.href = url; a.download = fileName; a.target = '_blank'
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+}
+
+// ── Delete doc ─────────────────────────────────────────────────────────────────
+async function deleteDoc(docId, name) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+  await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'delete_doc', doc_id: docId })
+  })
+  await openFile(currentFF.id); switchTab('docs')
+}
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+function toggleNoteForm(show) {
+  document.getElementById('addNoteForm').classList.toggle('hidden', !show)
+  document.getElementById('addNoteBtn').classList.toggle('hidden', show)
+  if (show) document.getElementById('noteText').focus()
+  else document.getElementById('noteText').value = ''
+}
+
+async function submitNote() {
+  const note = document.getElementById('noteText').value.trim()
+  if (!note) return
+  const res = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'add_note', firefighter_id: currentFF.id, note })
+  })
+  if (!res.ok) { showError('Failed to save note'); return }
+  toggleNoteForm(false)
+  await openFile(currentFF.id); switchTab('notes')
+}
+
+async function deleteNote(noteId) {
+  if (!confirm('Delete this note?')) return
+  await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'delete_note', note_id: noteId })
+  })
+  await openFile(currentFF.id); switchTab('notes')
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtDate(str) {
+  if (!str) return '—'
+  const [y, m, d] = String(str).split('-')
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  return `${months[parseInt(m)-1]} ${parseInt(d)}, ${y}`
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner')
+  el.textContent = msg; el.classList.remove('hidden')
+  setTimeout(() => el.classList.add('hidden'), 4000)
+}
+</script>
+</body>
+</html>

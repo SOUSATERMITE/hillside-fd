@@ -35,6 +35,7 @@ const AUTH = (() => {
     const slot = document.getElementById('authSlot')
     if (!slot) return
     const s = getSession()
+    document.querySelectorAll('[data-admin-only]').forEach(el => el.classList.toggle('hidden', !(s && s.role === 'admin')))
     if (s) {
       slot.innerHTML = `
         <span class="hidden sm:inline text-white text-xs font-semibold max-w-[110px] truncate">${s.display_name}</span>

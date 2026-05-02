@@ -42,6 +42,14 @@
   status = 200
 
 [[redirects]]
+  from = "/personnel"
+  to = "/personnel/index.html"
+  status = 200
+
+[[redirects]]
   from = "/chat"
   to = "/search/index.html"
   status = 200
+
+[functions."weekly-report"]
+  schedule = "0 10 * * 0"
