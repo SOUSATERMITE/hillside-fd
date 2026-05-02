@@ -87,3 +87,22 @@ create index if not exists idx_work_orders_status             on work_orders(sta
 create index if not exists idx_contacts_category              on contacts(category);
 create index if not exists idx_apparatus_active               on apparatus(active, unit_name);
 create index if not exists idx_apparatus_log_unit             on apparatus_log(apparatus_id, created_at desc);
+
+create table if not exists apparatus_findings (
+  id             uuid primary key default gen_random_uuid(),
+  apparatus_id   uuid references apparatus(id) not null,
+  finding_type   text not null,  -- damage/repair_needed/repair_completed/inspection/scheduled_maintenance
+  description    text not null,
+  priority       text not null default 'medium',  -- low/medium/high/critical
+  reported_by    text not null,
+  officer_id     uuid references officers(id),
+  assigned_to    text,
+  scheduled_date date,
+  completed_date date,
+  completed_by   text,
+  status         text not null default 'open',  -- open/in_progress/completed/cancelled
+  photos_notes   text,
+  created_at     timestamptz default now()
+);
+create index if not exists idx_apparatus_findings_unit     on apparatus_findings(apparatus_id, status, created_at desc);
+create index if not exists idx_apparatus_findings_priority on apparatus_findings(status, priority);

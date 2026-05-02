@@ -20,6 +20,20 @@ function groupForDateStr(dateStr) {
   return getGroupForMs(new Date(dateStr + 'T11:30:00Z').getTime())
 }
 
+function buildApparatusWithCounts(apparatus, findings) {
+  const countsByUnit = {}
+  for (const f of findings) {
+    if (!countsByUnit[f.apparatus_id]) countsByUnit[f.apparatus_id] = { total: 0, critical_high: 0 }
+    countsByUnit[f.apparatus_id].total++
+    if (['critical','high'].includes(f.priority)) countsByUnit[f.apparatus_id].critical_high++
+  }
+  return apparatus.map(a => ({
+    ...a,
+    open_findings: countsByUnit[a.id]?.total || 0,
+    critical_high: countsByUnit[a.id]?.critical_high || 0
+  }))
+}
+
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
@@ -41,7 +55,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -91,7 +105,13 @@ exports.handler = async (event) => {
         .from('apparatus')
         .select('id, unit_name, unit_type, status, location, last_updated, updated_by')
         .eq('active', true)
-        .order('unit_name', { ascending: true })
+        .order('unit_name', { ascending: true }),
+
+      supabase
+        .from('apparatus_findings')
+        .select('apparatus_id, priority, status')
+        .in('status', ['open', 'in_progress'])
+        .in('finding_type', ['damage', 'repair_needed', 'inspection'])
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -123,7 +143,7 @@ exports.handler = async (event) => {
         events,
         workOrders:          workOrderRes.data || [],
         contacts:            contactRes.data   || [],
-        apparatus:           apparatusRes.data || [],
+        apparatus:           buildApparatusWithCounts(apparatusRes.data || [], findingsRes.data || []),
         schedule
       })
     }

@@ -1,7 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 const { allowOrigin } = require('./_cors')
-const crypto = require('crypto')
 
 function sanitize(v) { return (v || '').replace(/[\r\n\t]/g, ' ').trim() }
 
@@ -38,48 +37,11 @@ function formatDates(arr) {
 }
 
 function reviewBtn(url, color) {
-  return `<p style="margin:16px 0 0;"><a href="${url}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">Review Request →</a></p>`
-}
-
-// Look up an officer record by name (exact then case-insensitive fallback)
-async function findOfficerByName(supabase, name) {
-  const { data: exact } = await supabase
-    .from('officers')
-    .select('id, name, display_name, role')
-    .eq('name', name)
-    .eq('active', true)
-    .maybeSingle()
-  if (exact) return exact
-
-  const { data: fuzzy } = await supabase
-    .from('officers')
-    .select('id, name, display_name, role')
-    .ilike('name', name)
-    .eq('active', true)
-    .maybeSingle()
-  return fuzzy || null
-}
-
-// Create a one-use magic token valid for 7 days; returns the token string or null
-async function mintMagicToken(supabase, officerId, requestId) {
-  try {
-    const token = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { error } = await supabase
-      .from('magic_tokens')
-      .insert({ officer_id: officerId, request_id: requestId, token, expires_at: expiresAt })
-    if (error) { console.error('[submit-vacation] mintMagicToken error:', error.message); return null }
-    return token
-  } catch (e) { console.error('[submit-vacation] mintMagicToken exception:', e.message); return null }
-}
-
-// Build the review URL — with magic token if officer has a login, plain if not
-async function buildReviewUrl(supabase, officerName, requestId) {
-  const BASE = `https://hillside-fd.netlify.app/vacation?request=${requestId}`
-  const officer = await findOfficerByName(supabase, officerName)
-  if (!officer) return BASE  // No officer login — URL works but needs manual PIN
-  const token = await mintMagicToken(supabase, officer.id, requestId)
-  return token ? `${BASE}&token=${token}` : BASE
+  return `
+<p style="margin:16px 0 0;">
+  <a href="${url}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">Review Request →</a>
+</p>
+<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">Log in at hillside-fd.netlify.app/vacation with your PIN to review this request.</p>`
 }
 
 exports.handler = async (event) => {
@@ -122,9 +84,9 @@ exports.handler = async (event) => {
 
     const cancelledStr = formatDates(cancelled_dates)
     const newStr       = formatDates(new_dates)
-    const isAdminFF    = !ff.group_number  // NULL = not assigned to a tour
+    const isAdminFF    = !ff.group_number
 
-    // ── ADMIN FF PATH: goes directly to Chief ───────────────────────────────────
+    // ── ADMIN FF PATH ──────────────────────────────────────────────────────────
     if (isAdminFF) {
       const { data: req, error: insertErr } = await supabase
         .from('vacation_requests')
@@ -146,6 +108,8 @@ exports.handler = async (event) => {
         .single()
       if (insertErr) throw insertErr
 
+      const reviewUrl = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
+
       const { data: chiefs } = await supabase
         .from('firefighters')
         .select('name, email')
@@ -156,7 +120,7 @@ exports.handler = async (event) => {
         ? `<tr><td style="padding:8px 12px;font-weight:600;color:#b91c1c;">Staffing Impact</td><td style="padding:8px 12px;color:#b91c1c;font-weight:600;">YES — ${sanitize(impact_explanation)}</td></tr>`
         : `<tr><td style="padding:8px 12px;font-weight:600;">Staffing Impact</td><td style="padding:8px 12px;">No</td></tr>`
 
-      const buildChiefHtml = (reviewUrl) => `
+      const chiefHtml = `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
   <div style="background:#7c3aed;padding:20px 28px;border-radius:10px 10px 0 0;">
     <h2 style="color:#fff;margin:0;font-size:18px;">Action Required — Administrative Staff Vacation Change</h2>
@@ -179,12 +143,11 @@ exports.handler = async (event) => {
       let chiefsNotified = 0
       for (const chief of (chiefs || [])) {
         if (chief.email) {
-          const reviewUrl = await buildReviewUrl(supabase, chief.name, req.id)
           await sendEmail({
             to: chief.email,
             subject: `Action Required — Administrative Staff Vacation Change Request from ${ff.name}`,
-            html: buildChiefHtml(reviewUrl),
-            text: `Administrative staff vacation change from ${ff.name}. Cancelled: ${cancelledStr}. New Dates: ${newStr}. Your approval is required. Review at: ${reviewUrl}`
+            html: chiefHtml,
+            text: `Administrative staff vacation change from ${ff.name}. Cancelled: ${cancelledStr}. New Dates: ${newStr}. Your approval is required. Log in at hillside-fd.netlify.app/vacation with your PIN to review this request.`
           })
           chiefsNotified++
         }
@@ -194,7 +157,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
     }
 
-    // ── TOUR FF PATH: normal Captain → DC → Chief chain ────────────────────────
+    // ── TOUR FF PATH ───────────────────────────────────────────────────────────
     const { data: captains } = await supabase
       .from('firefighters')
       .select('id, name, email')
@@ -224,11 +187,13 @@ exports.handler = async (event) => {
       .single()
     if (insertErr) throw insertErr
 
+    const reviewUrl = `https://hillside-fd.netlify.app/vacation?request=${req.id}`
+
     const impactLine = staffing_impact
       ? `<tr><td style="padding:8px 12px;font-weight:600;color:#b91c1c;">Staffing Impact</td><td style="padding:8px 12px;color:#b91c1c;font-weight:600;">YES — ${sanitize(impact_explanation)}</td></tr>`
       : `<tr><td style="padding:8px 12px;font-weight:600;">Staffing Impact</td><td style="padding:8px 12px;">No</td></tr>`
 
-    const buildCaptainHtml = (reviewUrl) => `
+    const captainHtml = `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
   <div style="background:#b91c1c;padding:20px 28px;border-radius:10px 10px 0 0;">
     <h2 style="color:#fff;margin:0;font-size:18px;">Action Required — Vacation Change Request</h2>
@@ -251,12 +216,11 @@ exports.handler = async (event) => {
     let captainsNotified = 0
     for (const cap of (captains || [])) {
       if (cap.email) {
-        const reviewUrl = await buildReviewUrl(supabase, cap.name, req.id)
         await sendEmail({
           to: cap.email,
           subject: `Action Required — Vacation Change Request from ${ff.name}`,
-          html: buildCaptainHtml(reviewUrl),
-          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}). Either captain may approve — first response is final.\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nReview at: ${reviewUrl}`
+          html: captainHtml,
+          text: `Vacation change request from ${ff.name} (Group ${ff.group_number}). Either captain may approve — first response is final.\nCancelled: ${cancelledStr}\nNew Dates: ${newStr}\nStaffing Impact: ${staffing_impact ? 'YES' : 'No'}\nLog in at hillside-fd.netlify.app/vacation with your PIN to review this request.`
         })
         captainsNotified++
       } else {
@@ -282,7 +246,6 @@ exports.handler = async (event) => {
     console.log(`[submit-vacation] Tour request ${req.id} created for ${ff.name} (Group ${ff.group_number}). Captains notified: ${captainsNotified}/${(captains || []).length}`)
     return { statusCode: 200, headers, body: JSON.stringify({ success: true, id: req.id }) }
   } catch (e) {
-    console.error('[submit-vacation] Error:', e)
     console.error('[submit-vacation] error:', e.message)
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
   }

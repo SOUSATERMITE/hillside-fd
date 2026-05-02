@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#b71c1c">
+  <meta name="theme-color" content="#1a5c2a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Hillside FD">
@@ -18,21 +18,25 @@
     #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); background: #1a5c2a; }
     .nav-active  { font-weight:700; border-bottom:2px solid rgba(255,255,255,0.85); }
     .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
-    details > summary { list-style:none; cursor:pointer; }
-    details > summary::-webkit-details-marker { display:none; }
+    .tab-active   { border-bottom: 3px solid #1a5c2a; color: #1a5c2a; font-weight: 700; }
+    .tab-inactive { border-bottom: 3px solid transparent; color: #6b7280; }
+    .pri-critical { background:#fee2e2; color:#991b1b; }
+    .pri-high     { background:#ffedd5; color:#9a3412; }
+    .pri-medium   { background:#fef9c3; color:#854d0e; }
+    .pri-low      { background:#f1f5f9; color:#475569; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
 <div id="authModal"></div>
 
-<!-- Edit Modal -->
-<div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
+<!-- Status Update Modal -->
+<div id="statusModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
-    <h2 class="font-bold text-gray-800 text-lg mb-4" id="editModalTitle">Update Apparatus</h2>
+    <h2 class="font-bold text-gray-800 text-lg mb-4" id="statusModalTitle">Update Status</h2>
     <div class="mb-3">
       <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Status</label>
-      <select id="editStatus" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+      <select id="ms_status" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
         <option value="in_service">In Service</option>
         <option value="out_of_service">Out of Service</option>
         <option value="maintenance">At Shop / Maintenance</option>
@@ -41,18 +45,128 @@
     </div>
     <div class="mb-3">
       <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Location</label>
-      <input id="editLocation" type="text" placeholder="e.g. Station 1, Township Garage, Mutual Aid" maxlength="200"
+      <input id="ms_location" type="text" placeholder="e.g. Station 1, Township Garage, Mutual Aid" maxlength="200"
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
     </div>
     <div class="mb-3">
-      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Findings / Notes</label>
-      <textarea id="editNotes" placeholder="Describe issue, repair, or reason for status change..." maxlength="1000" rows="3"
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes</label>
+      <textarea id="ms_notes" rows="2" maxlength="500"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div id="ms_err" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('statusModal')" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitStatusUpdate()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Finding/Damage Modal -->
+<div id="findingModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
+    <h2 class="font-bold text-gray-800 text-lg mb-4" id="findingModalTitle">Report Finding</h2>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Type</label>
+      <select id="fm_type" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+        <option value="damage">Damage</option>
+        <option value="repair_needed">Repair Needed</option>
+        <option value="inspection">Inspection Finding</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Priority</label>
+      <select id="fm_priority" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Description *</label>
+      <textarea id="fm_desc" rows="3" maxlength="2000" placeholder="Describe the damage, finding, or issue..."
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;resize:vertical;"></textarea>
     </div>
-    <div id="editErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Assigned To (optional)</label>
+      <input id="fm_assigned" type="text" placeholder="e.g. Township Garage, Lt. Smith" maxlength="200"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Photos / Additional Notes</label>
+      <textarea id="fm_notes" rows="2" maxlength="2000" placeholder="Additional notes, part numbers, etc."
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div id="fm_err" class="hidden text-red-600 text-xs mb-2"></div>
     <div class="flex gap-3">
-      <button onclick="closeEditModal()" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
-      <button onclick="submitUpdate()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition">Update</button>
+      <button onclick="closeModal('findingModal')" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitFinding()" class="flex-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition">Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- Repair Modal -->
+<div id="repairModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
+    <h2 class="font-bold text-gray-800 text-lg mb-4" id="repairModalTitle">Log Completed Repair</h2>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">What Was Fixed *</label>
+      <textarea id="rm_desc" rows="3" maxlength="2000" placeholder="Describe the repair performed..."
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;resize:vertical;"></textarea>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Completed By</label>
+        <input id="rm_by" type="text" placeholder="Name / Shop" maxlength="200"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Date</label>
+        <input id="rm_date" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Parts Used / Notes</label>
+      <textarea id="rm_notes" rows="2" maxlength="2000" placeholder="Part numbers, invoice #, additional notes..."
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div id="rm_err" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('repairModal')" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitRepair()" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl py-3 transition">Log Repair</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Modal -->
+<div id="scheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 my-4">
+    <h2 class="font-bold text-gray-800 text-lg mb-4" id="scheduleModalTitle">Schedule Maintenance</h2>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Description *</label>
+      <textarea id="sm_desc" rows="2" maxlength="2000" placeholder="What needs to be done..."
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Scheduled Date</label>
+        <input id="sm_date" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Assign To</label>
+        <input id="sm_assigned" type="text" placeholder="Shop / Vendor" maxlength="200"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes</label>
+      <textarea id="sm_notes" rows="2" maxlength="2000"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div id="sm_err" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('scheduleModal')" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitSchedule()" class="flex-1 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl py-3 transition">Schedule</button>
     </div>
   </div>
 </div>
@@ -60,14 +174,14 @@
 <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-40">
   <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
   <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
-    <a href="/"          class="hover:text-green-200 pb-0.5">Dashboard</a>
-    <a href="/sick"       class="hover:text-green-200 pb-0.5">Sick</a>
-    <a href="/recall"     class="hover:text-green-200 pb-0.5">Recall</a>
-    <a href="/docs"       class="hover:text-green-200 pb-0.5">Docs</a>
-    <a href="/search"     class="hover:text-green-200 pb-0.5">Search</a>
-    <a href="/vacation"   class="hover:text-green-200 pb-0.5">Vacation</a>
-    <a href="/apparatus"  class="nav-active pb-0.5">Apparatus</a>
-    <a href="/admin"      class="hover:text-green-200 pb-0.5">Admin</a>
+    <a href="/"         class="hover:text-green-200 pb-0.5">Dashboard</a>
+    <a href="/sick"     class="hover:text-green-200 pb-0.5">Sick</a>
+    <a href="/recall"   class="hover:text-green-200 pb-0.5">Recall</a>
+    <a href="/docs"     class="hover:text-green-200 pb-0.5">Docs</a>
+    <a href="/search"   class="hover:text-green-200 pb-0.5">Search</a>
+    <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
+    <a href="/apparatus" class="nav-active pb-0.5">Apparatus</a>
+    <a href="/admin"    class="hover:text-green-200 pb-0.5">Admin</a>
   </div>
   <div class="flex items-center gap-2">
     <span id="authSlot" class="flex items-center gap-2"></span>
@@ -76,31 +190,26 @@
 </nav>
 <div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
 <div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 80px);">
-  <a href="/"          onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
-  <a href="/sick"       onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
-  <a href="/recall"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
-  <a href="/docs"       onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
-  <a href="/search"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
-  <a href="/vacation"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
-  <a href="/apparatus"  onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Apparatus</a>
-  <a href="/admin"      onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+  <a href="/"         onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+  <a href="/sick"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+  <a href="/recall"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+  <a href="/docs"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+  <a href="/search"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
+  <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/apparatus" onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Apparatus</a>
+  <a href="/admin"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
 </div>
 
-<!-- OOS Banner -->
 <div id="oosBanner" class="hidden bg-red-700 text-white text-sm font-bold px-4 py-3 text-center"></div>
 
-<div class="max-w-4xl mx-auto px-3 py-4 space-y-4">
-
-  <div class="flex items-center justify-between">
+<div class="max-w-4xl mx-auto px-3 py-4">
+  <div class="flex items-center justify-between mb-4">
     <h1 class="text-xl font-extrabold text-gray-800">🚒 Apparatus Status</h1>
     <button onclick="loadApparatus()" class="text-sm text-green-700 font-semibold hover:text-green-900" style="min-height:0;">↻ Refresh</button>
   </div>
-
-  <!-- Grid of apparatus cards -->
-  <div id="apparatusGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    <div class="text-center py-8 text-gray-400 col-span-full">Loading...</div>
+  <div id="apparatusGrid" class="space-y-3">
+    <div class="text-center py-10 text-gray-400">Loading...</div>
   </div>
-
 </div>
 
 <script src="/auth.js"></script>
@@ -118,46 +227,57 @@ function timeAgo(iso) {
   return `${Math.floor(s/86400)}d ago`
 }
 
-function fmtDateTime(iso) {
+function fmtDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit', hour12: true
-  })
+  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
 }
 
-const STATUS_CONFIG = {
-  in_service:     { label: 'In Service',           cls: 'bg-green-100 text-green-800',   dot: 'bg-green-500',  border: 'border-green-200' },
-  out_of_service: { label: 'Out of Service',        cls: 'bg-red-100 text-red-800',       dot: 'bg-red-500',    border: 'border-red-400' },
-  maintenance:    { label: 'At Shop / Maintenance', cls: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500', border: 'border-orange-300' },
-  reserve:        { label: 'Reserve In Service',    cls: 'bg-yellow-100 text-yellow-800', dot: 'bg-yellow-500', border: 'border-yellow-300' }
+function fmtDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-US', { timeZone:'America/New_York', month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true })
+}
+
+const STATUS_CFG = {
+  in_service:     { label:'In Service',           cls:'bg-green-100 text-green-800',   dot:'bg-green-500',   border:'border-green-200',  bg:'' },
+  out_of_service: { label:'Out of Service',        cls:'bg-red-100 text-red-800',       dot:'bg-red-500',     border:'border-red-400',    bg:'bg-red-50' },
+  maintenance:    { label:'At Shop / Maintenance', cls:'bg-orange-100 text-orange-800', dot:'bg-orange-500',  border:'border-orange-300', bg:'bg-orange-50' },
+  reserve:        { label:'Reserve In Service',    cls:'bg-yellow-100 text-yellow-800', dot:'bg-yellow-500',  border:'border-yellow-300', bg:'' }
+}
+
+const PRI_CFG = {
+  critical:{ label:'CRITICAL', cls:'pri-critical' },
+  high:    { label:'High',     cls:'pri-high' },
+  medium:  { label:'Medium',   cls:'pri-medium' },
+  low:     { label:'Low',      cls:'pri-low' }
+}
+
+const FTYPE_LABEL = {
+  damage:'Damage', repair_needed:'Repair Needed', inspection:'Inspection',
+  scheduled_maintenance:'Scheduled Maint.', repair_completed:'Repair Completed'
 }
 
 let apparatusData = []
-let editingId = null
+let expandedId    = null
+let activeTab     = {}   // apparatusId → tab
+let modalUnitId   = null
 
+// ── LOAD ─────────────────────────────────────────────────────────────────────
 async function loadApparatus() {
   try {
     const res = await fetch(`${API}/get-apparatus`)
     if (!res.ok) throw new Error('Failed to load')
     apparatusData = await res.json()
-    renderApparatus()
+    renderAll()
   } catch (e) {
     document.getElementById('apparatusGrid').innerHTML =
-      `<div class="col-span-full text-center py-8 text-red-600 text-sm font-semibold">Failed to load apparatus data.</div>`
+      `<div class="text-center py-10 text-red-600 text-sm font-semibold">Failed to load apparatus data.</div>`
   }
 }
 
-function renderApparatus() {
-  const grid   = document.getElementById('apparatusGrid')
+function renderAll() {
   const banner = document.getElementById('oosBanner')
+  const grid   = document.getElementById('apparatusGrid')
   const isOff  = AUTH.isOfficer()
-
-  if (!apparatusData.length) {
-    grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-400">No apparatus found.</div>'
-    return
-  }
 
   const oos  = apparatusData.filter(u => u.status === 'out_of_service')
   const rest = apparatusData.filter(u => u.status !== 'out_of_service')
@@ -165,7 +285,7 @@ function renderApparatus() {
 
   if (oos.length) {
     banner.classList.remove('hidden')
-    banner.textContent = `⚠️ OUT OF SERVICE: ${oos.map(u => u.unit_name).join(', ')} — Notify D/C immediately`
+    banner.textContent = `⚠ OUT OF SERVICE: ${oos.map(u => u.unit_name).join(', ')} — Notify D/C immediately`
   } else {
     banner.classList.add('hidden')
   }
@@ -174,111 +294,392 @@ function renderApparatus() {
 }
 
 function renderCard(u, isOff) {
-  const st = STATUS_CONFIG[u.status] || STATUS_CONFIG.in_service
-  const log = u.log || []
+  const st       = STATUS_CFG[u.status] || STATUS_CFG.in_service
+  const isExp    = expandedId === u.id
+  const tab      = activeTab[u.id] || 'status'
+  const findings = u.findings || []
+  const openFindings = findings.filter(f => ['open','in_progress'].includes(f.status) && ['damage','repair_needed','inspection'].includes(f.finding_type))
+  const critHigh = openFindings.filter(f => ['critical','high'].includes(f.priority)).length
 
-  const editBtn = isOff ? `
-    <button onclick="openEditModal('${esc(u.id)}','${esc(u.unit_name)}','${esc(u.status)}','${esc(u.location||'')}','${esc(u.notes||'')}')"
-      class="text-xs font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1.5 hover:bg-green-50 transition" style="min-height:0;">
-      Edit Status
-    </button>` : ''
+  const findBadge = openFindings.length
+    ? `<span class="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${critHigh ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'} ml-1">
+        ${critHigh ? '⚠' : '!'} ${openFindings.length} finding${openFindings.length > 1 ? 's' : ''}
+       </span>`
+    : ''
+
+  const headerBg = u.status === 'out_of_service' ? 'bg-red-50' : u.status === 'maintenance' ? 'bg-orange-50' : 'bg-white'
+
+  return `<div class="bg-white rounded-2xl border-2 ${st.border} shadow-sm overflow-hidden">
+    <!-- Card Header (always visible) -->
+    <button onclick="toggleExpand('${u.id}')" class="w-full text-left ${headerBg} px-4 py-3 flex items-center justify-between gap-2 hover:bg-opacity-80 transition" style="min-height:0;">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="w-3 h-3 rounded-full flex-shrink-0 ${st.dot}"></span>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-extrabold text-gray-900 text-base">${esc(u.unit_name)}</span>
+            <span class="text-xs text-gray-500">${esc(u.unit_type)}</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>
+            ${findBadge}
+          </div>
+          <div class="text-xs text-gray-500 mt-0.5">${esc(u.location || '—')} · Updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
+        </div>
+      </div>
+      <span class="text-gray-400 text-lg flex-shrink-0">${isExp ? '▲' : '▼'}</span>
+    </button>
+
+    <!-- Expanded content -->
+    ${isExp ? renderExpanded(u, tab, isOff) : ''}
+  </div>`
+}
+
+function renderExpanded(u, tab, isOff) {
+  const findings = u.findings || []
+
+  const tabBtn = (id, label, badge) => {
+    const active = tab === id
+    const b = badge ? `<span class="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">${badge}</span>` : ''
+    return `<button onclick="setTab('${u.id}','${id}')" class="px-3 py-2.5 text-sm ${active ? 'tab-active' : 'tab-inactive'} hover:text-gray-800 transition whitespace-nowrap" style="min-height:0;">${label}${b}</button>`
+  }
+
+  const openFindings = findings.filter(f => ['open','in_progress'].includes(f.status) && ['damage','repair_needed','inspection'].includes(f.finding_type))
+  const repairs      = findings.filter(f => f.finding_type === 'repair_completed')
+  const scheduled    = findings.filter(f => f.finding_type === 'scheduled_maintenance' && ['open','in_progress'].includes(f.status))
+  const critHigh     = openFindings.filter(f => ['critical','high'].includes(f.priority)).length
+
+  let content = ''
+  if (tab === 'status') {
+    content = renderStatusTab(u, isOff)
+  } else if (tab === 'findings') {
+    content = renderFindingsTab(u, openFindings, isOff)
+  } else if (tab === 'repairs') {
+    content = renderRepairsTab(u, repairs, isOff)
+  } else if (tab === 'scheduled') {
+    content = renderScheduledTab(u, scheduled, isOff)
+  }
+
+  return `<div class="border-t border-gray-200">
+    <div class="flex border-b border-gray-200 overflow-x-auto bg-gray-50 px-2">
+      ${tabBtn('status',   'Status',    '')}
+      ${tabBtn('findings', 'Findings',  critHigh || '')}
+      ${tabBtn('repairs',  'Repairs',   '')}
+      ${tabBtn('scheduled','Scheduled', '')}
+    </div>
+    <div class="p-4">${content}</div>
+  </div>`
+}
+
+function renderStatusTab(u, isOff) {
+  const st = STATUS_CFG[u.status] || STATUS_CFG.in_service
+  const log = (u.log || []).slice(0, 15)
+
+  const updateForm = isOff ? `
+    <div class="border border-gray-200 rounded-xl p-3 mb-4 bg-gray-50">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Update Status</div>
+      <div class="grid grid-cols-1 gap-2">
+        <select onchange="openStatusModal('${u.id}', '${esc(u.unit_name)}', this.value, '${esc(u.location||'')}', '${esc(u.notes||'')}'); this.value=''" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="">Change status to...</option>
+          <option value="in_service">In Service</option>
+          <option value="out_of_service">Out of Service</option>
+          <option value="maintenance">At Shop / Maintenance</option>
+          <option value="reserve">Reserve In Service</option>
+        </select>
+      </div>
+    </div>` : ''
 
   const logHtml = log.length ? `
-    <details class="mt-3">
-      <summary class="text-xs font-semibold text-gray-400 hover:text-gray-600 flex items-center gap-1">
-        <span>▶</span> <span>Change Log (${log.length})</span>
-      </summary>
-      <div class="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
-        ${log.slice(0, 20).map(entry => {
-          const from = STATUS_CONFIG[entry.previous_status]?.label || entry.previous_status || '—'
-          const to   = STATUS_CONFIG[entry.new_status]?.label || entry.new_status
-          return `<div class="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-            <div class="font-semibold">${esc(from)} → ${esc(to)}</div>
-            ${entry.location ? `<div class="text-gray-400">📍 ${esc(entry.location)}</div>` : ''}
+    <div class="mt-3">
+      <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Status Change Log</div>
+      <div class="space-y-1.5">
+        ${log.map(entry => {
+          const from = STATUS_CFG[entry.previous_status]?.label || entry.previous_status || '—'
+          const to   = STATUS_CFG[entry.new_status]?.label || entry.new_status
+          return `<div class="text-xs bg-gray-50 rounded-lg px-3 py-2">
+            <span class="font-semibold">${esc(from)} → ${esc(to)}</span>
+            ${entry.location ? `<span class="text-gray-400 ml-2">📍${esc(entry.location)}</span>` : ''}
             ${entry.finding  ? `<div class="text-gray-500 mt-0.5">${esc(entry.finding)}</div>` : ''}
-            ${entry.notes    ? `<div class="text-gray-500 mt-0.5">${esc(entry.notes)}</div>` : ''}
             <div class="text-gray-400 mt-0.5">${esc(entry.changed_by)} · ${fmtDateTime(entry.created_at)}</div>
           </div>`
         }).join('')}
-        ${log.length > 20 ? `<div class="text-xs text-gray-400 text-center py-1">Showing 20 of ${log.length} entries</div>` : ''}
       </div>
-    </details>` : '<div class="mt-2 text-xs text-gray-400">No change history.</div>'
+    </div>` : ''
 
-  return `<div class="bg-white rounded-2xl border-2 ${st.border} shadow-sm p-4 ${u.status === 'out_of_service' ? 'bg-red-50' : ''}">
-    <div class="flex items-start justify-between gap-2 mb-2">
-      <div>
-        <div class="flex items-center gap-2 mb-1">
-          <span class="w-3 h-3 rounded-full flex-shrink-0 ${st.dot}"></span>
-          <span class="font-extrabold text-gray-900 text-lg">${esc(u.unit_name)}</span>
-        </div>
-        <div class="text-sm text-gray-500">${esc(u.unit_type)}</div>
-      </div>
-      ${editBtn}
+  return `<div>
+    <div class="flex items-center gap-3 mb-3">
+      <span class="font-bold px-3 py-1.5 rounded-full text-sm ${st.cls}">${st.label}</span>
+      ${u.location ? `<span class="text-sm text-gray-600">📍 ${esc(u.location)}</span>` : ''}
     </div>
-    <div class="mb-3">
-      <span class="inline-block text-sm font-bold px-3 py-1 rounded-full ${st.cls}">${st.label}</span>
-    </div>
-    ${u.location ? `<div class="text-xs text-gray-500 mb-1">📍 ${esc(u.location)}</div>` : ''}
-    ${u.notes    ? `<div class="text-xs text-gray-500 mb-1">📝 ${esc(u.notes)}</div>` : ''}
-    <div class="text-xs text-gray-400">Updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
+    ${u.notes ? `<div class="text-sm text-gray-600 mb-3 bg-gray-50 rounded-lg px-3 py-2">📝 ${esc(u.notes)}</div>` : ''}
+    <div class="text-xs text-gray-400 mb-3">Last updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
+    ${updateForm}
     ${logHtml}
   </div>`
 }
 
-// ── EDIT MODAL ────────────────────────────────────────────────────────────────
-function openEditModal(id, name, status, location, notes) {
-  editingId = id
-  document.getElementById('editModalTitle').textContent = `Update ${name}`
-  document.getElementById('editStatus').value   = status
-  document.getElementById('editLocation').value = location
-  document.getElementById('editNotes').value    = notes
-  document.getElementById('editErr').classList.add('hidden')
-  document.getElementById('editModal').classList.remove('hidden')
-  document.getElementById('editStatus').focus()
+function renderFindingsTab(u, openFindings, isOff) {
+  const addBtn = isOff ? `
+    <div class="flex gap-2 mb-4">
+      <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','damage')" class="flex-1 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Report Damage</button>
+      <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','repair_needed')" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Repair Needed</button>
+      <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','inspection')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Inspection</button>
+    </div>` : ''
+
+  const list = openFindings.length
+    ? openFindings.map(f => {
+        const pri = PRI_CFG[f.priority] || PRI_CFG.medium
+        const statusBtns = isOff ? `
+          <div class="flex gap-1 mt-1.5">
+            ${f.status === 'open' ? `<button onclick="updateFindingStatus('${f.id}','in_progress','${u.id}')" class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-semibold hover:bg-yellow-200" style="min-height:0;">Mark In Progress</button>` : ''}
+            <button onclick="updateFindingStatus('${f.id}','completed','${u.id}')" class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold hover:bg-green-200" style="min-height:0;">Mark Resolved</button>
+            <button onclick="updateFindingStatus('${f.id}','cancelled','${u.id}')" class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-semibold hover:bg-gray-200" style="min-height:0;">Cancel</button>
+          </div>` : ''
+        return `<div class="border rounded-xl px-3 py-2.5 mb-2 ${f.priority === 'critical' ? 'border-red-300 bg-red-50' : 'border-gray-200'}">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${pri.cls}">${pri.label}</span>
+                <span class="text-xs text-gray-500 font-semibold">${FTYPE_LABEL[f.finding_type] || f.finding_type}</span>
+                <span class="text-xs text-gray-400">${f.status.replace('_',' ')}</span>
+              </div>
+              <div class="text-sm font-semibold text-gray-800">${esc(f.description)}</div>
+              ${f.assigned_to ? `<div class="text-xs text-gray-500 mt-0.5">Assigned: ${esc(f.assigned_to)}</div>` : ''}
+              ${f.photos_notes ? `<div class="text-xs text-gray-500 mt-0.5">${esc(f.photos_notes)}</div>` : ''}
+              <div class="text-xs text-gray-400 mt-0.5">${esc(f.reported_by)} · ${fmtDateTime(f.created_at)}</div>
+              ${statusBtns}
+            </div>
+          </div>
+        </div>`
+      }).join('')
+    : `<div class="text-center py-6 text-gray-400 text-sm">No open findings.</div>`
+
+  return `${addBtn}${list}`
 }
 
-function closeEditModal() {
-  document.getElementById('editModal').classList.add('hidden')
-  editingId = null
+function renderRepairsTab(u, repairs, isOff) {
+  const addBtn = isOff ? `
+    <button onclick="openRepairModal('${u.id}','${esc(u.unit_name)}')" class="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-xl py-2.5 mb-4 transition" style="min-height:0;">+ Log Completed Repair</button>` : ''
+
+  const list = repairs.length
+    ? repairs.map(f => `
+        <div class="border border-gray-200 rounded-xl px-3 py-2.5 mb-2">
+          <div class="text-sm font-semibold text-gray-800 mb-1">${esc(f.description)}</div>
+          ${f.completed_by ? `<div class="text-xs text-gray-500">Completed by: ${esc(f.completed_by)}</div>` : ''}
+          ${f.completed_date ? `<div class="text-xs text-gray-500">Date: ${fmtDate(f.completed_date)}</div>` : ''}
+          ${f.photos_notes ? `<div class="text-xs text-gray-500 mt-0.5">${esc(f.photos_notes)}</div>` : ''}
+          <div class="text-xs text-gray-400 mt-0.5">Logged by ${esc(f.reported_by)} · ${fmtDateTime(f.created_at)}</div>
+        </div>`).join('')
+    : `<div class="text-center py-6 text-gray-400 text-sm">No repairs logged yet.</div>`
+
+  return `${addBtn}${list}`
 }
 
-async function submitUpdate() {
-  const err = document.getElementById('editErr')
+function renderScheduledTab(u, scheduled, isOff) {
+  const addBtn = isOff ? `
+    <button onclick="openScheduleModal('${u.id}','${esc(u.unit_name)}')" class="w-full bg-purple-700 hover:bg-purple-800 text-white text-sm font-bold rounded-xl py-2.5 mb-4 transition" style="min-height:0;">+ Schedule Maintenance</button>` : ''
+
+  const list = scheduled.length
+    ? scheduled.sort((a,b) => (a.scheduled_date||'').localeCompare(b.scheduled_date||'')).map(f => `
+        <div class="border border-gray-200 rounded-xl px-3 py-2.5 mb-2">
+          <div class="text-sm font-semibold text-gray-800 mb-1">${esc(f.description)}</div>
+          ${f.scheduled_date ? `<div class="text-xs text-blue-700 font-semibold">📅 Scheduled: ${fmtDate(f.scheduled_date)}</div>` : ''}
+          ${f.assigned_to ? `<div class="text-xs text-gray-500">Assigned to: ${esc(f.assigned_to)}</div>` : ''}
+          ${f.photos_notes ? `<div class="text-xs text-gray-500 mt-0.5">${esc(f.photos_notes)}</div>` : ''}
+          <div class="text-xs text-gray-400 mt-0.5">Added by ${esc(f.reported_by)} · ${fmtDateTime(f.created_at)}</div>
+          ${isOff ? `<button onclick="updateFindingStatus('${f.id}','completed','${u.id}')" class="mt-1.5 text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold hover:bg-green-200" style="min-height:0;">Mark Completed</button>` : ''}
+        </div>`).join('')
+    : `<div class="text-center py-6 text-gray-400 text-sm">No scheduled maintenance.</div>`
+
+  return `${addBtn}${list}`
+}
+
+// ── EXPAND / TAB TOGGLE ───────────────────────────────────────────────────────
+function toggleExpand(id) {
+  expandedId = expandedId === id ? null : id
+  if (expandedId && !activeTab[id]) activeTab[id] = 'status'
+  renderAll()
+}
+
+function setTab(unitId, tab) {
+  activeTab[unitId] = tab
+  renderAll()
+}
+
+// ── MODALS ────────────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden')
+  modalUnitId = null
+}
+
+function openStatusModal(id, name, status, location, notes) {
+  modalUnitId = id
+  document.getElementById('statusModalTitle').textContent = `Update ${name}`
+  document.getElementById('ms_status').value   = status
+  document.getElementById('ms_location').value = location
+  document.getElementById('ms_notes').value    = notes
+  document.getElementById('ms_err').classList.add('hidden')
+  document.getElementById('statusModal').classList.remove('hidden')
+}
+
+async function submitStatusUpdate() {
+  const err = document.getElementById('ms_err')
   err.classList.add('hidden')
-  const status   = document.getElementById('editStatus').value
-  const location = document.getElementById('editLocation').value.trim()
-  const finding  = document.getElementById('editNotes').value.trim()
-
   try {
     const res = await fetch(`${API}/manage-apparatus`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-      body: JSON.stringify({ action: 'update_status', id: editingId, status, location: location || undefined, finding: finding || undefined })
+      body: JSON.stringify({
+        action:   'update_status',
+        id:       modalUnitId,
+        status:   document.getElementById('ms_status').value,
+        location: document.getElementById('ms_location').value.trim() || undefined,
+        notes:    document.getElementById('ms_notes').value.trim() || undefined
+      })
     })
     const data = await res.json()
-    if (!res.ok) {
-      err.textContent = data.error || 'Update failed'
-      err.classList.remove('hidden')
-      return
-    }
-    closeEditModal()
+    if (!res.ok) { err.textContent = data.error || 'Update failed'; err.classList.remove('hidden'); return }
+    closeModal('statusModal')
     await loadApparatus()
-  } catch (e) {
-    err.textContent = e.message
-    err.classList.remove('hidden')
-  }
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden') }
 }
+
+function openFindingModal(id, name, type) {
+  modalUnitId = id
+  document.getElementById('findingModalTitle').textContent = `Report Finding — ${name}`
+  document.getElementById('fm_type').value    = type
+  document.getElementById('fm_priority').value = 'medium'
+  document.getElementById('fm_desc').value    = ''
+  document.getElementById('fm_assigned').value = ''
+  document.getElementById('fm_notes').value   = ''
+  document.getElementById('fm_err').classList.add('hidden')
+  document.getElementById('findingModal').classList.remove('hidden')
+  document.getElementById('fm_desc').focus()
+}
+
+async function submitFinding() {
+  const err = document.getElementById('fm_err')
+  err.classList.add('hidden')
+  const desc = document.getElementById('fm_desc').value.trim()
+  if (!desc) { err.textContent = 'Description required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({
+        action:       'report',
+        apparatus_id: modalUnitId,
+        finding_type: document.getElementById('fm_type').value,
+        description:  desc,
+        priority:     document.getElementById('fm_priority').value,
+        assigned_to:  document.getElementById('fm_assigned').value.trim() || undefined,
+        photos_notes: document.getElementById('fm_notes').value.trim() || undefined
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error || 'Failed'; err.classList.remove('hidden'); return }
+    closeModal('findingModal')
+    await loadApparatus()
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+function openRepairModal(id, name) {
+  modalUnitId = id
+  document.getElementById('repairModalTitle').textContent = `Log Repair — ${name}`
+  document.getElementById('rm_desc').value  = ''
+  document.getElementById('rm_by').value    = ''
+  document.getElementById('rm_date').value  = new Date().toISOString().split('T')[0]
+  document.getElementById('rm_notes').value = ''
+  document.getElementById('rm_err').classList.add('hidden')
+  document.getElementById('repairModal').classList.remove('hidden')
+  document.getElementById('rm_desc').focus()
+}
+
+async function submitRepair() {
+  const err = document.getElementById('rm_err')
+  err.classList.add('hidden')
+  const desc = document.getElementById('rm_desc').value.trim()
+  if (!desc) { err.textContent = 'Description required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({
+        action:         'log_repair',
+        apparatus_id:   modalUnitId,
+        description:    desc,
+        completed_by:   document.getElementById('rm_by').value.trim() || undefined,
+        completed_date: document.getElementById('rm_date').value || undefined,
+        photos_notes:   document.getElementById('rm_notes').value.trim() || undefined
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error || 'Failed'; err.classList.remove('hidden'); return }
+    closeModal('repairModal')
+    await loadApparatus()
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+function openScheduleModal(id, name) {
+  modalUnitId = id
+  document.getElementById('scheduleModalTitle').textContent = `Schedule Maintenance — ${name}`
+  document.getElementById('sm_desc').value     = ''
+  document.getElementById('sm_date').value     = ''
+  document.getElementById('sm_assigned').value = ''
+  document.getElementById('sm_notes').value    = ''
+  document.getElementById('sm_err').classList.add('hidden')
+  document.getElementById('scheduleModal').classList.remove('hidden')
+  document.getElementById('sm_desc').focus()
+}
+
+async function submitSchedule() {
+  const err = document.getElementById('sm_err')
+  err.classList.add('hidden')
+  const desc = document.getElementById('sm_desc').value.trim()
+  if (!desc) { err.textContent = 'Description required'; err.classList.remove('hidden'); return }
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({
+        action:         'report',
+        apparatus_id:   modalUnitId,
+        finding_type:   'scheduled_maintenance',
+        description:    desc,
+        priority:       'low',
+        scheduled_date: document.getElementById('sm_date').value || undefined,
+        assigned_to:    document.getElementById('sm_assigned').value.trim() || undefined,
+        photos_notes:   document.getElementById('sm_notes').value.trim() || undefined
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error || 'Failed'; err.classList.remove('hidden'); return }
+    closeModal('scheduleModal')
+    await loadApparatus()
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+async function updateFindingStatus(findingId, status, unitId) {
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({ action: 'update', id: findingId, status })
+    })
+    if (!res.ok) { alert('Update failed'); return }
+    await loadApparatus()
+  } catch (e) { alert(e.message) }
+}
+
+// Close modals on backdrop click
+['statusModal','findingModal','repairModal','scheduleModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) closeModal(id)
+  })
+})
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await AUTH.init
   AUTH.updateNav()
   loadApparatus()
-})
-
-// Close modal on backdrop click
-document.getElementById('editModal').addEventListener('click', function(e) {
-  if (e.target === this) closeEditModal()
 })
 </script>
 </body>

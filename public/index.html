@@ -216,8 +216,15 @@
       <button id="contactToggle" onclick="toggleContactForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Add</button>
     </div>
     <div class="px-4 pt-3 pb-2">
-      <input id="contactSearch" type="search" placeholder="Search contacts..." oninput="filterContacts()"
+      <input id="contactSearch" type="search" placeholder="Search by name, title, phone..." oninput="filterContacts()"
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div class="px-4 pb-2 flex gap-1.5 flex-wrap">
+      <button id="ctf-officers"     onclick="setContactFilter('officers')"     class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-gray-800 text-white transition" style="min-height:0;">Officers</button>
+      <button id="ctf-firefighters" onclick="setContactFilter('firefighters')" class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Firefighters</button>
+      <button id="ctf-staff"        onclick="setContactFilter('staff')"        class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Admin Staff</button>
+      <button id="ctf-external"     onclick="setContactFilter('external')"     class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Vendors/Other</button>
+      <button id="ctf-all"          onclick="setContactFilter('all')"          class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">All</button>
     </div>
     <div id="contactForm" class="hidden px-4 py-3 border-t border-gray-100 bg-green-50">
       <div class="grid grid-cols-2 gap-2 mb-2">
@@ -250,7 +257,7 @@
       </div>
       <div id="ctErr" class="hidden text-red-600 text-xs mt-1"></div>
     </div>
-    <div id="contactList" class="divide-y divide-gray-50 border-t border-gray-100">
+    <div id="contactList" class="divide-y divide-gray-100 border-t border-gray-100">
       <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
     </div>
   </div>
@@ -291,6 +298,9 @@ function fmtTime(t) {
   const hr = parseInt(h)
   return `${hr === 0 ? 12 : hr > 12 ? hr-12 : hr}:${m}${hr < 12 ? 'am' : 'pm'}`
 }
+
+function isNew(iso) { return iso && (Date.now() - new Date(iso)) < 4 * 86400000 }
+function newBadge(iso) { return isNew(iso) ? '<span class="badge bg-green-100 text-green-700 ml-1">NEW</span>' : '' }
 
 const APPARATUS_STATUS = {
   in_service:      { label: 'In Service',     cls: 'bg-green-100 text-green-800',  dot: 'bg-green-500' },
@@ -388,17 +398,22 @@ function renderBulletins() {
   }
 
   list.innerHTML = bulletins.map(b => {
-    const pinHtml = b.pinned ? `<span class="text-yellow-500 mr-1">📌</span>` : ''
-    const catCls  = CAT_COLORS[b.category] || CAT_COLORS.general
+    const pinHtml  = b.pinned ? `<span class="text-yellow-500 mr-1">📌</span>` : ''
+    const catCls   = CAT_COLORS[b.category] || CAT_COLORS.general
     const adminBtns = isAdm ? `
       <button onclick="pinBulletin('${b.id}',${!b.pinned})" class="text-xs text-gray-400 hover:text-yellow-600 ml-2" style="min-height:0;">${b.pinned?'Unpin':'Pin'}</button>
       <button onclick="deleteBulletin('${b.id}')" class="text-xs text-red-400 hover:text-red-600 ml-2" style="min-height:0;">Delete</button>
     ` : ''
+    const full     = esc(b.content)
+    const short    = b.content.length > 100 ? esc(b.content.slice(0, 100)) : null
+    const contentHtml = short
+      ? `<p class="text-sm text-gray-600 mt-1" id="bc-${b.id}">${short}<span id="bmore-${b.id}">… <button onclick="expandBulletin('${b.id}')" class="text-green-700 font-semibold text-xs" style="min-height:0;">Read more</button></span><span id="bfull-${b.id}" class="hidden whitespace-pre-wrap">${full.slice(short.length)}</span></p>`
+      : `<p class="text-sm text-gray-600 mt-1 whitespace-pre-wrap">${full}</p>`
     return `<div class="px-4 py-3 ${b.pinned ? 'bg-yellow-50' : ''}">
       <div class="flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
-          <div class="font-semibold text-gray-800 text-sm">${pinHtml}${esc(b.title)}</div>
-          <p class="text-sm text-gray-600 mt-1 whitespace-pre-wrap">${esc(b.content)}</p>
+          <div class="font-semibold text-gray-800 text-sm">${pinHtml}${esc(b.title)}${newBadge(b.created_at)}</div>
+          ${contentHtml}
         </div>
       </div>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
@@ -450,6 +465,11 @@ async function pinBulletin(id, pin) {
   renderBulletins()
 }
 
+function expandBulletin(id) {
+  document.getElementById('bmore-' + id)?.classList.add('hidden')
+  document.getElementById('bfull-' + id)?.classList.remove('hidden')
+}
+
 async function deleteBulletin(id) {
   if (!confirm('Delete this bulletin?')) return
   await fetch(`${API}/post-bulletin`, {
@@ -461,6 +481,8 @@ async function deleteBulletin(id) {
 }
 
 // ── SECTION 3: EVENTS ────────────────────────────────────────────────────────
+let showAllEvents = false
+
 function renderEvents() {
   const list   = document.getElementById('eventList')
   const events = dashData.events
@@ -469,38 +491,50 @@ function renderEvents() {
     return
   }
 
-  // Group by date
+  // Group by date, limit to 5 events unless expanded
   const byDate = {}
+  let count = 0
+  const total = events.length
   for (const e of events) {
+    if (!showAllEvents && count >= 5) break
     if (!byDate[e.event_date]) byDate[e.event_date] = []
     byDate[e.event_date].push(e)
+    count++
   }
 
-  list.innerHTML = Object.entries(byDate).map(([date, evs]) => {
+  const showAllBtn = !showAllEvents && total > 5
+    ? `<div class="px-4 py-3 border-t border-gray-100 text-center">
+        <button onclick="showAllEvents=true;renderEvents()" class="text-sm font-bold text-green-700 hover:text-green-900" style="min-height:0;">Show all ${total} events →</button>
+       </div>`
+    : ''
+
+  const rows = Object.entries(byDate).map(([date, evs]) => {
     const g = groupForDate(new Date(date + 'T11:30:00Z'))
     const isToday = date === dashData.shift.todayStr
     return `<div class="px-4 py-2 ${isToday ? 'bg-green-50' : ''}">
       <div class="flex items-center gap-2 mb-1">
-        <span class="text-xs font-extrabold uppercase tracking-wide ${isToday?'text-green-700':'text-gray-400'}">${fmtDate(date)}${isToday?' — TODAY':''}</span>
-        <span class="badge bg-gray-100 text-gray-500">Grp ${g} on duty</span>
+        <span class="text-xs font-extrabold uppercase tracking-wide ${isToday ? 'text-green-700' : 'text-gray-700'}">${fmtDate(date)}${isToday ? ' — TODAY' : ''}</span>
+        <span class="badge bg-gray-700 text-white">Grp ${g} on duty</span>
       </div>
       ${evs.map(e => {
         const catCls = CAT_COLORS[e.category] || CAT_COLORS.other
         const groupBadge = e.group_number ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Group ${e.group_number} only</span>` : ''
         return `<div class="flex items-start gap-2 py-1.5">
-          <div class="text-xs text-gray-400 w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
+          <div class="text-xs text-gray-600 font-semibold w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-gray-800">${esc(e.title)}</div>
-            ${e.description ? `<div class="text-xs text-gray-500 mt-0.5">${esc(e.description)}</div>`:''}
+            <div class="text-sm font-semibold text-gray-800">${esc(e.title)}${newBadge(e.created_at)}</div>
+            ${e.description ? `<div class="text-xs text-gray-600 mt-0.5">${esc(e.description)}</div>` : ''}
             <div class="flex items-center gap-1 mt-1 flex-wrap">
               <span class="badge ${catCls}">${e.category}</span>${groupBadge}
-              <span class="text-xs text-gray-400">— ${esc(e.created_by)}</span>
+              <span class="text-xs text-gray-500">— ${esc(e.created_by)}</span>
             </div>
           </div>
         </div>`
       }).join('')}
     </div>`
   }).join('')
+
+  list.innerHTML = rows + showAllBtn
 }
 
 function toggleEventForm() {
@@ -586,7 +620,7 @@ function renderWOCard(w, isOff, archived) {
   return `<div class="px-4 py-3">
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1 min-w-0">
-        <div class="text-sm font-semibold text-gray-800">${esc(w.title)}</div>
+        <div class="text-sm font-semibold text-gray-800">${esc(w.title)}${newBadge(w.created_at)}</div>
         ${w.location ? `<div class="text-xs text-gray-500 mt-0.5">📍 ${esc(w.location)}</div>` : ''}
         ${w.description ? `<div class="text-xs text-gray-500 mt-0.5">${esc(w.description)}</div>` : ''}
       </div>
@@ -664,7 +698,7 @@ async function updateWOStatus(id, status) {
 function renderApparatus() {
   const grid   = document.getElementById('apparatusGrid')
   const banner = document.getElementById('apparatusOOSBanner')
-  const units  = dashData.apparatus || []
+  const units = dashData.apparatus || []
 
   if (!units.length) {
     grid.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm col-span-full">No apparatus found.</div>'
@@ -685,6 +719,9 @@ function renderApparatus() {
 
   grid.innerHTML = sorted.map(u => {
     const st = APPARATUS_STATUS[u.status] || APPARATUS_STATUS.in_service
+    const findBadge = u.open_findings
+      ? `<span class="inline-block mt-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${u.critical_high ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${u.critical_high ? '⚠' : '!'} ${u.open_findings}</span>`
+      : ''
     return `<a href="/apparatus" class="block border rounded-xl px-3 py-2.5 ${u.status === 'out_of_service' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-sm transition">
       <div class="flex items-center gap-1.5 mb-1">
         <span class="w-2 h-2 rounded-full flex-shrink-0 ${st.dot}"></span>
@@ -692,62 +729,107 @@ function renderApparatus() {
       </div>
       <div class="text-xs text-gray-500">${esc(u.unit_type)}</div>
       <span class="inline-block mt-1.5 text-xs font-semibold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>
+      ${findBadge}
     </a>`
   }).join('')
 }
 
 // ── SECTION 6: CONTACTS ──────────────────────────────────────────────────────
-function renderContacts(filter) {
-  const list     = document.getElementById('contactList')
-  const q        = (filter || '').toLowerCase()
-  let contacts   = dashData.contacts
-  if (q) contacts = contacts.filter(c =>
-    c.name.toLowerCase().includes(q) ||
-    (c.title||'').toLowerCase().includes(q) ||
-    (c.phone||'').includes(q) ||
-    (c.category||'').toLowerCase().includes(q)
-  )
+let contactFilter = 'officers'
+let expandedContactId = null
+
+const OFFICER_TITLES = ['chief','captain','dc','d/c','deputy chief','lieutenant']
+const FF_TITLES = ['firefighter','ff ']
+
+function isOfficerContact(c) {
+  const t = (c.title || '').toLowerCase()
+  return OFFICER_TITLES.some(k => t.includes(k))
+}
+function isFFContact(c) {
+  const t = (c.title || '').toLowerCase()
+  return FF_TITLES.some(k => t.startsWith(k) || t === 'ff') || (c.category === 'staff' && !isOfficerContact(c))
+}
+
+function setContactFilter(f) {
+  contactFilter = f
+  document.querySelectorAll('.ctf-btn').forEach(b => {
+    b.className = b.className.replace(/bg-gray-800 text-white/g, 'bg-white text-gray-600').replace(/hover:bg-gray-50/g,'') + ' hover:bg-gray-50'
+  })
+  const active = document.getElementById('ctf-' + f)
+  if (active) active.className = active.className.replace('bg-white text-gray-600','bg-gray-800 text-white')
+  renderContacts()
+}
+
+function highlightMatch(str, q) {
+  if (!q || !str) return esc(str)
+  const idx = str.toLowerCase().indexOf(q.toLowerCase())
+  if (idx < 0) return esc(str)
+  return esc(str.slice(0, idx)) + `<mark class="bg-yellow-200 rounded">${esc(str.slice(idx, idx + q.length))}</mark>` + esc(str.slice(idx + q.length))
+}
+
+function renderContacts() {
+  const list  = document.getElementById('contactList')
+  const q     = document.getElementById('contactSearch').value.trim()
+  const isOff = AUTH.isOfficer()
+  let contacts = dashData.contacts
+
+  // Apply search
+  if (q) {
+    const ql = q.toLowerCase()
+    contacts = contacts.filter(c =>
+      c.name.toLowerCase().includes(ql) ||
+      (c.title||'').toLowerCase().includes(ql) ||
+      (c.phone||'').includes(ql) ||
+      (c.email||'').toLowerCase().includes(ql)
+    )
+  } else {
+    // Apply filter
+    if (contactFilter === 'officers') {
+      contacts = contacts.filter(isOfficerContact)
+    } else if (contactFilter === 'firefighters') {
+      contacts = contacts.filter(c => !isOfficerContact(c) && c.category === 'staff')
+    } else if (contactFilter === 'staff') {
+      contacts = contacts.filter(c => c.category === 'staff')
+    } else if (contactFilter === 'external') {
+      contacts = contacts.filter(c => ['vendor','utility','emergency','other'].includes(c.category))
+    }
+  }
 
   if (!contacts.length) {
-    list.innerHTML = `<div class="px-4 py-6 text-center text-gray-400 text-sm">${q ? 'No contacts match.' : 'No contacts yet.'}</div>`
+    list.innerHTML = `<div class="px-4 py-6 text-center text-gray-400 text-sm">${q ? 'No contacts match.' : 'No contacts in this group.'}</div>`
     return
   }
 
-  // Group by category
-  const groups = {}
-  for (const c of contacts) {
-    const cat = c.category || 'other'
-    if (!groups[cat]) groups[cat] = []
-    groups[cat].push(c)
-  }
-  const catOrder = ['emergency','staff','vendor','utility','other']
-  const isOff = AUTH.isOfficer()
+  list.innerHTML = contacts.map(c => {
+    const isExp = expandedContactId === c.id
+    const expandedHtml = isExp ? `
+      <div class="mt-1.5 text-xs space-y-0.5">
+        ${c.email ? `<div><a href="mailto:${esc(c.email)}" class="text-blue-600 hover:underline">${esc(c.email)}</a></div>` : ''}
+        ${c.notes ? `<div class="text-gray-500">${esc(c.notes)}</div>` : ''}
+        ${isOff ? `<button onclick="editContact(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="mt-1 text-xs text-gray-400 hover:text-gray-600" style="min-height:0;">Edit</button>` : ''}
+      </div>` : ''
 
-  list.innerHTML = catOrder.filter(c => groups[c]).map(cat => `
-    <div>
-      <div class="px-4 py-1.5 bg-gray-50 border-b border-gray-100">
-        <span class="text-xs font-extrabold uppercase tracking-wider text-gray-400">${cat}</span>
-      </div>
-      ${groups[cat].map(c => `
-        <div class="px-4 py-3 flex items-start justify-between gap-2 border-b border-gray-50">
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-semibold text-gray-800">${esc(c.name)}</div>
-            ${c.title ? `<div class="text-xs text-gray-500">${esc(c.title)}</div>` : ''}
-            <div class="flex items-center gap-3 mt-1 flex-wrap">
-              ${c.phone ? `<a href="tel:${esc(c.phone)}" class="text-sm text-blue-600 font-semibold">${esc(c.phone)}</a>` : ''}
-              ${c.email ? `<a href="mailto:${esc(c.email)}" class="text-xs text-gray-500 hover:text-blue-600">${esc(c.email)}</a>` : ''}
-            </div>
-            ${c.notes ? `<div class="text-xs text-gray-400 mt-0.5">${esc(c.notes)}</div>` : ''}
-          </div>
-          ${isOff ? `<button onclick="editContact(${JSON.stringify(c).replace(/"/g,'&quot;')})" class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0" style="min-height:0;">Edit</button>` : ''}
+    return `<div class="px-4 py-2.5 flex items-start justify-between gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-semibold text-gray-800">${highlightMatch(c.name, q)}${newBadge(c.created_at)}</span>
+          ${c.title ? `<span class="text-xs text-gray-500">${highlightMatch(c.title, q)}</span>` : ''}
         </div>
-      `).join('')}
-    </div>
-  `).join('')
+        ${c.phone ? `<a href="tel:${esc(c.phone)}" class="inline-block mt-1 text-sm text-blue-600 font-bold bg-blue-50 rounded-lg px-2 py-0.5" style="min-height:0;">${highlightMatch(c.phone, q)}</a>` : ''}
+        ${expandedHtml}
+      </div>
+      <button onclick="toggleContactExpand('${c.id}')" class="text-gray-400 text-lg flex-shrink-0 hover:text-gray-600" style="min-height:0;">${isExp ? '▲' : '▼'}</button>
+    </div>`
+  }).join('')
+}
+
+function toggleContactExpand(id) {
+  expandedContactId = expandedContactId === id ? null : id
+  renderContacts()
 }
 
 function filterContacts() {
-  renderContacts(document.getElementById('contactSearch').value)
+  renderContacts()
 }
 
 function toggleContactForm() {
