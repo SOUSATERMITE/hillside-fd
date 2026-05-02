@@ -8,8 +8,8 @@ function makeTransport() {
     port: 465,
     secure: true,
     auth: {
-      user: process.env.SMTP_USER || 'sousa@sousapest.com',
-      pass: process.env.SMTP_PASS
+      user: process.env.ZOHO_SMTP_USER || process.env.SMTP_USER || 'sousa@sousapest.com',
+      pass: process.env.ZOHO_SMTP_PASS || process.env.SMTP_PASS
     }
   })
 }
