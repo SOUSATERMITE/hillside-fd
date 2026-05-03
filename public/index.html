@@ -1362,14 +1362,16 @@ async function uploadBoardAttachment(source_type, source_id, file) {
 }
 
 async function downloadAttachment(id) {
+  const win = window.open('', '_blank')
   try {
     const res = await fetch(`${API}/manage-board-attachments`, {
       method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
       body: JSON.stringify({ action:'download_url', id })
     })
-    const { url } = await res.json()
-    window.open(url, '_blank')
-  } catch(e) { alert('Download failed: ' + e.message) }
+    const data = await res.json()
+    if (!data.url) { if (win) win.close(); alert(data.error || 'Download failed'); return }
+    if (win) win.location = data.url
+  } catch(e) { if (win) win.close(); alert('Download failed: ' + e.message) }
 }
 
 async function deleteAttachment(id, source_type, source_id) {
