@@ -98,25 +98,50 @@ exports.handler = async (event) => {
       const { duty_id, completed_date, notes } = body
       if (!duty_id || !completed_date) return { statusCode: 400, headers, body: JSON.stringify({ error: 'duty_id and completed_date required' }) }
 
-      const { data, error } = await supabase.from('duty_completions').upsert({
-        duty_id,
-        completed_date,
-        completed_by: officer.display_name,
-        officer_id:   officer.officer_id,
-        notes:        notes?.trim() || null
-      }, { onConflict: 'duty_id,completed_date' }).select().single()
-      if (error) throw error
+      const { data: existing } = await supabase
+        .from('duty_completions')
+        .select('id')
+        .eq('duty_id', duty_id)
+        .eq('completed_date', completed_date)
+        .maybeSingle()
+
+      let data, dbError
+      if (existing) {
+        ;({ data, error: dbError } = await supabase
+          .from('duty_completions')
+          .update({ completed_by: officer.display_name, officer_id: officer.officer_id, notes: notes?.trim() || null })
+          .eq('id', existing.id)
+          .select().single())
+      } else {
+        ;({ data, error: dbError } = await supabase
+          .from('duty_completions')
+          .insert({ duty_id, completed_date, completed_by: officer.display_name, officer_id: officer.officer_id, notes: notes?.trim() || null })
+          .select().single())
+      }
+      if (dbError) throw dbError
 
       // Log to duty_log
-      await supabase.from('duty_log').upsert({
+      const { data: existingLog } = await supabase
+        .from('duty_log')
+        .select('id')
+        .eq('duty_id', duty_id)
+        .eq('shift_date', completed_date)
+        .maybeSingle()
+
+      const logPayload = {
         duty_id,
-        shift_date:   completed_date,
+        shift_date:    completed_date,
         group_on_duty: null,
-        status:       'completed',
-        completed_by: officer.display_name,
-        officer_id:   officer.officer_id,
-        notes:        notes?.trim() || null
-      }, { onConflict: 'duty_id,shift_date' }).catch(() => {})
+        status:        'completed',
+        completed_by:  officer.display_name,
+        officer_id:    officer.officer_id,
+        notes:         notes?.trim() || null
+      }
+      if (existingLog) {
+        await supabase.from('duty_log').update(logPayload).eq('id', existingLog.id).catch(() => {})
+      } else {
+        await supabase.from('duty_log').insert(logPayload).catch(() => {})
+      }
 
       return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
@@ -132,6 +157,6 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid action' }) }
   } catch (e) {
     console.error('[manage-duties] error:', e.message)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
+    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message || 'Internal server error' }) }
   }
 }
