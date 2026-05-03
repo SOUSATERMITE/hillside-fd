@@ -55,7 +55,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -113,17 +113,36 @@ exports.handler = async (event) => {
         .from('apparatus_findings')
         .select('apparatus_id, priority, status')
         .in('status', ['open', 'in_progress'])
-        .in('finding_type', ['damage', 'repair_needed', 'inspection'])
+        .in('finding_type', ['damage', 'repair_needed', 'inspection']),
+
+      supabase
+        .from('board_attachments')
+        .select('id, source_type, source_id, file_name, file_size, uploaded_by, created_at')
+        .order('created_at', { ascending: true })
     ])
 
     const currentGroup  = getGroupForMs(now)
     const shiftStartMs  = getShiftStartMs(now)
     const shiftStart    = new Date(shiftStartMs).toISOString()
 
-    // Tag each event with its on-duty group
+    // Build attachment maps keyed by source_id
+    const bulletinAtts = {}
+    const eventAtts    = {}
+    for (const a of (attachRes.data || [])) {
+      if (a.source_type === 'bulletin') {
+        if (!bulletinAtts[a.source_id]) bulletinAtts[a.source_id] = []
+        bulletinAtts[a.source_id].push(a)
+      } else {
+        if (!eventAtts[a.source_id]) eventAtts[a.source_id] = []
+        eventAtts[a.source_id].push(a)
+      }
+    }
+
+    // Tag each event with its on-duty group and attachments
     const events = (eventRes.data || []).map(e => ({
       ...e,
-      on_duty_group: groupForDateStr(e.event_date)
+      on_duty_group: groupForDateStr(e.event_date),
+      attachments:   eventAtts[e.id] || []
     }))
 
     // Build next 14 days schedule
@@ -141,7 +160,7 @@ exports.handler = async (event) => {
         sick:                sickRes.data   || [],
         recalledToday:       recallRes.data || [],
         pendingVacation:     vacRes.data    || [],
-        bulletins:           bulletinRes.data || [],
+        bulletins:           (bulletinRes.data || []).map(b => ({ ...b, attachments: bulletinAtts[b.id] || [] })),
         events,
         workOrders:          workOrderRes.data || [],
         contacts:            contactRes.data   || [],

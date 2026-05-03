@@ -29,6 +29,20 @@ const MIGRATION_SQL = `
   create index if not exists idx_personnel_notes_ff on personnel_notes(firefighter_id, created_at desc);
   alter table personnel_documents enable row level security;
   alter table personnel_notes      enable row level security;
+
+  create table if not exists board_attachments (
+    id          uuid primary key default gen_random_uuid(),
+    source_type text not null check (source_type in ('bulletin','event')),
+    source_id   uuid not null,
+    file_name   text not null,
+    file_path   text not null,
+    file_size   integer,
+    uploaded_by text not null,
+    officer_id  uuid references officers(id),
+    created_at  timestamptz default now()
+  );
+  create index if not exists idx_board_attach_source on board_attachments(source_type, source_id, created_at);
+  alter table board_attachments enable row level security;
 `
 
 async function tryPg(host, port, user, password, log) {

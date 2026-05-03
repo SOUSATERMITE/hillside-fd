@@ -107,6 +107,13 @@
       </select>
       <textarea id="bContent" placeholder="Message..." maxlength="2000" rows="3"
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;resize:vertical;"></textarea>
+      <div class="flex items-center gap-2 mb-2">
+        <label class="cursor-pointer inline-flex items-center gap-1 text-xs text-gray-600 font-semibold border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition" style="min-height:0;">
+          📎 Attach file
+          <input type="file" id="bFile" class="hidden" onchange="bFileChipUpdate()" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
+        </label>
+        <span id="bFileChip" class="text-xs text-gray-500 truncate max-w-xs"></span>
+      </div>
       <div class="flex gap-2">
         <button onclick="postBulletin()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Post</button>
         <button onclick="toggleBulletinForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
@@ -149,6 +156,13 @@
       </div>
       <textarea id="evDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+      <div class="flex items-center gap-2 mb-2">
+        <label class="cursor-pointer inline-flex items-center gap-1 text-xs text-gray-600 font-semibold border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition" style="min-height:0;">
+          📎 Attach file
+          <input type="file" id="evFile" class="hidden" onchange="evFileChipUpdate()" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
+        </label>
+        <span id="evFileChip" class="text-xs text-gray-500 truncate max-w-xs"></span>
+      </div>
       <div class="flex gap-2">
         <button onclick="addEvent()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Add Event</button>
         <button onclick="toggleEventForm()" class="text-gray-500 text-sm px-3 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
@@ -292,6 +306,14 @@
     </select>
     <textarea id="beContent" maxlength="1950" rows="5" placeholder="Message..."
       class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:100px;resize:vertical;"></textarea>
+    <div id="beAttachments" class="mb-2"></div>
+    <div class="flex items-center gap-2 mb-3">
+      <label class="cursor-pointer inline-flex items-center gap-1 text-xs text-gray-600 font-semibold border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition" style="min-height:0;">
+        📎 Add file
+        <input type="file" id="beFile" class="hidden" onchange="beFileChipUpdate()" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
+      </label>
+      <span id="beFileChip" class="text-xs text-gray-500 truncate max-w-xs"></span>
+    </div>
     <div class="flex gap-2">
       <button onclick="saveBulletinEdit()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
       <button onclick="closeBulletinEdit()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
@@ -332,6 +354,14 @@
     </div>
     <textarea id="eeDesc" placeholder="Description (optional)" maxlength="950" rows="3"
       class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:70px;resize:vertical;"></textarea>
+    <div id="eeAttachments" class="mb-2"></div>
+    <div class="flex items-center gap-2 mb-3">
+      <label class="cursor-pointer inline-flex items-center gap-1 text-xs text-gray-600 font-semibold border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition" style="min-height:0;">
+        📎 Add file
+        <input type="file" id="eeFile" class="hidden" onchange="eeFileChipUpdate()" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif">
+      </label>
+      <span id="eeFileChip" class="text-xs text-gray-500 truncate max-w-xs"></span>
+    </div>
     <div class="flex gap-2">
       <button onclick="saveEventEdit()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2 text-sm transition">Save</button>
       <button onclick="closeEventEdit()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
@@ -524,12 +554,17 @@ function renderBulletins() {
     const contentHtml = short
       ? `<p class="text-sm text-gray-600 mt-1" id="bc-${b.id}">${short}<span id="bmore-${b.id}">… <button onclick="expandBulletin('${b.id}')" class="text-green-700 font-semibold text-xs" style="min-height:0;">Read more</button></span><span id="bfull-${b.id}" class="hidden whitespace-pre-wrap">${full.slice(short.length)}</span></p>`
       : `<p class="text-sm text-gray-600 mt-1 whitespace-pre-wrap">${full}</p>`
+    const attHtml = b.attachments && b.attachments.length
+      ? `<div class="mt-1.5 flex flex-wrap gap-1">` +
+        b.attachments.map(a => `<button onclick="downloadAttachment('${a.id}')" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 rounded-lg px-2 py-0.5 transition" style="min-height:0;">📎 ${esc(a.file_name)}</button>`).join('') +
+        `</div>` : ''
     return `<div class="px-4 py-3 ${b.pinned ? 'bg-yellow-50' : ''}">
       <div class="flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
           <div style="font-size:1.1rem;font-weight:700;color:#1a5c2a;">${pinHtml}${esc(b.title)}${newBadge(b.created_at)}</div>
           ${contentHtml}
           ${editNote}
+          ${attHtml}
         </div>
       </div>
       <div class="flex items-center gap-2 mt-2 flex-wrap">
@@ -562,9 +597,19 @@ async function postBulletin() {
     })
     const data = await res.json()
     if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
+    data.attachments = []
     dashData.bulletins.unshift(data)
     document.getElementById('bTitle').value = ''
     document.getElementById('bContent').value = ''
+    const bFile = document.getElementById('bFile').files[0]
+    if (bFile) {
+      try {
+        const att = await uploadBoardAttachment('bulletin', data.id, bFile)
+        data.attachments.push(att)
+      } catch(e) { console.warn('Attachment upload failed:', e.message) }
+      document.getElementById('bFile').value = ''
+      document.getElementById('bFileChip').innerHTML = ''
+    }
     toggleBulletinForm()
     renderBulletins()
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
@@ -647,6 +692,10 @@ function renderEvents() {
         const descEditIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
         const cleanDesc = descEditIdx >= 0 ? rawDesc.slice(0, descEditIdx).trim() : rawDesc
         const descEditNote = descEditIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawDesc.slice(descEditIdx).trim())}</div>` : ''
+        const evAttHtml = e.attachments && e.attachments.length
+          ? `<div class="mt-1 flex flex-wrap gap-1">` +
+            e.attachments.map(a => `<button onclick="downloadAttachment('${a.id}')" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 rounded-lg px-2 py-0.5 transition" style="min-height:0;">📎 ${esc(a.file_name)}</button>`).join('') +
+            `</div>` : ''
         return `<div class="flex items-start gap-2 py-1.5">
           <div class="text-xs text-gray-600 font-semibold w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
           <div class="flex-1 min-w-0">
@@ -656,6 +705,7 @@ function renderEvents() {
             </div>
             ${cleanDesc ? `<div class="text-xs text-gray-600 mt-0.5">${esc(cleanDesc)}</div>` : ''}
             ${descEditNote}
+            ${evAttHtml}
             <div class="flex items-center gap-1 mt-1 flex-wrap">
               <span class="badge ${catCls}">${e.category}</span>${groupBadge}
               <span class="text-xs text-gray-500">— ${esc(e.created_by)}</span>
@@ -699,10 +749,20 @@ async function addEvent() {
     const data = await res.json()
     if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
     data.on_duty_group = groupForDate(new Date(data.event_date + 'T11:30:00Z'))
+    data.attachments   = []
     dashData.events.push(data)
     dashData.events.sort((a,b) => a.event_date.localeCompare(b.event_date) || (a.event_time||'').localeCompare(b.event_time||''))
     document.getElementById('evTitle').value = ''
     document.getElementById('evDesc').value  = ''
+    const evFile = document.getElementById('evFile').files[0]
+    if (evFile) {
+      try {
+        const att = await uploadBoardAttachment('event', data.id, evFile)
+        data.attachments.push(att)
+      } catch(e) { console.warn('Attachment upload failed:', e.message) }
+      document.getElementById('evFile').value = ''
+      document.getElementById('evFileChip').innerHTML = ''
+    }
     toggleEventForm()
     renderEvents()
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
@@ -1100,10 +1160,15 @@ function openBulletinEdit(id) {
   document.getElementById('beCat').value   = b.category || 'general'
   document.getElementById('beContent').value = clean
   document.getElementById('beErr').classList.add('hidden')
+  document.getElementById('beFile').value = ''
+  document.getElementById('beFileChip').innerHTML = ''
+  renderBulletinEditAttachments(id)
   document.getElementById('bulletinEditModal').classList.remove('hidden')
 }
 function closeBulletinEdit() {
   document.getElementById('bulletinEditModal').classList.add('hidden')
+  document.getElementById('beFile').value = ''
+  document.getElementById('beFileChip').innerHTML = ''
 }
 async function saveBulletinEdit() {
   const err = document.getElementById('beErr')
@@ -1122,6 +1187,13 @@ async function saveBulletinEdit() {
     if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
     const b = dashData.bulletins.find(x => x.id === id)
     if (b) { b.title = title; b.content = data.content || content; b.category = category }
+    const beFile = document.getElementById('beFile').files[0]
+    if (beFile) {
+      try {
+        const att = await uploadBoardAttachment('bulletin', id, beFile)
+        if (b) { if (!b.attachments) b.attachments = []; b.attachments.push(att) }
+      } catch(e) { console.warn('Attachment upload failed:', e.message) }
+    }
     closeBulletinEdit()
     renderBulletins()
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
@@ -1142,10 +1214,15 @@ function openEventEdit(id) {
   document.getElementById('eeCat').value   = e.category || 'other'
   document.getElementById('eeDesc').value  = cleanDesc
   document.getElementById('eeErr').classList.add('hidden')
+  document.getElementById('eeFile').value = ''
+  document.getElementById('eeFileChip').innerHTML = ''
+  renderEventEditAttachments(id)
   document.getElementById('eventEditModal').classList.remove('hidden')
 }
 function closeEventEdit() {
   document.getElementById('eventEditModal').classList.add('hidden')
+  document.getElementById('eeFile').value = ''
+  document.getElementById('eeFileChip').innerHTML = ''
 }
 async function saveEventEdit() {
   const err = document.getElementById('eeErr')
@@ -1168,6 +1245,13 @@ async function saveEventEdit() {
     const e = dashData.events.find(x => x.id === id)
     if (e) { e.title=title; e.event_date=event_date; e.event_time=event_time; e.group_number=group_number?parseInt(group_number):null; e.category=category; e.description=data.description||description; e.on_duty_group=groupForDate(new Date(event_date+'T11:30:00Z')) }
     dashData.events.sort((a,b) => a.event_date.localeCompare(b.event_date)||(a.event_time||'').localeCompare(b.event_time||''))
+    const eeFile = document.getElementById('eeFile').files[0]
+    if (eeFile) {
+      try {
+        const att = await uploadBoardAttachment('event', id, eeFile)
+        if (e) { if (!e.attachments) e.attachments = []; e.attachments.push(att) }
+      } catch(e2) { console.warn('Attachment upload failed:', e2.message) }
+    }
     closeEventEdit()
     renderEvents()
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
@@ -1236,6 +1320,112 @@ async function deleteWO(id, title) {
     dashData.workOrders = dashData.workOrders.filter(w => w.id !== id)
     renderWorkOrders()
   } catch(e) { alert(e.message) }
+}
+
+// ── BOARD ATTACHMENTS ─────────────────────────────────────────────────────────
+function bFileChipUpdate() {
+  const f = document.getElementById('bFile').files[0]
+  document.getElementById('bFileChip').innerHTML = f
+    ? `${esc(f.name)} <button onclick="document.getElementById('bFile').value='';document.getElementById('bFileChip').innerHTML=''" class="text-red-400 ml-1 hover:text-red-600" style="min-height:0;">✕</button>` : ''
+}
+function evFileChipUpdate() {
+  const f = document.getElementById('evFile').files[0]
+  document.getElementById('evFileChip').innerHTML = f
+    ? `${esc(f.name)} <button onclick="document.getElementById('evFile').value='';document.getElementById('evFileChip').innerHTML=''" class="text-red-400 ml-1 hover:text-red-600" style="min-height:0;">✕</button>` : ''
+}
+function beFileChipUpdate() {
+  const f = document.getElementById('beFile').files[0]
+  document.getElementById('beFileChip').innerHTML = f
+    ? `${esc(f.name)} <button onclick="document.getElementById('beFile').value='';document.getElementById('beFileChip').innerHTML=''" class="text-red-400 ml-1 hover:text-red-600" style="min-height:0;">✕</button>` : ''
+}
+function eeFileChipUpdate() {
+  const f = document.getElementById('eeFile').files[0]
+  document.getElementById('eeFileChip').innerHTML = f
+    ? `${esc(f.name)} <button onclick="document.getElementById('eeFile').value='';document.getElementById('eeFileChip').innerHTML=''" class="text-red-400 ml-1 hover:text-red-600" style="min-height:0;">✕</button>` : ''
+}
+
+async function uploadBoardAttachment(source_type, source_id, file) {
+  const r1 = await fetch(`${API}/manage-board-attachments`, {
+    method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+    body: JSON.stringify({ action:'upload_url', source_type, source_id, file_name: file.name })
+  })
+  if (!r1.ok) throw new Error('Could not get upload URL')
+  const { signedUrl, path } = await r1.json()
+  const r2 = await fetch(signedUrl, { method:'PUT', body: file, headers:{'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true'} })
+  if (!r2.ok) throw new Error('File upload failed')
+  const r3 = await fetch(`${API}/manage-board-attachments`, {
+    method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+    body: JSON.stringify({ action:'confirm', source_type, source_id, file_name: file.name, file_path: path, file_size: file.size })
+  })
+  if (!r3.ok) throw new Error('Failed to save attachment metadata')
+  return await r3.json()
+}
+
+async function downloadAttachment(id) {
+  try {
+    const res = await fetch(`${API}/manage-board-attachments`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'download_url', id })
+    })
+    const { url } = await res.json()
+    window.open(url, '_blank')
+  } catch(e) { alert('Download failed: ' + e.message) }
+}
+
+async function deleteAttachment(id, source_type, source_id) {
+  if (!confirm('Remove this attachment?')) return
+  try {
+    const res = await fetch(`${API}/manage-board-attachments`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return }
+    if (source_type === 'bulletin') {
+      const b = dashData.bulletins.find(x => x.id === source_id)
+      if (b) b.attachments = (b.attachments||[]).filter(a => a.id !== id)
+      renderBulletinEditAttachments(source_id)
+      renderBulletins()
+    } else {
+      const e = dashData.events.find(x => x.id === source_id)
+      if (e) e.attachments = (e.attachments||[]).filter(a => a.id !== id)
+      renderEventEditAttachments(source_id)
+      renderEvents()
+    }
+  } catch(e) { alert(e.message) }
+}
+
+function renderBulletinEditAttachments(id) {
+  const el = document.getElementById('beAttachments')
+  if (!el) return
+  const b = dashData.bulletins.find(x => x.id === id)
+  const atts = b?.attachments || []
+  if (!atts.length) { el.innerHTML = ''; return }
+  const isAdm = AUTH.isAdmin(), myName = AUTH.getDisplayName()
+  el.innerHTML = `<div class="text-xs font-semibold text-gray-500 mb-1">Current attachments:</div>` +
+    atts.map(a => {
+      const canDel = isAdm || a.uploaded_by === myName
+      return `<div class="flex items-center gap-2 text-xs mb-1 bg-gray-50 rounded-lg px-2 py-1">
+        <button onclick="downloadAttachment('${a.id}')" class="flex-1 text-blue-600 hover:underline text-left truncate" style="min-height:0;">📎 ${esc(a.file_name)}</button>
+        ${canDel ? `<button onclick="deleteAttachment('${a.id}','bulletin','${id}')" class="text-red-400 hover:text-red-600 flex-shrink-0" style="min-height:0;">🗑️</button>` : ''}
+      </div>`
+    }).join('')
+}
+
+function renderEventEditAttachments(id) {
+  const el = document.getElementById('eeAttachments')
+  if (!el) return
+  const e = dashData.events.find(x => x.id === id)
+  const atts = e?.attachments || []
+  if (!atts.length) { el.innerHTML = ''; return }
+  const isAdm = AUTH.isAdmin(), myName = AUTH.getDisplayName()
+  el.innerHTML = `<div class="text-xs font-semibold text-gray-500 mb-1">Current attachments:</div>` +
+    atts.map(a => {
+      const canDel = isAdm || a.uploaded_by === myName
+      return `<div class="flex items-center gap-2 text-xs mb-1 bg-gray-50 rounded-lg px-2 py-1">
+        <button onclick="downloadAttachment('${a.id}')" class="flex-1 text-blue-600 hover:underline text-left truncate" style="min-height:0;">📎 ${esc(a.file_name)}</button>
+        ${canDel ? `<button onclick="deleteAttachment('${a.id}','event','${id}')" class="text-red-400 hover:text-red-600 flex-shrink-0" style="min-height:0;">🗑️</button>` : ''}
+      </div>`
+    }).join('')
 }
 
 // ── OFFICER BUTTONS ───────────────────────────────────────────────────────────
