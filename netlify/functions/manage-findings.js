@@ -24,39 +24,97 @@ async function sendEmail({ to, subject, html, text }) {
   }
 }
 
-async function notifyCritical(supabase, unitName, officerName, description, apparatusId) {
+// Email all DCs (and optionally Chief) about a finding
+async function notifyFinding(supabase, { unitName, findingType, description, priority, officerName, timestamp }, includingChief = false) {
+  const rankFilter = ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4']
+  if (includingChief) rankFilter.push('Chief')
+
   const { data: recipients } = await supabase
     .from('firefighters')
     .select('name, email')
-    .in('rank', ['Chief', 'DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4'])
+    .in('rank', rankFilter)
     .eq('active', true)
 
   const emails = (recipients || []).filter(r => r.email).map(r => r.email)
   if (!emails.length) return
 
-  const appUrl = `https://hillside-fd.netlify.app/apparatus`
+  const priColor = priority === 'critical' ? '#dc2626' : priority === 'high' ? '#d97706' : priority === 'medium' ? '#2563eb' : '#6b7280'
+  const priLabel = priority.charAt(0).toUpperCase() + priority.slice(1)
+  const typeLabel = findingType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  const appUrl = 'https://hillside-fd.netlify.app/apparatus'
+
+  const subject = `${typeLabel} — ${unitName} reported by ${officerName}`
   const html = `
 <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
-  <div style="background:#dc2626;padding:20px 28px;border-radius:10px 10px 0 0;">
-    <h2 style="color:#fff;margin:0;font-size:18px;">⚠ CRITICAL Finding Reported — ${unitName}</h2>
+  <div style="background:#1a2e52;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">${typeLabel} — ${unitName}</h2>
   </div>
   <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
-    <table style="width:100%;border-collapse:collapse;background:#fef2f2;border-radius:8px;overflow:hidden;margin-bottom:20px;">
-      <tr><td style="padding:8px 12px;font-weight:600;">Unit</td><td style="padding:8px 12px;font-weight:700;color:#dc2626;">${unitName}</td></tr>
-      <tr style="background:#fee2e2;"><td style="padding:8px 12px;font-weight:600;">Reported By</td><td style="padding:8px 12px;">${officerName}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:600;">Finding</td><td style="padding:8px 12px;">${description}</td></tr>
+    <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr><td style="padding:8px 12px;font-weight:600;width:120px;">Unit</td><td style="padding:8px 12px;font-weight:700;">${unitName}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Finding Type</td><td style="padding:8px 12px;">${typeLabel}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Priority</td><td style="padding:8px 12px;font-weight:700;color:${priColor};">${priLabel}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Description</td><td style="padding:8px 12px;">${description}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Reported By</td><td style="padding:8px 12px;">${officerName}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Timestamp</td><td style="padding:8px 12px;">${new Date(timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</td></tr>
     </table>
-    <p style="margin:0 0 16px;font-weight:600;color:#dc2626;">Immediate attention required. Review and assign corrective action.</p>
-    <p style="margin:16px 0 0;"><a href="${appUrl}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">View Apparatus →</a></p>
-    <p style="margin:12px 0 0;font-size:12px;color:#9ca3af;">Log in at hillside-fd.netlify.app/apparatus with your PIN to review.</p>
+    <p style="margin:16px 0 0;"><a href="${appUrl}" style="display:inline-block;background:#1a2e52;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">View Apparatus →</a></p>
   </div>
 </div>`
 
   await sendEmail({
     to: emails.join(', '),
-    subject: `CRITICAL Finding — ${unitName} — reported by ${officerName}`,
+    subject,
     html,
-    text: `CRITICAL finding reported on ${unitName} by ${officerName}. Finding: ${description}. Review at: ${appUrl}`
+    text: `${typeLabel} on ${unitName} reported by ${officerName}.\nPriority: ${priLabel}\nDescription: ${description}\nTimestamp: ${timestamp}\nReview at: ${appUrl}`
+  })
+}
+
+// Email DCs when a daily or weekly check has failed items
+async function notifyFailedCheck(supabase, { unitName, officerName, tour, checkType, failedItems, timestamp }) {
+  const { data: recipients } = await supabase
+    .from('firefighters')
+    .select('name, email')
+    .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4'])
+    .eq('active', true)
+
+  const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+  if (!emails.length) return
+
+  const checkLabel = checkType === 'weekly_check' ? 'Weekly' : 'Daily'
+  const appUrl = 'https://hillside-fd.netlify.app/apparatus'
+  const subject = `FAILED CHECK — ${unitName} ${checkLabel} Check — ${officerName} Tour ${tour}`
+
+  const itemRows = failedItems.map(item =>
+    `<tr><td style="padding:6px 10px;border-bottom:1px solid #fecaca;font-weight:600;color:#dc2626;">✗ ${item.label}</td><td style="padding:6px 10px;border-bottom:1px solid #fecaca;">${item.value || 'Issue reported'}</td></tr>`
+  ).join('')
+
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
+  <div style="background:#dc2626;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">FAILED CHECK — ${unitName} ${checkLabel} Check</h2>
+  </div>
+  <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+    <table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr><td style="padding:8px 12px;font-weight:600;width:120px;">Unit</td><td style="padding:8px 12px;font-weight:700;">${unitName}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Check Type</td><td style="padding:8px 12px;">${checkLabel} Check</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Officer</td><td style="padding:8px 12px;">${officerName}</td></tr>
+      <tr style="background:#f3f4f6;"><td style="padding:8px 12px;font-weight:600;">Tour</td><td style="padding:8px 12px;">${tour}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Timestamp</td><td style="padding:8px 12px;">${new Date(timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</td></tr>
+    </table>
+    <p style="margin:0 0 12px;font-weight:700;color:#dc2626;">Failed Items (${failedItems.length}):</p>
+    <table style="width:100%;border-collapse:collapse;background:#fef2f2;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      ${itemRows}
+    </table>
+    <p style="margin:16px 0 0;"><a href="${appUrl}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">View Apparatus →</a></p>
+  </div>
+</div>`
+
+  await sendEmail({
+    to: emails.join(', '),
+    subject,
+    html,
+    text: `FAILED CHECK — ${unitName} ${checkLabel} Check — ${officerName} Tour ${tour}\nFailed items:\n${failedItems.map(i => `- ${i.label}: ${i.value || 'Issue'}`).join('\n')}\nReview at: ${appUrl}`
   })
 }
 
@@ -79,6 +137,78 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}')
     const { action } = body
 
+    // ── SUBMIT CHECK (daily_check / weekly_check) ─────────────────────────────
+    if (action === 'submit_check') {
+      const { apparatus_id, check_type, items, notes, has_issues, tour } = body
+      if (!apparatus_id || !check_type || !Array.isArray(items)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'apparatus_id, check_type, and items required' }) }
+      }
+
+      const VALID_CHECK_TYPES = ['daily_check', 'weekly_check']
+      if (!VALID_CHECK_TYPES.includes(check_type)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid check_type' }) }
+      }
+
+      const failedItems = items.filter(i => i.pass === false)
+      const hasIssues = has_issues || failedItems.length > 0
+      const timestamp = new Date().toISOString()
+
+      // Fetch apparatus name
+      const { data: unit } = await supabase
+        .from('apparatus')
+        .select('unit_name, unit_type')
+        .eq('id', apparatus_id)
+        .single()
+
+      const findingsData = {
+        check_type,
+        items,
+        notes: notes?.trim() || null,
+        has_issues: hasIssues,
+        failed_items: failedItems,
+        tour,
+        submitted_by: officer.display_name,
+        submitted_at: timestamp
+      }
+
+      const descParts = []
+      if (hasIssues && failedItems.length > 0) {
+        descParts.push(`Failed: ${failedItems.map(i => i.label).join(', ')}`)
+      }
+      if (notes?.trim()) descParts.push(notes.trim())
+
+      const { data, error } = await supabase
+        .from('apparatus_findings')
+        .insert({
+          apparatus_id,
+          finding_type:   check_type,
+          description:    descParts.length ? descParts.join(' | ').slice(0, 2000) : (check_type === 'daily_check' ? 'Daily check completed — all items OK' : 'Weekly check completed — all items OK'),
+          priority:       hasIssues ? 'high' : 'low',
+          reported_by:    officer.display_name,
+          officer_id:     officer.officer_id,
+          status:         'completed',
+          findings_data:  findingsData
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Notify DCs if any items failed
+      if (hasIssues && failedItems.length > 0 && unit) {
+        await notifyFailedCheck(supabase, {
+          unitName: unit.unit_name,
+          officerName: officer.display_name,
+          tour: tour || '?',
+          checkType: check_type,
+          failedItems,
+          timestamp
+        })
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
+    }
+
     // ── REPORT FINDING (damage/repair_needed/inspection/scheduled_maintenance) ─
     if (action === 'report') {
       const { apparatus_id, finding_type, description, priority, assigned_to, scheduled_date, photos_notes } = body
@@ -91,6 +221,7 @@ exports.handler = async (event) => {
       if (!VALID_TYPES.includes(finding_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid finding_type' }) }
 
       const pri = VALID_PRIS.includes(priority) ? priority : 'medium'
+      const timestamp = new Date().toISOString()
 
       // Fetch apparatus name for notification
       const { data: unit } = await supabase
@@ -111,16 +242,24 @@ exports.handler = async (event) => {
           assigned_to:   assigned_to?.trim() || null,
           scheduled_date: scheduled_date || null,
           photos_notes:  photos_notes?.trim().slice(0, 2000) || null,
-          status:        finding_type === 'repair_completed' ? 'completed' : 'open'
+          status:        'open'
         })
         .select()
         .single()
 
       if (error) throw error
 
-      // Send critical notification
-      if (pri === 'critical' && unit) {
-        await notifyCritical(supabase, unit.unit_name, officer.display_name, description.trim(), apparatus_id)
+      // Notify DCs (and Chief for critical)
+      if (unit && ['damage', 'repair_needed', 'inspection'].includes(finding_type)) {
+        const includingChief = pri === 'critical'
+        await notifyFinding(supabase, {
+          unitName: unit.unit_name,
+          findingType: finding_type,
+          description: description.trim(),
+          priority: pri,
+          officerName: officer.display_name,
+          timestamp
+        }, includingChief)
       }
 
       return { statusCode: 200, headers, body: JSON.stringify(data) }

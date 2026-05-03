@@ -171,6 +171,27 @@
   </div>
 </div>
 
+<!-- Daily/Weekly Check Modal -->
+<div id="checkModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-4 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 my-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-gray-800 text-lg" id="checkModalTitle">Daily Check</h2>
+      <button onclick="closeModal('checkModal')" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <div id="checkItems" class="mb-3 divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden"></div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes (required if any issues)</label>
+      <textarea id="ck_notes" rows="2" maxlength="1000" placeholder="Describe any issues found..."
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
+    </div>
+    <div id="ck_err" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-3">
+      <button onclick="closeModal('checkModal')" class="flex-1 bg-gray-200 text-gray-700 font-bold rounded-xl py-3 transition hover:bg-gray-300">Cancel</button>
+      <button onclick="submitCheck()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition" id="ck_submit">Submit Check</button>
+    </div>
+  </div>
+</div>
+
 <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-40">
   <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
   <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
@@ -218,6 +239,57 @@
 <script>
 const API = '/.netlify/functions'
 
+// ── SHIFT CALCULATOR ─────────────────────────────────────────────────────────
+const SHIFT_ANCHOR_MS = new Date('2026-04-30T11:30:00Z').getTime()
+const ROTATION = [3, 4, 1, 2]
+function getShiftStartMs(ms) {
+  const shifts = Math.floor((ms - SHIFT_ANCHOR_MS) / 86400000)
+  return SHIFT_ANCHOR_MS + shifts * 86400000
+}
+function groupForDate(ms) {
+  const shifts = Math.floor((ms - SHIFT_ANCHOR_MS) / 86400000)
+  return ROTATION[((shifts % 4) + 4) % 4]
+}
+
+// ── CHECK ITEM DEFINITIONS ───────────────────────────────────────────────────
+const DAILY_COMMON = [
+  { key:'fuel_level',    label:'Fuel Level',                    options:['Full','3/4','Half','Low'],      pass:['Full','3/4'] },
+  { key:'oil_level',     label:'Oil Level',                     options:['Good','Low','Add'],              pass:['Good'] },
+  { key:'coolant_level', label:'Coolant Level',                 options:['Good','Low'],                   pass:['Good'] },
+  { key:'battery',       label:'Battery',                       options:['Good','Weak','Dead'],            pass:['Good'] },
+  { key:'tires',         label:'Tires',                         options:['Good','Issue'],                  pass:['Good'] },
+  { key:'lights',        label:'Lights (Headlights/Warning)',   options:['All Good','Issue'],              pass:['All Good'] },
+  { key:'wipers',        label:'Wipers',                        options:['Good','Issue'],                  pass:['Good'] },
+  { key:'cab_equipment', label:'Cab Equipment In Place',        options:['Good','Missing items'],          pass:['Good'] },
+  { key:'radio',         label:'Radio Operational',             options:['Good','Issue'],                  pass:['Good'] },
+]
+const DAILY_ENGINE = [
+  { key:'pump',       label:'Pump Operational',   options:['Good','Issue'],              pass:['Good'] },
+  { key:'water_tank', label:'Water Tank Level',   options:['Full','3/4','Half','Low'],   pass:['Full','3/4'] },
+  { key:'hose_load',  label:'Hose Load Intact',   options:['Good','Issue'],              pass:['Good'] },
+]
+const DAILY_TOWER = [
+  { key:'aerial',       label:'Aerial Operational', options:['Good','Issue'], pass:['Good'] },
+  { key:'stabilizers',  label:'Stabilizers',         options:['Good','Issue'], pass:['Good'] },
+]
+const DAILY_RESCUE = [
+  { key:'generator', label:'Generator Operational', options:['Good','Issue'], pass:['Good'] },
+  { key:'inverter',  label:'Inverter',               options:['Good','Issue'], pass:['Good'] },
+]
+const WEEKLY_ITEMS = [
+  { key:'scba_bottles',    label:'SCBA Bottles (qty/pressure)',  options:['Good','Issue'], pass:['Good'] },
+  { key:'scba_masks',      label:'SCBA Masks (condition)',        options:['Good','Issue'], pass:['Good'] },
+  { key:'hand_tools',      label:'Hand Tools (present/condition)',options:['Good','Issue'], pass:['Good'] },
+  { key:'power_tools',     label:'Power Tools Operational',       options:['Good','Issue'], pass:['Good'] },
+  { key:'medical_bag',     label:'Medical Bag Stocked',           options:['Good','Issue'], pass:['Good'] },
+  { key:'hose',            label:'Hose (qty/condition)',          options:['Good','Issue'], pass:['Good'] },
+  { key:'nozzles',         label:'Nozzles Present',               options:['Good','Issue'], pass:['Good'] },
+  { key:'ladders',         label:'Ladders Secure/Condition',      options:['Good','Issue'], pass:['Good'] },
+  { key:'rope_bags',       label:'Rope Bags Present',             options:['Good','Issue'], pass:['Good'] },
+  { key:'thermal_camera',  label:'Thermal Imaging Camera',        options:['Good','Issue'], pass:['Good'] },
+  { key:'forcible_entry',  label:'Forcible Entry Tools',          options:['Good','Issue'], pass:['Good'] },
+]
+
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 
 function timeAgo(iso) {
@@ -255,7 +327,8 @@ const PRI_CFG = {
 
 const FTYPE_LABEL = {
   damage:'Damage', repair_needed:'Repair Needed', inspection:'Inspection',
-  scheduled_maintenance:'Scheduled Maint.', repair_completed:'Repair Completed'
+  scheduled_maintenance:'Scheduled Maint.', repair_completed:'Repair Completed',
+  daily_check:'Daily Check', weekly_check:'Weekly Check'
 }
 
 let apparatusData = []
@@ -309,6 +382,13 @@ function renderCard(u, isOff) {
        </span>`
     : ''
 
+  const lastDailyCheck = (u.findings || []).find(f => f.finding_type === 'daily_check')
+  const shiftStart = getShiftStartMs(Date.now())
+  const checkDoneThisShift = lastDailyCheck && new Date(lastDailyCheck.created_at).getTime() >= shiftStart
+  const dailyCheckBadge = checkDoneThisShift
+    ? `<span class="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-1">✓ Checked</span>`
+    : `<span class="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 ml-1">⚠ No daily check</span>`
+
   const headerBg = u.status === 'out_of_service' ? 'bg-red-50' : u.status === 'maintenance' ? 'bg-orange-50' : 'bg-white'
 
   return `<div class="bg-white rounded-2xl border-2 ${st.border} shadow-sm overflow-hidden">
@@ -321,7 +401,7 @@ function renderCard(u, isOff) {
             <span class="font-extrabold text-gray-900 text-base">${esc(u.unit_name)}</span>
             <span class="text-xs text-gray-500">${esc(u.unit_type)}</span>
             <span class="text-xs font-bold px-2 py-0.5 rounded-full ${st.cls}">${st.label}</span>
-            ${findBadge}
+            ${findBadge}${dailyCheckBadge}
           </div>
           <div class="text-xs text-gray-500 mt-0.5">${esc(u.location || '—')} · Updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
         </div>
@@ -357,6 +437,8 @@ function renderExpanded(u, tab, isOff) {
     content = renderRepairsTab(u, repairs, isOff)
   } else if (tab === 'scheduled') {
     content = renderScheduledTab(u, scheduled, isOff)
+  } else if (tab === 'checks') {
+    content = renderChecksTab(u, isOff)
   }
 
   return `<div class="border-t border-gray-200">
@@ -365,6 +447,7 @@ function renderExpanded(u, tab, isOff) {
       ${tabBtn('findings', 'Findings',  critHigh || '')}
       ${tabBtn('repairs',  'Repairs',   '')}
       ${tabBtn('scheduled','Scheduled', '')}
+      ${tabBtn('checks',   'Checks',    '')}
     </div>
     <div class="p-4">${content}</div>
   </div>`
@@ -425,6 +508,12 @@ function renderFindingsTab(u, openFindings, isOff) {
       <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','inspection')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Inspection</button>
     </div>` : ''
 
+  const checkBtns = isOff ? `
+    <div class="flex gap-2 mb-4">
+      <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','daily_check')" class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Daily Check</button>
+      <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','weekly_check')" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Weekly Check</button>
+    </div>` : ''
+
   const list = openFindings.length
     ? openFindings.map(f => {
         const pri = PRI_CFG[f.priority] || PRI_CFG.medium
@@ -453,7 +542,7 @@ function renderFindingsTab(u, openFindings, isOff) {
       }).join('')
     : `<div class="text-center py-6 text-gray-400 text-sm">No open findings.</div>`
 
-  return `${addBtn}${list}`
+  return `${addBtn}${checkBtns}${list}`
 }
 
 function renderRepairsTab(u, repairs, isOff) {
@@ -491,6 +580,64 @@ function renderScheduledTab(u, scheduled, isOff) {
     : `<div class="text-center py-6 text-gray-400 text-sm">No scheduled maintenance.</div>`
 
   return `${addBtn}${list}`
+}
+
+function renderChecksTab(u, isOff) {
+  const allFindings = u.findings || []
+  const dailyChecks  = allFindings.filter(f => f.finding_type === 'daily_check').slice(0, 10)
+  const weeklyChecks = allFindings.filter(f => f.finding_type === 'weekly_check').slice(0, 5)
+
+  const checkBtns = isOff ? `
+    <div class="flex gap-2 mb-4">
+      <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','daily_check')" class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Daily Check</button>
+      <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','weekly_check')" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Weekly Check</button>
+    </div>` : ''
+
+  function renderCheckList(checks, label) {
+    if (!checks.length) return `<div class="text-xs text-gray-400 italic mb-3">No ${label} on record.</div>`
+    return checks.map(f => {
+      const hasIssues = f.description && f.description.startsWith('ISSUES')
+      const statusCls = hasIssues ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'
+      const iconCls   = hasIssues ? 'text-red-700' : 'text-green-700'
+      const icon      = hasIssues ? '⚠' : '✓'
+      const expandId  = `cke-${f.id}`
+      return `<div class="border rounded-xl px-3 py-2 mb-2 ${statusCls}">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <span class="text-xs font-bold ${iconCls}">${icon} ${hasIssues ? 'ISSUES FOUND' : 'PASS'}</span>
+            <span class="text-xs text-gray-500 ml-2">${fmtDateTime(f.created_at)} — ${esc(f.reported_by)}</span>
+          </div>
+          <button onclick="document.getElementById('${expandId}').classList.toggle('hidden')" class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0" style="min-height:0;">Details ▾</button>
+        </div>
+        ${hasIssues ? `<div class="text-xs text-red-700 font-semibold mt-0.5 truncate">${esc(f.description)}</div>` : ''}
+        <div id="${expandId}" class="hidden mt-2">
+          ${renderCheckData(f.findings_data)}
+        </div>
+      </div>`
+    }).join('')
+  }
+
+  return `${checkBtns}
+    <div class="mb-1">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Daily Checks (recent)</div>
+      ${renderCheckList(dailyChecks, 'daily checks')}
+    </div>
+    <div>
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Weekly Checks (recent)</div>
+      ${renderCheckList(weeklyChecks, 'weekly checks')}
+    </div>`
+}
+
+function renderCheckData(fd) {
+  if (!fd || !fd.items) return '<span class="text-xs text-gray-400">No detail data</span>'
+  return `<table style="width:100%;font-size:11px;border-collapse:collapse;">
+    ${fd.items.map(i => `
+      <tr style="${!i.pass ? 'background:#fef2f2;' : ''}">
+        <td style="padding:3px 8px;border-bottom:1px solid #f3f4f6;color:#374151;">${esc(i.label)}</td>
+        <td style="padding:3px 8px;border-bottom:1px solid #f3f4f6;font-weight:${!i.pass ? '700' : 'normal'};color:${!i.pass ? '#dc2626' : '#374151'};">${esc(i.value)}</td>
+      </tr>`).join('')}
+    ${fd.notes ? `<tr><td colspan="2" style="padding:3px 8px;font-style:italic;color:#6b7280;font-size:11px;">Notes: ${esc(fd.notes)}</td></tr>` : ''}
+  </table>`
 }
 
 // ── EXPAND / TAB TOGGLE ───────────────────────────────────────────────────────
@@ -670,8 +817,101 @@ async function updateFindingStatus(findingId, status, unitId) {
   } catch (e) { alert(e.message) }
 }
 
+// ── CHECK MODAL ───────────────────────────────────────────────────────────────
+let currentCheckType = 'daily_check'
+
+function getDailyItems(unitType, unitName) {
+  const t = (unitType || '').toLowerCase()
+  const n = (unitName || '').toLowerCase()
+  let items = [...DAILY_COMMON]
+  // Match engine by type name or unit name (E1, E5, etc.)
+  if (t.includes('engine') || t.includes('pumper') || /\be\d+\b/.test(n)) {
+    items = [...items, ...DAILY_ENGINE]
+  } else if (t.includes('tower') || /\bt\d+\b/.test(n)) {
+    items = [...items, ...DAILY_TOWER]
+  } else if (t.includes('rescue') || /\br\d+\b/.test(n)) {
+    items = [...items, ...DAILY_RESCUE]
+  }
+  return items
+}
+
+function openCheckModal(id, name, unitType, checkType) {
+  modalUnitId      = id
+  currentCheckType = checkType
+  const isDaily    = checkType === 'daily_check'
+  document.getElementById('checkModalTitle').textContent = `${isDaily ? '✓ Daily Check' : '✓ Weekly Equipment Check'} — ${name}`
+  document.getElementById('ck_notes').value  = ''
+  document.getElementById('ck_err').classList.add('hidden')
+
+  const items = isDaily ? getDailyItems(unitType, name) : WEEKLY_ITEMS
+  const container = document.getElementById('checkItems')
+  container.innerHTML = items.map(item => `
+    <div class="flex items-center justify-between gap-3 px-3 py-2.5" id="ck-row-${item.key}">
+      <label class="text-sm font-medium text-gray-700 flex-1">${esc(item.label)}</label>
+      <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
+        onchange="onCheckItemChange(this)"
+        class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
+        ${item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+      </select>
+    </div>`).join('')
+
+  document.getElementById('checkModal').classList.remove('hidden')
+}
+
+function onCheckItemChange(sel) {
+  const passValues = JSON.parse(sel.dataset.pass)
+  const isPass     = passValues.includes(sel.value)
+  const row        = document.getElementById(`ck-row-${sel.dataset.key}`)
+  if (row) row.className = row.className.replace(/bg-red-50|bg-white/g, '') + (isPass ? '' : ' bg-red-50')
+  sel.className = sel.className.replace(/border-red-400|border-gray-200/g, '') + (isPass ? ' border-gray-200' : ' border-red-400')
+  // Require notes if any item fails
+  const anyFail = [...document.querySelectorAll('#checkItems select[data-key]')].some(s => !JSON.parse(s.dataset.pass).includes(s.value))
+  document.getElementById('ck_notes').required = anyFail
+}
+
+async function submitCheck() {
+  const err  = document.getElementById('ck_err')
+  err.classList.add('hidden')
+
+  const allSelects = [...document.querySelectorAll('#checkItems select[data-key]')]
+  const items = allSelects.map(sel => ({
+    key:   sel.dataset.key,
+    label: sel.dataset.label,
+    value: sel.value,
+    pass:  JSON.parse(sel.dataset.pass).includes(sel.value)
+  }))
+
+  const notes     = document.getElementById('ck_notes').value.trim()
+  const hasIssues = items.some(i => !i.pass)
+
+  if (hasIssues && !notes) {
+    err.textContent = 'Notes are required when any item has an issue'
+    err.classList.remove('hidden')
+    document.getElementById('ck_notes').focus()
+    return
+  }
+
+  const tour = groupForDate(Date.now())
+  const btn  = document.getElementById('ck_submit')
+  btn.disabled = true
+  btn.textContent = 'Submitting...'
+
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'submit_check', apparatus_id:modalUnitId, check_type:currentCheckType, items, notes:notes||null, has_issues:hasIssues, tour })
+    })
+    const data = await res.json()
+    if (!res.ok) { err.textContent = data.error||'Failed'; err.classList.remove('hidden'); return }
+    closeModal('checkModal')
+    await loadApparatus()
+    setTab(modalUnitId||data.apparatus_id, 'checks')
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+  finally { btn.disabled=false; btn.textContent='Submit Check' }
+}
+
 // Close modals on backdrop click
-['statusModal','findingModal','repairModal','scheduleModal'].forEach(id => {
+['statusModal','findingModal','repairModal','scheduleModal','checkModal'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e) {
     if (e.target === this) closeModal(id)
   })

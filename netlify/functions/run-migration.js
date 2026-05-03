@@ -43,6 +43,8 @@ const MIGRATION_SQL = `
   );
   create index if not exists idx_board_attach_source on board_attachments(source_type, source_id, created_at);
   alter table board_attachments enable row level security;
+
+  alter table apparatus_findings add column if not exists findings_data jsonb;
 `
 
 async function tryPg(host, port, user, password, log) {
