@@ -29,7 +29,7 @@ exports.handler = async (event) => {
     }
   }
 
-  const recipients = ['sousa@sousapest.com', 'fsousa@hillsidefire.org']
+  const recipients = ['fsousa@hillsidefire.org', 'sousa@sousapest.com']
   const timestamp  = new Date().toISOString()
   const results    = []
 
@@ -37,19 +37,19 @@ exports.handler = async (event) => {
     console.log(`[SMTP TEST] Attempting → to: ${to}`)
     try {
       const transport = nodemailer.createTransport({
-        host: 'smtp.zoho.com', port: 465, secure: true,
+        host: 'smtp.gmail.com', port: 587, secure: false,
         auth: { user: smtpUser, pass: smtpPass }
       })
       const result = await transport.sendMail({
-        from: `"Hillside Fire Department" <${smtpUser}>`,
+        from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
         replyTo: 'noreply@hillsidefire.org',
         to,
-        subject: 'TEST — Hillside FD SMTP Connection Test',
-        text: `This is a test email from hillside-fd.netlify.app to verify the Zoho SMTP connection is working.\n\nFrom address: ${smtpUser}\nTimestamp: ${timestamp}`,
+        subject: 'TEST — Hillside FD Gmail SMTP Connection Test',
+        text: `This is a test email from hillside-fd.netlify.app to verify the Gmail SMTP connection is working.\n\nFrom address: hillsidefireapp@gmail.com\nTimestamp: ${timestamp}`,
         html: `<div style="font-family:Arial,sans-serif;padding:20px;">
-          <h2 style="color:#b91c1c;">Hillside FD — SMTP Test</h2>
-          <p>This is a test email verifying the Zoho SMTP connection is working.</p>
-          <p><strong>From:</strong> ${smtpUser}<br><strong>Timestamp:</strong> ${timestamp}</p>
+          <h2 style="color:#1a2e52;">Hillside FD — Gmail SMTP Test</h2>
+          <p>This is a test email verifying the Gmail SMTP connection is working.</p>
+          <p><strong>From:</strong> hillsidefireapp@gmail.com<br><strong>Timestamp:</strong> ${timestamp}</p>
           <p style="color:#15803d;font-weight:bold;">✓ If you received this, SMTP is working correctly.</p>
         </div>`
       })

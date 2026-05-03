@@ -1,14 +1,14 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 
-// ── Email transport (Zoho SMTP) ────────────────────────────────────────────────
+// ── Email transport (Gmail SMTP) ───────────────────────────────────────────────
 function makeTransport() {
   return nodemailer.createTransport({
-    host: 'smtp.zoho.com',
-    port: 465,
-    secure: true,
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
-      user: process.env.ZOHO_SMTP_USER || process.env.SMTP_USER || 'sousa@sousapest.com',
+      user: process.env.ZOHO_SMTP_USER || process.env.SMTP_USER,
       pass: process.env.ZOHO_SMTP_PASS || process.env.SMTP_PASS
     }
   })
@@ -494,13 +494,13 @@ exports.handler = async (event) => {
   try {
     const transport = makeTransport()
     await transport.sendMail({
-      from: '"Hillside Fire Department" <sousa@sousapest.com>',
+      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
       to:   RECIPIENTS.join(', '),
       subject,
       html: reportHtml
     })
     await transport.sendMail({
-      from: '"Hillside Fire Department" <sousa@sousapest.com>',
+      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
       to:   'fsousa@hillsidefire.org',
       subject: patternSubject,
       html: patternHtml

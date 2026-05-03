@@ -7,7 +7,7 @@ function sanitize(v) { return (v || '').replace(/[\r\n\t]/g, ' ').trim() }
 
 function makeTransport() {
   return nodemailer.createTransport({
-    host: 'smtp.zoho.com', port: 465, secure: true,
+    host: 'smtp.gmail.com', port: 587, secure: false,
     auth: { user: process.env.ZOHO_SMTP_USER, pass: process.env.ZOHO_SMTP_PASS }
   })
 }
@@ -20,7 +20,7 @@ async function sendEmail({ to, subject, html, text }) {
   console.log(`[SMTP] Attempting → to: ${to} | subject: ${subject}`)
   try {
     const result = await makeTransport().sendMail({
-      from: '"Hillside Fire Department" <sousa@sousapest.com>',
+      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
       replyTo: 'noreply@hillsidefire.org',
       to, subject, html, text
     })

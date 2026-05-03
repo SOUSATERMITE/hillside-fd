@@ -5,7 +5,7 @@ const { verifySession } = require('./_auth')
 
 function makeTransport() {
   return nodemailer.createTransport({
-    host: 'smtp.zoho.com', port: 465, secure: true,
+    host: 'smtp.gmail.com', port: 587, secure: false,
     auth: { user: process.env.ZOHO_SMTP_USER, pass: process.env.ZOHO_SMTP_PASS }
   })
 }
@@ -14,7 +14,7 @@ async function sendEmail({ to, subject, html, text }) {
   if (!process.env.ZOHO_SMTP_USER || !process.env.ZOHO_SMTP_PASS) return
   try {
     await makeTransport().sendMail({
-      from: '"Hillside Fire Department" <sousa@sousapest.com>',
+      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
       replyTo: 'noreply@hillsidefire.org',
       to, subject, html, text
     })
