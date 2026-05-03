@@ -68,7 +68,7 @@
     <!-- Header -->
     <div style="background:#1e3a5f;" class="px-4 py-3 flex items-start justify-between">
       <div class="flex-1 min-w-0">
-        <div class="text-white font-extrabold tracking-widest" style="font-size:0.72rem;">HILLSIDE FIRE DEPARTMENT — DAILY BRIEFING</div>
+        <div class="text-white font-extrabold text-base">Daily Briefing</div>
         <div id="briefingDate" class="text-blue-200 text-xs mt-0.5">Loading...</div>
       </div>
       <div class="flex items-center gap-2 ml-3 flex-shrink-0 mt-0.5">
@@ -139,10 +139,10 @@
   </div>
 
   <!-- SECTION 2: BULLETIN BOARD -->
-  <div class="section-card">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="font-extrabold text-gray-800 text-base">📋 Bulletin Board</h2>
-      <button id="bulletinToggle" onclick="toggleBulletinForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Post</button>
+  <div class="section-card overflow-hidden">
+    <div class="px-4 py-2.5 flex items-center justify-between" style="background:#1a5c2a;">
+      <h2 class="font-extrabold text-white text-sm tracking-wide">📋 Bulletin Board</h2>
+      <button id="bulletinToggle" onclick="toggleBulletinForm()" class="hidden text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">+ Post</button>
     </div>
     <div id="bulletinForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
       <input id="bTitle"   type="text"    placeholder="Title" maxlength="200"
@@ -175,10 +175,10 @@
   </div>
 
   <!-- SECTION 3: UPCOMING EVENTS -->
-  <div class="section-card">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="font-extrabold text-gray-800 text-base">📅 Upcoming Events <span class="text-xs font-normal text-gray-400">(next 14 days)</span></h2>
-      <button id="eventToggle" onclick="toggleEventForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Add</button>
+  <div class="section-card overflow-hidden">
+    <div class="px-4 py-2.5 flex items-center justify-between" style="background:#1e40af;">
+      <h2 class="font-extrabold text-white text-sm tracking-wide">📅 Upcoming Events <span class="text-xs font-normal text-blue-200">(next 14 days)</span></h2>
+      <button id="eventToggle" onclick="toggleEventForm()" class="hidden text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">+ Add</button>
     </div>
     <div id="eventForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
       <input id="evTitle" type="text" placeholder="Event title" maxlength="200"
@@ -224,10 +224,10 @@
   </div>
 
   <!-- SECTION 4: WORK ORDERS -->
-  <div class="section-card">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="font-extrabold text-gray-800 text-base">🔧 DPW Work Orders</h2>
-      <button id="woToggle" onclick="toggleWOForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Submit</button>
+  <div class="section-card overflow-hidden">
+    <div class="px-4 py-2.5 flex items-center justify-between" style="background:#92400e;">
+      <h2 class="font-extrabold text-white text-sm tracking-wide">🔧 DPW Work Orders</h2>
+      <button id="woToggle" onclick="toggleWOForm()" class="hidden text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">+ Submit</button>
     </div>
     <div id="woForm" class="hidden px-4 py-3 border-b border-gray-100 bg-green-50">
       <div id="woDupWarn" class="hidden bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-2 text-xs text-yellow-800 font-semibold mb-2"></div>
@@ -263,10 +263,10 @@
   </div>
 
   <!-- SECTION 5: APPARATUS STATUS -->
-  <div id="apparatusCard" class="section-card">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="font-extrabold text-gray-800 text-base">🚒 Apparatus Status</h2>
-      <a href="/apparatus" class="text-sm font-bold text-green-700 hover:text-green-800">View All →</a>
+  <div id="apparatusCard" class="section-card overflow-hidden">
+    <div class="px-4 py-2.5 flex items-center justify-between" style="background:#991b1b;">
+      <h2 class="font-extrabold text-white text-sm tracking-wide">🚒 Apparatus Status</h2>
+      <a href="/apparatus" class="text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">View All →</a>
     </div>
     <div id="apparatusOOSBanner" class="hidden px-4 py-2 bg-red-50 border-b border-red-200 text-sm font-bold text-red-700"></div>
     <div id="apparatusGrid" class="px-3 py-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -275,10 +275,10 @@
   </div>
 
   <!-- SECTION 6: CONTACTS -->
-  <div class="section-card mb-6">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-      <h2 class="font-extrabold text-gray-800 text-base">📞 Contact Directory</h2>
-      <button id="contactToggle" onclick="toggleContactForm()" class="hidden text-sm font-bold text-green-700 border border-green-700 rounded-lg px-3 py-1" style="min-height:0;">+ Add</button>
+  <div class="section-card overflow-hidden mb-6">
+    <div class="px-4 py-2.5 flex items-center justify-between" style="background:#1e3a5f;">
+      <h2 class="font-extrabold text-white text-sm tracking-wide">📞 Contact Directory</h2>
+      <button id="contactToggle" onclick="toggleContactForm()" class="hidden text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">+ Add</button>
     </div>
     <div class="px-4 pt-3 pb-2">
       <input id="contactSearch" type="search" placeholder="Search by name, title, phone..." oninput="filterContacts()"
@@ -625,7 +625,7 @@ function renderShift() {
   const startTime = start.toLocaleTimeString('en-US', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true })
 
   document.getElementById('briefingDate').textContent =
-    `${dayName}, ${fullDate}  ·  Group ${g} On Duty  ·  Tour started at ${startTime}`
+    `Tour ${g} On Duty  ·  ${dayName}, ${fullDate}`
 
   const sickCount      = sick.length
   const recallCount    = recalledToday.length
@@ -668,18 +668,13 @@ function renderShift() {
   if (sickCount > 0) {
     sickSection.classList.remove('hidden')
     sickList.innerHTML = sick.map(s => {
-      const ff       = s.firefighters
-      const days     = Math.floor((Date.now() - new Date(s.marked_sick_date)) / 86400000)
-      const covered  = recalledToday.some(r => r.firefighters?.id === ff?.id)
+      const ff   = s.firefighters
+      const days = Math.floor((Date.now() - new Date(s.marked_sick_date)) / 86400000)
+      const tourLabel = ff?.group_number ? `Tour ${ff.group_number}` : ''
       return `<div class="flex items-center justify-between py-2">
         <span class="text-sm font-semibold text-gray-800">${esc(ff?.name || '—')}
-          <span class="text-xs font-normal text-gray-400">${esc(ff?.rank||'')}</span></span>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-gray-500">${days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`}</span>
-          ${covered
-            ? '<span class="text-xs bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">Covered</span>'
-            : '<span class="text-xs bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">Uncovered</span>'}
-        </div>
+          <span class="text-xs font-normal text-gray-400">${esc(ff?.rank||'')}${tourLabel ? ' · ' + tourLabel : ''}</span></span>
+        <span class="text-xs text-gray-500">${days === 0 ? 'Sick today' : days === 1 ? '1 day out' : `${days} days out`}</span>
       </div>`
     }).join('')
   } else {
