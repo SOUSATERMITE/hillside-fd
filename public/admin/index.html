@@ -116,6 +116,7 @@
       <button id="adminTab-logins"    onclick="switchAdminTab('logins')"    class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Officer Logins</button>
       <button id="adminTab-sicklog"   onclick="switchAdminTab('sicklog')"   class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Sick Log</button>
       <button id="adminTab-recalllog" onclick="switchAdminTab('recalllog')" class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Recall Log</button>
+      <button id="adminTab-duties"    onclick="switchAdminTab('duties')"    class="admin-tab-inactive px-5 py-3 text-sm whitespace-nowrap">Duties</button>
     </div>
 
     <!-- TAB: Firefighters -->
@@ -235,6 +236,78 @@
       </div>
     </div>
 
+    <!-- TAB: Duties -->
+    <div id="tab-duties" class="hidden">
+      <!-- Add New Duty Form -->
+      <div class="bg-white rounded-2xl shadow p-5 mb-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-gray-800 text-base uppercase tracking-wide">Add New Duty</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <input id="dutyAdminTitle" type="text" placeholder="Duty title *" maxlength="200"
+            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+          <select id="dutyAdminType" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+            <option value="administrative">Administrative</option>
+            <option value="training">Training</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="inspection">Inspection</option>
+            <option value="other" selected>Other</option>
+          </select>
+          <select id="dutyAdminRecurrence" onchange="onAdminDutyRecurrenceChange()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+            <option value="one_time">One-time</option>
+            <option value="daily">Daily (every shift)</option>
+            <option value="weekly">Weekly (specific day)</option>
+            <option value="monthly">Monthly</option>
+            <option value="specific_day">Specific Day of Week</option>
+          </select>
+          <select id="dutyAdminTour" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+            <option value="">All Tours</option>
+            <option value="1">Tour 1</option>
+            <option value="2">Tour 2</option>
+            <option value="3">Tour 3</option>
+            <option value="4">Tour 4</option>
+          </select>
+        </div>
+        <div id="dutyAdminDateRow" class="mb-3">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Date (for one-time duty)</label>
+          <input id="dutyAdminDate" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+        </div>
+        <div id="dutyAdminDayRow" class="hidden mb-3">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Day of Week</label>
+          <select id="dutyAdminDay" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+            <option value="0">Sunday</option>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+          </select>
+        </div>
+        <textarea id="dutyAdminDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:60px;resize:vertical;"></textarea>
+        <div class="flex items-center gap-3 mb-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="dutyAdminRequiresReport" class="w-4 h-4 rounded accent-red-700">
+            <span class="text-sm font-semibold text-gray-700">📋 Requires Report (emails DCs + Chief if incomplete)</span>
+          </label>
+        </div>
+        <button onclick="createAdminDuty()" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2 transition w-full sm:w-auto">Add Duty</button>
+        <div id="dutyAdminResult" class="text-sm font-semibold text-center mt-2"></div>
+      </div>
+
+      <!-- All Duties List -->
+      <div class="bg-white rounded-2xl shadow overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-bold text-gray-800">All Duties</h2>
+          <button onclick="loadAdminDuties()" class="text-xs text-gray-500 hover:text-gray-700 font-semibold" style="min-height:0;">↻ Refresh</button>
+        </div>
+        <div id="dutyAdminListContainer" class="divide-y divide-gray-100">
+          <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="/auth.js"></script>
@@ -293,7 +366,7 @@
     // ── Admin Tabs ────────────────────────────────────────────────────────────────
 
     function switchAdminTab(tab) {
-      const tabs = ['ff', 'positions', 'acting', 'logins', 'sicklog', 'recalllog']
+      const tabs = ['ff', 'positions', 'acting', 'logins', 'sicklog', 'recalllog', 'duties']
       for (const t of tabs) {
         document.getElementById(`adminTab-${t}`).className = t === tab
           ? 'admin-tab-active px-5 py-3 text-sm whitespace-nowrap'
@@ -306,6 +379,7 @@
       if (tab === 'positions') loadPositionsGroup(currentPosGroup)
       if (tab === 'acting')    loadActingList()
       if (tab === 'logins')    loadOfficerLogins()
+      if (tab === 'duties')    loadAdminDuties()
     }
 
     // ── Firefighters Tab ──────────────────────────────────────────────────────────
@@ -1134,6 +1208,129 @@
         if (!res.ok) { alert(data.error || 'Error'); btn.disabled = false; return }
         loadOfficerLogins()
       } catch (e) { alert('Network error: ' + e.message); btn.disabled = false }
+    }
+
+    // ── Admin Duties Tab ──────────────────────────────────────────────────────────
+
+    const ADMIN_DUTY_TYPE_COLORS = {
+      administrative: 'bg-red-100 text-red-700',
+      training:       'bg-blue-100 text-blue-700',
+      maintenance:    'bg-orange-100 text-orange-700',
+      inspection:     'bg-green-100 text-green-700',
+      other:          'bg-gray-100 text-gray-600'
+    }
+    const ADMIN_RECURRENCE_LABELS = { one_time:'One-time', daily:'Daily', weekly:'Weekly', monthly:'Monthly', specific_day:'Specific Day' }
+    const ADMIN_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+
+    function onAdminDutyRecurrenceChange() {
+      const rec = document.getElementById('dutyAdminRecurrence').value
+      document.getElementById('dutyAdminDateRow').classList.toggle('hidden', rec !== 'one_time')
+      document.getElementById('dutyAdminDayRow').classList.toggle('hidden', rec !== 'weekly' && rec !== 'specific_day')
+    }
+
+    async function loadAdminDuties() {
+      document.getElementById('dutyAdminListContainer').innerHTML = '<div class="text-gray-400 text-sm text-center py-8">Loading...</div>'
+      try {
+        const res = await fetch(`${API}/manage-duties`, {
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action:'list_all' })
+        })
+        const data = await res.json()
+        if (!res.ok) { showError(data.error || 'Failed to load duties'); return }
+        renderAdminDuties(data)
+      } catch(e) { showError('Error loading duties: ' + e.message) }
+    }
+
+    function renderAdminDuties(duties) {
+      const el = document.getElementById('dutyAdminListContainer')
+      if (!duties.length) {
+        el.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No duties found.</div>'
+        return
+      }
+      el.innerHTML = duties.map(d => {
+        const tc = ADMIN_DUTY_TYPE_COLORS[d.duty_type] || 'bg-gray-100 text-gray-600'
+        const recLbl = ADMIN_RECURRENCE_LABELS[d.recurrence] || d.recurrence
+        const recDetail = (d.recurrence === 'weekly' || d.recurrence === 'specific_day') && d.recurrence_day !== null
+          ? ` (${ADMIN_DOW[d.recurrence_day]})` : d.recurrence === 'one_time' && d.specific_date ? ` (${d.specific_date})` : ''
+        const tourBadge = d.tour_specific ? `<span class="ml-1 inline-block text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full">Tour ${d.tour_specific}</span>` : ''
+        const statusBadge = d.active
+          ? '<span class="inline-block text-xs bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">Active</span>'
+          : '<span class="inline-block text-xs bg-gray-200 text-gray-500 font-bold px-1.5 py-0.5 rounded-full">Inactive</span>'
+        const reportBadge = d.requires_report ? '<span class="ml-1 inline-block text-xs bg-yellow-100 text-yellow-700 font-bold px-1.5 py-0.5 rounded-full">📋 Report</span>' : ''
+        return `<div class="p-4 hover:bg-gray-50">
+      <div class="flex items-start gap-2 flex-wrap mb-1">
+        <span class="font-semibold text-gray-800 flex-1">${esc(d.title)}</span>
+        ${statusBadge}
+        <span class="inline-block text-xs ${tc} font-bold px-1.5 py-0.5 rounded-full">${d.duty_type.charAt(0).toUpperCase()+d.duty_type.slice(1)}</span>
+        <span class="inline-block text-xs bg-gray-100 text-gray-600 font-bold px-1.5 py-0.5 rounded-full">${recLbl}${recDetail}</span>
+        ${tourBadge}${reportBadge}
+      </div>
+      ${d.description ? `<div class="text-xs text-gray-500 mb-1">${esc(d.description)}</div>` : ''}
+      <div class="text-xs text-gray-400 mb-2">Created by ${esc(d.created_by)}</div>
+      <div class="flex gap-2">
+        ${d.active
+          ? `<button onclick="toggleAdminDutyActive('${d.id}', false)" class="text-xs bg-gray-200 text-gray-700 font-bold px-3 py-1.5 rounded-xl hover:bg-gray-300 transition" style="min-height:0;">Deactivate</button>`
+          : `<button onclick="toggleAdminDutyActive('${d.id}', true)"  class="text-xs bg-green-600 text-white font-bold px-3 py-1.5 rounded-xl hover:bg-green-700 transition" style="min-height:0;">Reactivate</button>`
+        }
+        <button onclick="deleteAdminDuty('${d.id}')" class="text-xs bg-red-100 text-red-700 font-bold px-3 py-1.5 rounded-xl hover:bg-red-200 transition" style="min-height:0;">Delete</button>
+      </div>
+    </div>`
+      }).join('')
+    }
+
+    async function createAdminDuty() {
+      const title = document.getElementById('dutyAdminTitle').value.trim()
+      if (!title) { document.getElementById('dutyAdminResult').textContent = 'Title is required'; document.getElementById('dutyAdminResult').style.color = '#dc2626'; return }
+      const rec = document.getElementById('dutyAdminRecurrence').value
+      const body = {
+        action: 'create',
+        title,
+        description:     document.getElementById('dutyAdminDesc').value.trim() || null,
+        duty_type:       document.getElementById('dutyAdminType').value,
+        recurrence:      rec,
+        recurrence_day:  (rec === 'weekly' || rec === 'specific_day') ? parseInt(document.getElementById('dutyAdminDay').value) : null,
+        specific_date:   rec === 'one_time' ? (document.getElementById('dutyAdminDate').value || null) : null,
+        tour_specific:   document.getElementById('dutyAdminTour').value ? parseInt(document.getElementById('dutyAdminTour').value) : null,
+        requires_report: document.getElementById('dutyAdminRequiresReport').checked
+      }
+      try {
+        const res = await fetch(`${API}/manage-duties`, {
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify(body)
+        })
+        const data = await res.json()
+        if (!res.ok) { document.getElementById('dutyAdminResult').textContent = data.error || 'Failed'; document.getElementById('dutyAdminResult').style.color = '#dc2626'; return }
+        document.getElementById('dutyAdminTitle').value = ''
+        document.getElementById('dutyAdminDesc').value  = ''
+        document.getElementById('dutyAdminRequiresReport').checked = false
+        document.getElementById('dutyAdminResult').textContent = 'Duty added!'
+        document.getElementById('dutyAdminResult').style.color = '#16a34a'
+        setTimeout(() => { document.getElementById('dutyAdminResult').textContent = '' }, 3000)
+        loadAdminDuties()
+      } catch(e) { document.getElementById('dutyAdminResult').textContent = e.message; document.getElementById('dutyAdminResult').style.color = '#dc2626' }
+    }
+
+    async function toggleAdminDutyActive(id, active) {
+      try {
+        const res = await fetch(`${API}/manage-duties`, {
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action:'update', id, active })
+        })
+        if (!res.ok) { const d = await res.json(); showError(d.error || 'Failed'); return }
+        loadAdminDuties()
+      } catch(e) { showError(e.message) }
+    }
+
+    async function deleteAdminDuty(id) {
+      if (!confirm('Delete this duty permanently? (Cannot be undone)')) return
+      try {
+        const res = await fetch(`${API}/manage-duties`, {
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action:'delete', id })
+        })
+        if (!res.ok) { const d = await res.json(); showError(d.error || 'Failed'); return }
+        loadAdminDuties()
+      } catch(e) { showError(e.message) }
     }
 
     if ('serviceWorker' in navigator) {

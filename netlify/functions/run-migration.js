@@ -45,6 +45,50 @@ const MIGRATION_SQL = `
   alter table board_attachments enable row level security;
 
   alter table apparatus_findings add column if not exists findings_data jsonb;
+
+  create table if not exists daily_duties (
+    id              uuid primary key default gen_random_uuid(),
+    title           text not null,
+    description     text,
+    duty_type       text not null default 'other' check (duty_type in ('administrative','training','maintenance','inspection','other')),
+    recurrence      text not null default 'one_time' check (recurrence in ('one_time','daily','weekly','monthly','specific_day')),
+    recurrence_day  int,
+    specific_date   date,
+    tour_specific   int,
+    requires_report boolean default false,
+    active          boolean default true,
+    created_by      text not null,
+    officer_id      uuid references officers(id),
+    created_at      timestamptz default now()
+  );
+
+  create table if not exists duty_completions (
+    id              uuid primary key default gen_random_uuid(),
+    duty_id         uuid references daily_duties(id) on delete cascade,
+    completed_date  date not null,
+    completed_by    text not null,
+    officer_id      uuid references officers(id),
+    notes           text,
+    created_at      timestamptz default now(),
+    unique(duty_id, completed_date)
+  );
+
+  create table if not exists duty_log (
+    id              uuid primary key default gen_random_uuid(),
+    duty_id         uuid references daily_duties(id) on delete cascade,
+    shift_date      date not null,
+    group_on_duty   int,
+    status          text not null check (status in ('completed','incomplete','not_applicable')),
+    completed_by    text,
+    officer_id      uuid references officers(id),
+    notes           text,
+    created_at      timestamptz default now(),
+    unique(duty_id, shift_date)
+  );
+
+  create index if not exists idx_daily_duties_active     on daily_duties(active, recurrence);
+  create index if not exists idx_duty_completions_date   on duty_completions(duty_id, completed_date);
+  create index if not exists idx_duty_log_date           on duty_log(duty_id, shift_date);
 `
 
 async function tryPg(host, port, user, password, log) {

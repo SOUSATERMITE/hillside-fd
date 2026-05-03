@@ -53,3 +53,6 @@
 
 [functions."weekly-report"]
   schedule = "0 10 * * 0"
+
+[functions."duty-cron"]
+  schedule = "30 11 * * *"

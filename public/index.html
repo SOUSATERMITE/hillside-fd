@@ -62,6 +62,49 @@
 
 <div class="max-w-3xl mx-auto px-3 py-4 space-y-4">
 
+  <!-- DAILY SPOTLIGHT -->
+  <div id="spotlightCard" class="rounded-2xl overflow-hidden shadow-lg">
+    <!-- Header -->
+    <div style="background:#1e3a5f;" class="px-4 py-3 flex items-center justify-between">
+      <div>
+        <div id="spotlightTitle" class="text-white font-extrabold text-base tracking-wide">TODAY'S SPOTLIGHT</div>
+        <div id="spotlightSub" class="text-blue-200 text-xs mt-0.5"></div>
+      </div>
+      <button onclick="loadDuties()" class="text-blue-200 hover:text-white text-xs font-semibold" style="min-height:0;background:none;border:none;cursor:pointer;">↻ Refresh</button>
+    </div>
+
+    <!-- Sub-section 1: Today's Schedule -->
+    <div class="bg-white border-b border-gray-100">
+      <div class="px-4 py-2 flex items-center justify-between" style="background:#dbeafe;">
+        <span class="text-xs font-bold text-blue-900 uppercase tracking-wide">📅 Today's Schedule</span>
+        <a href="/apparatus" class="text-xs text-blue-700 font-semibold hover:underline" style="min-height:0;">View all →</a>
+      </div>
+      <div id="spotlightEvents" class="px-4 py-2 divide-y divide-gray-50">
+        <div class="py-3 text-sm text-gray-400 text-center">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Sub-section 2: Shift Duties -->
+    <div class="bg-white border-b border-gray-100">
+      <div class="px-4 py-2 flex items-center justify-between" style="background:#dbeafe;">
+        <span class="text-xs font-bold text-blue-900 uppercase tracking-wide">✅ Shift Duties</span>
+        <button id="addDutyBtn" onclick="openDutyModal(null)" class="hidden text-xs font-bold text-blue-700 border border-blue-700 rounded-lg px-2 py-0.5 hover:bg-blue-50 transition" style="min-height:0;">+ Add Duty</button>
+      </div>
+      <div id="spotlightDuties" class="divide-y divide-gray-50">
+        <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Sub-section 3: Yesterday's Incomplete -->
+    <div id="spotlightYesterdaySection" class="hidden bg-white">
+      <div class="px-4 py-2" style="background:#fee2e2;">
+        <span class="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Yesterday's Incomplete</span>
+        <span id="spotlightYesterdayLabel" class="text-xs text-red-500 ml-2"></span>
+      </div>
+      <div id="spotlightYesterday" class="divide-y divide-gray-50"></div>
+    </div>
+  </div>
+
   <!-- SECTION 1: SHIFT STATUS -->
   <div id="shiftCard" class="section-card overflow-hidden">
     <div id="shiftBanner" class="px-4 py-3 flex items-center justify-between">
@@ -398,6 +441,93 @@
     </div>
     <div id="weErr" class="hidden text-red-600 text-xs mt-2"></div>
     <input type="hidden" id="weId">
+  </div>
+</div>
+
+<!-- MARK COMPLETE MODAL -->
+<div id="markCompleteModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 id="markCompleteTitle" class="font-extrabold text-gray-800 text-base">Mark Complete</h3>
+      <button onclick="closeMarkCompleteModal()" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <label id="markCompleteNotesLabel" class="block text-xs font-semibold text-gray-600 mb-1">Notes (optional)</label>
+    <textarea id="markCompleteNotes" rows="3" maxlength="500" placeholder="Add a note..."
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:70px;resize:vertical;"></textarea>
+    <div id="markCompleteErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-2">
+      <button onclick="submitMarkComplete()" id="markCompleteSubmitBtn" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl py-3 text-sm transition">Mark Complete</button>
+      <button onclick="closeMarkCompleteModal()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DUTY MODAL -->
+<div id="dutyModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5 overflow-y-auto" style="max-height:90vh;">
+    <div class="flex items-center justify-between mb-4">
+      <h3 id="dutyModalTitle" class="font-extrabold text-gray-800 text-base">Add New Duty</h3>
+      <button onclick="closeDutyModal()" class="text-gray-400 hover:text-gray-600 text-xl" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+    </div>
+    <input id="dmTitle" type="text" placeholder="Duty title *" maxlength="200"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+    <textarea id="dmDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:60px;resize:vertical;"></textarea>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <select id="dmType" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+        <option value="administrative">Administrative</option>
+        <option value="training">Training</option>
+        <option value="maintenance">Maintenance</option>
+        <option value="inspection">Inspection</option>
+        <option value="other" selected>Other</option>
+      </select>
+      <select id="dmRecurrence" onchange="onDutyRecurrenceChange()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+        <option value="one_time">One-time</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="specific_day">Specific Day</option>
+      </select>
+    </div>
+    <div id="dmDateRow" class="mb-2">
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+      <input id="dmDate" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+    </div>
+    <div id="dmDayRow" class="hidden mb-2">
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Day of Week</label>
+      <select id="dmDay" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+        <option value="0">Sunday</option>
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5">Friday</option>
+        <option value="6">Saturday</option>
+      </select>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Tour (optional)</label>
+        <select id="dmTour" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" style="min-height:40px;">
+          <option value="">All Tours</option>
+          <option value="1">Tour 1</option>
+          <option value="2">Tour 2</option>
+          <option value="3">Tour 3</option>
+          <option value="4">Tour 4</option>
+        </select>
+      </div>
+      <div class="flex items-end pb-1">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="dmRequiresReport" class="w-4 h-4 rounded accent-blue-700">
+          <span class="text-xs font-semibold text-gray-700">📋 Report Required</span>
+        </label>
+      </div>
+    </div>
+    <div id="dutyModalErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-2">
+      <button id="dutyModalSubmitBtn" onclick="saveDuty()" class="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl py-3 text-sm transition">Add Duty</button>
+      <button onclick="closeDutyModal()" class="text-gray-500 text-sm px-4 py-2 rounded-xl border border-gray-300" style="min-height:0;">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -1430,6 +1560,246 @@ function renderEventEditAttachments(id) {
     }).join('')
 }
 
+// ── DAILY SPOTLIGHT ──────────────────────────────────────────────────────────
+let spotlightData = null
+
+const DUTY_TYPE_COLORS = {
+  administrative: { bg:'bg-red-100',    text:'text-red-700',    label:'Administrative' },
+  training:       { bg:'bg-blue-100',   text:'text-blue-700',   label:'Training' },
+  maintenance:    { bg:'bg-orange-100', text:'text-orange-700', label:'Maintenance' },
+  inspection:     { bg:'bg-green-100',  text:'text-green-700',  label:'Inspection' },
+  other:          { bg:'bg-gray-100',   text:'text-gray-600',   label:'Other' }
+}
+const RECURRENCE_LABELS = { one_time:'One-time', daily:'Daily', weekly:'Weekly', monthly:'Monthly', specific_day:'Specific Day' }
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+async function loadDuties() {
+  try {
+    const res = await fetch(`${API}/get-duties`)
+    if (!res.ok) return
+    spotlightData = await res.json()
+    renderSpotlight()
+  } catch(e) { console.error('loadDuties:', e) }
+}
+
+function renderSpotlight() {
+  if (!spotlightData) return
+  const { date, events, duties_today, duties_yesterday_incomplete } = spotlightData
+  const d = new Date(date.today + 'T12:00:00')
+  const dateDisplay = d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+  document.getElementById('spotlightSub').textContent = `${DAYS[d.getDay()]}, ${dateDisplay}  ·  Group ${date.currentGroup} On Duty`
+  renderSpotlightEvents(events)
+  renderSpotlightDuties(duties_today, date.today)
+  renderYesterdayIncomplete(duties_yesterday_incomplete, date.yesterday, date.yesterdayGroup)
+}
+
+function renderSpotlightEvents(events) {
+  const el = document.getElementById('spotlightEvents')
+  if (!events || !events.length) {
+    el.innerHTML = '<div class="py-3 text-sm text-gray-400 italic text-center">No events scheduled for this shift</div>'
+    return
+  }
+  const CAT_COLORS = { training:'bg-blue-100 text-blue-700', meeting:'bg-purple-100 text-purple-700', drill:'bg-orange-100 text-orange-700', inspection:'bg-green-100 text-green-700', other:'bg-gray-100 text-gray-600' }
+  el.innerHTML = events.map(e => {
+    const t = e.event_time ? e.event_time.slice(0,5) : ''
+    const catCls = CAT_COLORS[e.category] || 'bg-gray-100 text-gray-600'
+    const catLbl = (e.category||'other').charAt(0).toUpperCase() + (e.category||'other').slice(1)
+    return `<div class="py-2 flex items-center gap-2 flex-wrap">
+      ${t ? `<span class="text-xs font-bold text-blue-800 w-10 flex-shrink-0">${t}</span>` : '<span class="w-10 flex-shrink-0"></span>'}
+      <span class="text-sm font-semibold text-gray-800 flex-1">${esc(e.title)}</span>
+      <span class="badge ${catCls} flex-shrink-0">${catLbl}</span>
+    </div>`
+  }).join('')
+}
+
+function renderDutyCard(d, dateStr, isYesterday) {
+  const tc = DUTY_TYPE_COLORS[d.duty_type] || DUTY_TYPE_COLORS.other
+  const recLbl = RECURRENCE_LABELS[d.recurrence] || d.recurrence
+  const comp = d.completion
+  const isOfficer = AUTH.isOfficer()
+  const isAdmin = AUTH.isAdmin()
+  const myName = AUTH.getDisplayName()
+  const canEdit = isAdmin || d.created_by === myName
+  const tourBadge = d.tour_specific ? `<span class="badge bg-indigo-100 text-indigo-700 ml-1">Tour ${d.tour_specific}</span>` : ''
+  const reportIcon = d.requires_report ? ' 📋' : ''
+
+  let statusBlock
+  if (comp) {
+    const t = new Date(comp.created_at).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true, timeZone:'America/New_York' })
+    statusBlock = `<div class="flex items-center gap-1.5 mt-2 flex-wrap">
+      <span class="text-green-600 font-bold text-sm">✅ Completed</span>
+      <span class="text-xs text-gray-500">by ${esc(comp.completed_by)} at ${t}</span>
+      ${comp.notes ? `<span class="text-xs text-gray-400 italic truncate max-w-xs">"${esc(comp.notes)}"</span>` : ''}
+    </div>`
+  } else {
+    statusBlock = `<div class="flex items-center gap-2 mt-2">
+      <span class="text-amber-600 font-bold text-sm">⏳ Pending</span>
+      ${isOfficer ? `<button onclick="openMarkCompleteModal('${d.id}','${esc(dateStr)}',${isYesterday})" class="text-xs bg-blue-700 text-white font-bold rounded-lg px-2 py-0.5 hover:bg-blue-800 transition" style="min-height:0;">Mark Complete</button>` : ''}
+    </div>`
+  }
+
+  const editDeleteBtns = (canEdit && isOfficer) ? `<div class="flex gap-2 mt-1.5">
+    <button onclick="openDutyModal('${d.id}')" class="text-xs text-gray-400 hover:text-blue-700 font-semibold" style="min-height:0;">Edit</button>
+    <button onclick="deleteDuty('${d.id}')" class="text-xs text-gray-400 hover:text-red-600 font-semibold" style="min-height:0;">Delete</button>
+  </div>` : ''
+
+  return `<div class="px-4 py-3">
+    <div class="flex items-start gap-1.5 flex-wrap mb-0.5">
+      <span class="font-semibold text-gray-800 text-sm flex-1">${esc(d.title)}${reportIcon}</span>
+      <span class="badge ${tc.bg} ${tc.text} flex-shrink-0 text-xs">${tc.label}</span>
+      <span class="badge bg-gray-100 text-gray-500 flex-shrink-0 text-xs">${recLbl}</span>
+      ${tourBadge}
+    </div>
+    ${d.description ? `<div class="text-xs text-gray-500">${esc(d.description)}</div>` : ''}
+    ${statusBlock}
+    ${editDeleteBtns}
+  </div>`
+}
+
+function renderSpotlightDuties(duties, todayStr) {
+  const el = document.getElementById('spotlightDuties')
+  if (AUTH.isOfficer()) document.getElementById('addDutyBtn').classList.remove('hidden')
+  if (!duties || !duties.length) {
+    el.innerHTML = '<div class="px-4 py-4 text-sm text-gray-400 italic text-center">No duties assigned for this shift</div>'
+    return
+  }
+  el.innerHTML = duties.map(d => renderDutyCard(d, todayStr, false)).join('')
+}
+
+function renderYesterdayIncomplete(duties, yesterdayStr, yesterdayGroup) {
+  const section = document.getElementById('spotlightYesterdaySection')
+  const el = document.getElementById('spotlightYesterday')
+  if (!duties || !duties.length) { section.classList.add('hidden'); return }
+  section.classList.remove('hidden')
+  const d = new Date(yesterdayStr + 'T12:00:00')
+  const dateDisplay = d.toLocaleDateString('en-US', { month:'long', day:'numeric' })
+  document.getElementById('spotlightYesterdayLabel').textContent = `Carried over from ${dateDisplay} — Tour ${yesterdayGroup}`
+  el.innerHTML = duties.map(d => renderDutyCard(d, yesterdayStr, true)).join('')
+}
+
+// ── Mark Complete Modal ───────────────────────────────────────────────────────
+let _mcDutyId = null, _mcDate = null
+
+function openMarkCompleteModal(dutyId, dateStr, isRetro) {
+  _mcDutyId = dutyId; _mcDate = dateStr
+  document.getElementById('markCompleteTitle').textContent = isRetro ? 'Mark Complete (Retroactive)' : 'Mark Complete'
+  document.getElementById('markCompleteNotesLabel').textContent = isRetro ? 'Note explaining delay (optional)' : 'Notes (optional)'
+  document.getElementById('markCompleteNotes').value = ''
+  document.getElementById('markCompleteErr').classList.add('hidden')
+  document.getElementById('markCompleteModal').classList.remove('hidden')
+}
+function closeMarkCompleteModal() { document.getElementById('markCompleteModal').classList.add('hidden'); _mcDutyId = null; _mcDate = null }
+
+async function submitMarkComplete() {
+  if (!_mcDutyId || !_mcDate) return
+  const notes = document.getElementById('markCompleteNotes').value.trim()
+  const btn = document.getElementById('markCompleteSubmitBtn')
+  btn.disabled = true; btn.textContent = 'Saving...'
+  try {
+    const res = await fetch(`${API}/manage-duties`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'mark_complete', duty_id:_mcDutyId, completed_date:_mcDate, notes })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      document.getElementById('markCompleteErr').textContent = data.error || 'Failed'
+      document.getElementById('markCompleteErr').classList.remove('hidden')
+      return
+    }
+    closeMarkCompleteModal()
+    loadDuties()
+  } catch(e) {
+    document.getElementById('markCompleteErr').textContent = e.message
+    document.getElementById('markCompleteErr').classList.remove('hidden')
+  } finally { btn.disabled = false; btn.textContent = 'Mark Complete' }
+}
+
+// ── Add / Edit Duty Modal ─────────────────────────────────────────────────────
+let _editDutyId = null
+
+function openDutyModal(id) {
+  _editDutyId = id
+  document.getElementById('dutyModalTitle').textContent = id ? 'Edit Duty' : 'Add New Duty'
+  document.getElementById('dutyModalSubmitBtn').textContent = id ? 'Save Changes' : 'Add Duty'
+  document.getElementById('dutyModalErr').classList.add('hidden')
+  if (id) {
+    const duty = (spotlightData?.duties_today || []).find(d => d.id === id) ||
+                 (spotlightData?.duties_yesterday_incomplete || []).find(d => d.id === id)
+    if (duty) {
+      document.getElementById('dmTitle').value = duty.title || ''
+      document.getElementById('dmDesc').value  = duty.description || ''
+      document.getElementById('dmType').value  = duty.duty_type || 'other'
+      document.getElementById('dmRecurrence').value = duty.recurrence || 'one_time'
+      document.getElementById('dmTour').value  = duty.tour_specific || ''
+      document.getElementById('dmRequiresReport').checked = duty.requires_report || false
+      document.getElementById('dmDate').value  = duty.specific_date || ''
+      document.getElementById('dmDay').value   = duty.recurrence_day !== null && duty.recurrence_day !== undefined ? duty.recurrence_day : '0'
+    }
+  } else {
+    document.getElementById('dmTitle').value = ''; document.getElementById('dmDesc').value = ''
+    document.getElementById('dmType').value = 'other'; document.getElementById('dmRecurrence').value = 'one_time'
+    document.getElementById('dmTour').value = ''; document.getElementById('dmRequiresReport').checked = false
+    document.getElementById('dmDate').value = ''; document.getElementById('dmDay').value = '0'
+  }
+  onDutyRecurrenceChange()
+  document.getElementById('dutyModal').classList.remove('hidden')
+}
+function closeDutyModal() { document.getElementById('dutyModal').classList.add('hidden'); _editDutyId = null }
+
+function onDutyRecurrenceChange() {
+  const rec = document.getElementById('dmRecurrence').value
+  document.getElementById('dmDateRow').classList.toggle('hidden', rec !== 'one_time')
+  document.getElementById('dmDayRow').classList.toggle('hidden', rec !== 'weekly' && rec !== 'specific_day')
+}
+
+async function saveDuty() {
+  const title = document.getElementById('dmTitle').value.trim()
+  if (!title) { document.getElementById('dutyModalErr').textContent = 'Title is required'; document.getElementById('dutyModalErr').classList.remove('hidden'); return }
+  const rec = document.getElementById('dmRecurrence').value
+  const payload = {
+    action: _editDutyId ? 'update' : 'create',
+    title,
+    description:     document.getElementById('dmDesc').value.trim() || null,
+    duty_type:       document.getElementById('dmType').value,
+    recurrence:      rec,
+    recurrence_day:  (rec === 'weekly' || rec === 'specific_day') ? parseInt(document.getElementById('dmDay').value) : null,
+    specific_date:   rec === 'one_time' ? (document.getElementById('dmDate').value || null) : null,
+    tour_specific:   document.getElementById('dmTour').value ? parseInt(document.getElementById('dmTour').value) : null,
+    requires_report: document.getElementById('dmRequiresReport').checked
+  }
+  if (_editDutyId) payload.id = _editDutyId
+  const btn = document.getElementById('dutyModalSubmitBtn')
+  btn.disabled = true; btn.textContent = 'Saving...'
+  try {
+    const res = await fetch(`${API}/manage-duties`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify(payload)
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      document.getElementById('dutyModalErr').textContent = data.error || 'Failed'
+      document.getElementById('dutyModalErr').classList.remove('hidden')
+      return
+    }
+    closeDutyModal(); loadDuties()
+  } catch(e) {
+    document.getElementById('dutyModalErr').textContent = e.message
+    document.getElementById('dutyModalErr').classList.remove('hidden')
+  } finally { btn.disabled = false }
+}
+
+async function deleteDuty(id) {
+  if (!confirm('Delete this duty?')) return
+  try {
+    const res = await fetch(`${API}/manage-duties`, {
+      method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+      body: JSON.stringify({ action:'delete', id })
+    })
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return }
+    loadDuties()
+  } catch(e) { alert(e.message) }
+}
+
 // ── OFFICER BUTTONS ───────────────────────────────────────────────────────────
 function showOfficerButtons() {
   if (AUTH.isOfficer()) {
@@ -1446,11 +1816,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   AUTH.updateNav()
   showOfficerButtons()
   loadDashboard()
+  loadDuties()
 
   // Refresh shift status every 5 minutes
   setInterval(() => {
     if (dashData) renderShift()
   }, 300000)
+})
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'bulletinEditModal') closeBulletinEdit()
+  if (e.target.id === 'eventEditModal')    closeEventEdit()
+  if (e.target.id === 'markCompleteModal') closeMarkCompleteModal()
+  if (e.target.id === 'dutyModal')         closeDutyModal()
 })
 </script>
 </body>
