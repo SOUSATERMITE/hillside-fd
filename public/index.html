@@ -62,74 +62,80 @@
 
 <div class="max-w-3xl mx-auto px-3 py-4 space-y-4">
 
-  <!-- DAILY SPOTLIGHT -->
-  <div id="spotlightCard" class="rounded-2xl overflow-hidden shadow-lg">
+  <!-- DAILY BRIEFING -->
+  <div id="briefingCard" class="rounded-2xl overflow-hidden shadow-lg">
+
     <!-- Header -->
-    <div style="background:#1e3a5f;" class="px-4 py-3 flex items-center justify-between">
+    <div style="background:#1e3a5f;" class="px-4 py-3 flex items-start justify-between">
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-extrabold tracking-widest" style="font-size:0.72rem;">HILLSIDE FIRE DEPARTMENT — DAILY BRIEFING</div>
+        <div id="briefingDate" class="text-blue-200 text-xs mt-0.5">Loading...</div>
+      </div>
+      <div class="flex items-center gap-2 ml-3 flex-shrink-0 mt-0.5">
+        <div id="briefingDot" class="w-3 h-3 rounded-full border-2 border-white"></div>
+        <button onclick="loadDashboard();loadDuties()" class="text-blue-300 hover:text-white text-xs" style="min-height:0;background:none;border:none;cursor:pointer;">↻</button>
+      </div>
+    </div>
+
+    <!-- Row 1: Quick Stats (4 boxes, tappable) -->
+    <div class="grid grid-cols-4 bg-white border-b border-gray-100">
+      <div id="statSick" onclick="scrollToBriefingSick()" class="px-2 py-3 text-center cursor-pointer hover:bg-gray-50 border-r border-gray-100 transition select-none">
+        <div class="font-bold text-gray-400 uppercase tracking-widest mb-0.5" style="font-size:0.58rem;">🤒 Sick</div>
+        <div id="briefingSick" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+      <div id="statRecall" onclick="window.location='/recall'" class="px-2 py-3 text-center cursor-pointer hover:bg-gray-50 border-r border-gray-100 transition select-none">
+        <div class="font-bold text-gray-400 uppercase tracking-widest mb-0.5" style="font-size:0.58rem;">🔄 Recalled</div>
+        <div id="briefingRecall" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+      <div id="statVac" onclick="window.location='/vacation'" class="px-2 py-3 text-center cursor-pointer hover:bg-gray-50 border-r border-gray-100 transition select-none">
+        <div class="font-bold text-gray-400 uppercase tracking-widest mb-0.5" style="font-size:0.58rem;">📋 Vacation</div>
+        <div id="briefingVac" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+      <div id="statIssues" onclick="scrollToApparatus()" class="px-2 py-3 text-center cursor-pointer hover:bg-gray-50 transition select-none">
+        <div class="font-bold text-gray-400 uppercase tracking-widest mb-0.5" style="font-size:0.58rem;">⚠️ Issues</div>
+        <div id="briefingIssues" class="text-2xl font-extrabold text-gray-800">—</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Today's Schedule + Shift Duties (side by side on sm+) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 bg-white border-b border-gray-100 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
       <div>
-        <div id="spotlightTitle" class="text-white font-extrabold text-base tracking-wide">TODAY'S SPOTLIGHT</div>
-        <div id="spotlightSub" class="text-blue-200 text-xs mt-0.5"></div>
+        <div class="px-3 py-1.5 flex items-center justify-between" style="background:#eff6ff;">
+          <span class="font-bold text-blue-900 uppercase tracking-widest" style="font-size:0.6rem;">📅 Today's Schedule</span>
+          <a href="/apparatus" class="text-xs text-blue-600 font-semibold hover:underline" style="min-height:0;">All →</a>
+        </div>
+        <div id="briefingEvents" class="px-3 py-1">
+          <div class="py-3 text-sm text-gray-400 italic text-center">Loading...</div>
+        </div>
       </div>
-      <button onclick="loadDuties()" class="text-blue-200 hover:text-white text-xs font-semibold" style="min-height:0;background:none;border:none;cursor:pointer;">↻ Refresh</button>
-    </div>
-
-    <!-- Sub-section 1: Today's Schedule -->
-    <div class="bg-white border-b border-gray-100">
-      <div class="px-4 py-2 flex items-center justify-between" style="background:#dbeafe;">
-        <span class="text-xs font-bold text-blue-900 uppercase tracking-wide">📅 Today's Schedule</span>
-        <a href="/apparatus" class="text-xs text-blue-700 font-semibold hover:underline" style="min-height:0;">View all →</a>
-      </div>
-      <div id="spotlightEvents" class="px-4 py-2 divide-y divide-gray-50">
-        <div class="py-3 text-sm text-gray-400 text-center">Loading...</div>
-      </div>
-    </div>
-
-    <!-- Sub-section 2: Shift Duties -->
-    <div class="bg-white border-b border-gray-100">
-      <div class="px-4 py-2 flex items-center justify-between" style="background:#dbeafe;">
-        <span class="text-xs font-bold text-blue-900 uppercase tracking-wide">✅ Shift Duties</span>
-        <button id="addDutyBtn" onclick="openDutyModal(null)" class="hidden text-xs font-bold text-blue-700 border border-blue-700 rounded-lg px-2 py-0.5 hover:bg-blue-50 transition" style="min-height:0;">+ Add Duty</button>
-      </div>
-      <div id="spotlightDuties" class="divide-y divide-gray-50">
-        <div class="px-4 py-6 text-center text-gray-400 text-sm">Loading...</div>
+      <div>
+        <div class="px-3 py-1.5 flex items-center justify-between" style="background:#eff6ff;">
+          <span class="font-bold text-blue-900 uppercase tracking-widest" style="font-size:0.6rem;">✅ Shift Duties</span>
+          <button id="addDutyBtn" onclick="openDutyModal(null)" class="hidden text-xs font-bold text-blue-700 border border-blue-700 rounded-lg px-2 py-0.5 hover:bg-blue-50 transition" style="min-height:0;">+ Add</button>
+        </div>
+        <div id="briefingDuties" class="divide-y divide-gray-50">
+          <div class="px-3 py-4 text-center text-gray-400 text-sm">Loading...</div>
+        </div>
       </div>
     </div>
 
-    <!-- Sub-section 3: Yesterday's Incomplete -->
+    <!-- Row 3: Currently Out Sick (hidden when none) -->
+    <div id="briefingSickSection" class="hidden bg-white border-b border-gray-100">
+      <div class="px-3 py-1.5" style="background:#fef2f2;">
+        <span class="font-bold text-red-700 uppercase tracking-widest" style="font-size:0.6rem;">🤒 Currently Out Sick</span>
+      </div>
+      <div id="briefingSickList" class="px-4 py-1 divide-y divide-gray-50"></div>
+    </div>
+
+    <!-- Yesterday's Incomplete (hidden when none) -->
     <div id="spotlightYesterdaySection" class="hidden bg-white">
-      <div class="px-4 py-2" style="background:#fee2e2;">
-        <span class="text-xs font-bold text-red-700 uppercase tracking-wide">⚠️ Yesterday's Incomplete</span>
+      <div class="px-3 py-1.5" style="background:#fee2e2;">
+        <span class="font-bold text-red-700 uppercase tracking-widest" style="font-size:0.6rem;">⚠️ Yesterday's Incomplete</span>
         <span id="spotlightYesterdayLabel" class="text-xs text-red-500 ml-2"></span>
       </div>
       <div id="spotlightYesterday" class="divide-y divide-gray-50"></div>
     </div>
-  </div>
 
-  <!-- SECTION 1: SHIFT STATUS -->
-  <div id="shiftCard" class="section-card overflow-hidden">
-    <div id="shiftBanner" class="px-4 py-3 flex items-center justify-between">
-      <div>
-        <div id="shiftTitle" class="text-lg font-extrabold text-white">Loading...</div>
-        <div id="shiftSub"   class="text-sm text-white text-opacity-80 mt-0.5"></div>
-      </div>
-      <div id="statusDot" class="w-5 h-5 rounded-full border-2 border-white flex-shrink-0"></div>
-    </div>
-    <div id="shiftDetails" class="px-4 py-3 grid grid-cols-3 gap-3 text-center border-t border-gray-100">
-      <div>
-        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sick</div>
-        <div id="sickCount" class="text-2xl font-extrabold text-gray-800">—</div>
-      </div>
-      <div>
-        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Recalled Today</div>
-        <div id="recallCount" class="text-2xl font-extrabold text-gray-800">—</div>
-      </div>
-      <div>
-        <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Pending Vacation</div>
-        <div id="vacCount" class="text-2xl font-extrabold text-gray-800">—</div>
-        <a href="/vacation" class="text-xs text-blue-600 font-semibold">Review →</a>
-      </div>
-    </div>
-    <div id="sickList" class="hidden px-4 pb-3 border-t border-gray-100"></div>
   </div>
 
   <!-- SECTION 2: BULLETIN BOARD -->
@@ -257,7 +263,7 @@
   </div>
 
   <!-- SECTION 5: APPARATUS STATUS -->
-  <div class="section-card">
+  <div id="apparatusCard" class="section-card">
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
       <h2 class="font-extrabold text-gray-800 text-base">🚒 Apparatus Status</h2>
       <a href="/apparatus" class="text-sm font-bold text-green-700 hover:text-green-800">View All →</a>
@@ -609,48 +615,85 @@ async function loadDashboard() {
   }
 }
 
-// ── SECTION 1: SHIFT ─────────────────────────────────────────────────────────
+// ── SECTION 1: DAILY BRIEFING ────────────────────────────────────────────────
 function renderShift() {
-  const { shift, sick, recalledToday, pendingVacation } = dashData
-  const g = shift.currentGroup
+  const { shift, sick, recalledToday, pendingVacation, apparatus } = dashData
+  const g     = shift.currentGroup
   const start = new Date(shift.shiftStart)
-  const startET = start.toLocaleDateString('en-US', { timeZone:'America/New_York', weekday:'short', month:'short', day:'numeric' })
+  const dayName  = start.toLocaleDateString('en-US', { timeZone:'America/New_York', weekday:'long' })
+  const fullDate = start.toLocaleDateString('en-US', { timeZone:'America/New_York', month:'long', day:'numeric', year:'numeric' })
+  const startTime = start.toLocaleTimeString('en-US', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true })
 
-  document.getElementById('shiftTitle').textContent = `Group ${g} On Duty`
-  document.getElementById('shiftSub').textContent   = `Tour started ${startET} at 07:30`
+  document.getElementById('briefingDate').textContent =
+    `${dayName}, ${fullDate}  ·  Group ${g} On Duty  ·  Tour started at ${startTime}`
 
-  const sickCount   = sick.length
-  const recallCount = recalledToday.length
-  const vacCount    = pendingVacation.length
+  const sickCount      = sick.length
+  const recallCount    = recalledToday.length
+  const vacCount       = pendingVacation.length
+  const apparatusIssues = (apparatus || []).filter(a =>
+    a.status === 'out_of_service' || a.critical_high > 0
+  ).length
 
-  document.getElementById('sickCount').textContent   = sickCount
-  document.getElementById('recallCount').textContent = recallCount
-  document.getElementById('vacCount').textContent    = vacCount
+  document.getElementById('briefingSick').textContent    = sickCount
+  document.getElementById('briefingRecall').textContent  = recallCount
+  document.getElementById('briefingVac').textContent     = vacCount
+  document.getElementById('briefingIssues').textContent  = apparatusIssues
 
-  // Status: red = uncovered sick, yellow = covered or pending, green = all clear
+  // Color stat cells
   const uncovered = sickCount - recallCount
-  let bannerColor, dotColor
-  if (uncovered > 0)                       { bannerColor = 'bg-red-700';    dotColor = 'bg-red-300' }
-  else if (sickCount > 0 || vacCount > 0)  { bannerColor = 'bg-yellow-600'; dotColor = 'bg-yellow-200' }
-  else                                      { bannerColor = 'bg-green-700';  dotColor = 'bg-green-300' }
+  const sickEl    = document.getElementById('statSick')
+  const sickNum   = document.getElementById('briefingSick')
+  const vacEl     = document.getElementById('statVac')
+  const vacNum    = document.getElementById('briefingVac')
+  const issueEl   = document.getElementById('statIssues')
+  const issueNum  = document.getElementById('briefingIssues')
 
-  document.getElementById('shiftBanner').className = `px-4 py-3 flex items-center justify-between ${bannerColor}`
-  document.getElementById('statusDot').className   = `w-5 h-5 rounded-full border-2 border-white flex-shrink-0 ${dotColor}`
+  sickEl.style.background  = uncovered > 0 ? '#fee2e2' : sickCount > 0 ? '#fef9c3' : ''
+  sickNum.style.color      = uncovered > 0 ? '#dc2626' : sickCount > 0 ? '#92400e' : ''
+  vacEl.style.background   = vacCount > 0 ? '#fef9c3' : ''
+  vacNum.style.color       = vacCount > 0 ? '#92400e' : ''
+  issueEl.style.background = apparatusIssues > 0 ? '#fee2e2' : ''
+  issueNum.style.color     = apparatusIssues > 0 ? '#dc2626' : ''
+
+  // Status dot
+  let dotCls
+  if (uncovered > 0)                                          dotCls = 'bg-red-400'
+  else if (sickCount > 0 || vacCount > 0 || apparatusIssues > 0) dotCls = 'bg-yellow-300'
+  else                                                        dotCls = 'bg-green-400'
+  document.getElementById('briefingDot').className = `w-3 h-3 rounded-full border-2 border-white ${dotCls}`
 
   // Sick list
+  const sickSection = document.getElementById('briefingSickSection')
+  const sickList    = document.getElementById('briefingSickList')
   if (sickCount > 0) {
-    const sl = document.getElementById('sickList')
-    sl.classList.remove('hidden')
-    sl.innerHTML = '<div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Currently Out Sick</div>' +
-      sick.map(s => {
-        const ff = s.firefighters
-        const days = Math.floor((Date.now() - new Date(s.marked_sick_date)) / 86400000)
-        return `<div class="flex items-center justify-between py-1">
-          <span class="text-sm font-semibold text-gray-800">${esc(ff?.name || '—')} <span class="text-xs font-normal text-gray-400">${esc(ff?.rank||'')}</span></span>
+    sickSection.classList.remove('hidden')
+    sickList.innerHTML = sick.map(s => {
+      const ff       = s.firefighters
+      const days     = Math.floor((Date.now() - new Date(s.marked_sick_date)) / 86400000)
+      const covered  = recalledToday.some(r => r.firefighters?.id === ff?.id)
+      return `<div class="flex items-center justify-between py-2">
+        <span class="text-sm font-semibold text-gray-800">${esc(ff?.name || '—')}
+          <span class="text-xs font-normal text-gray-400">${esc(ff?.rank||'')}</span></span>
+        <div class="flex items-center gap-2">
           <span class="text-xs text-gray-500">${days === 0 ? 'today' : days === 1 ? '1 day' : `${days} days`}</span>
-        </div>`
-      }).join('')
+          ${covered
+            ? '<span class="text-xs bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">Covered</span>'
+            : '<span class="text-xs bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">Uncovered</span>'}
+        </div>
+      </div>`
+    }).join('')
+  } else {
+    sickSection.classList.add('hidden')
   }
+}
+
+function scrollToBriefingSick() {
+  const el = document.getElementById('briefingSickSection')
+  if (el && !el.classList.contains('hidden')) el.scrollIntoView({ behavior:'smooth', block:'nearest' })
+}
+function scrollToApparatus() {
+  const el = document.getElementById('apparatusCard')
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'start' })
 }
 
 // ── SECTION 2: BULLETINS ──────────────────────────────────────────────────────
@@ -1585,16 +1628,13 @@ async function loadDuties() {
 function renderSpotlight() {
   if (!spotlightData) return
   const { date, events, duties_today, duties_yesterday_incomplete } = spotlightData
-  const d = new Date(date.today + 'T12:00:00')
-  const dateDisplay = d.toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
-  document.getElementById('spotlightSub').textContent = `${DAYS[d.getDay()]}, ${dateDisplay}  ·  Group ${date.currentGroup} On Duty`
   renderSpotlightEvents(events)
   renderSpotlightDuties(duties_today, date.today)
   renderYesterdayIncomplete(duties_yesterday_incomplete, date.yesterday, date.yesterdayGroup)
 }
 
 function renderSpotlightEvents(events) {
-  const el = document.getElementById('spotlightEvents')
+  const el = document.getElementById('briefingEvents')
   if (!events || !events.length) {
     el.innerHTML = '<div class="py-3 text-sm text-gray-400 italic text-center">No events scheduled for this shift</div>'
     return
@@ -1657,7 +1697,7 @@ function renderDutyCard(d, dateStr, isYesterday) {
 }
 
 function renderSpotlightDuties(duties, todayStr) {
-  const el = document.getElementById('spotlightDuties')
+  const el = document.getElementById('briefingDuties')
   if (AUTH.isOfficer()) document.getElementById('addDutyBtn').classList.remove('hidden')
   if (!duties || !duties.length) {
     el.innerHTML = '<div class="px-4 py-4 text-sm text-gray-400 italic text-center">No duties assigned for this shift</div>'
