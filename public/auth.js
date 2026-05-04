@@ -66,10 +66,23 @@ const AUTH = (() => {
   function buildOfficerOptions() {
     const regular = officersList.filter(o => !o.is_temporary)
     const acting  = officersList.filter(o => o.is_temporary)
+    const chiefs   = regular.filter(o => o.role === 'admin')
+    const captains = regular.filter(o => o.role === 'officer')
+    const ffs      = regular.filter(o => o.role === 'firefighter')
     let html = '<option value="">Select your name...</option>'
-    if (regular.length) {
-      html += '<optgroup label="Officers">'
-      for (const o of regular) html += `<option value="${o.name}">${o.display_name}</option>`
+    if (chiefs.length) {
+      html += '<optgroup label="Chief &amp; Deputy Chiefs">'
+      for (const o of chiefs) html += `<option value="${o.name}">${o.display_name}</option>`
+      html += '</optgroup>'
+    }
+    if (captains.length) {
+      html += '<optgroup label="Captains">'
+      for (const o of captains) html += `<option value="${o.name}">${o.display_name}</option>`
+      html += '</optgroup>'
+    }
+    if (ffs.length) {
+      html += '<optgroup label="Firefighters">'
+      for (const o of ffs) html += `<option value="${o.name}">${o.display_name}</option>`
       html += '</optgroup>'
     }
     if (acting.length) {
