@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes, stationIssuesRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -94,7 +94,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('work_orders')
-        .select('id, title, description, location, priority, status, submitted_by, assigned_to, created_at, updated_at')
+        .select('id, title, description, location, issue_type, priority, status, submitted_by, assigned_to, created_at, updated_at')
         .not('status', 'in', '("completed","cancelled")')
         .order('created_at', { ascending: false }),
 
@@ -107,7 +107,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus')
-        .select('id, unit_name, unit_type, status, location, last_updated, updated_by')
+        .select('id, unit_name, unit_type, status, location, notes, last_updated, updated_by, primary_officer_name, secondary_officer_name')
         .eq('active', true)
         .order('unit_name', { ascending: true }),
 
@@ -128,7 +128,15 @@ exports.handler = async (event) => {
         .eq('finding_type', 'manual_report')
         .in('status', ['completed', 'cancelled'])
         .gte('completed_date', new Date(now - 7 * 86400000).toISOString().split('T')[0])
-        .order('completed_date', { ascending: false })
+        .order('completed_date', { ascending: false }),
+
+      supabase
+        .from('work_orders')
+        .select('id, title, location, issue_type, priority, status, submitted_by, created_at')
+        .not('status', 'in', '("completed","cancelled")')
+        .in('priority', ['urgent', 'high'])
+        .order('priority', { ascending: true })
+        .order('created_at', { ascending: true })
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -181,6 +189,7 @@ exports.handler = async (event) => {
         apparatus:           buildApparatusWithCounts(apparatusRes.data || [], apparatusFindings),
         manual_issues:       manualIssues,
         recently_resolved:   resolvedRes.data  || [],
+        station_issues:      stationIssuesRes.data || [],
         schedule
       })
     }

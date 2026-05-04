@@ -19,11 +19,12 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   const body = JSON.parse(event.body || '{}')
   const { action } = body
-  const isAdmin = officer.role === 'admin'
+  const isAdmin  = officer.role === 'admin'
+  const isOfficer = officer.role === 'officer' || officer.role === 'admin'
   const priorities = ['low', 'medium', 'high', 'urgent']
 
   if (action === 'submit') {
-    const { title, description, location, priority } = body
+    const { title, description, location, priority, issue_type } = body
     if (!title?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Title required' }) }
 
     const pri = priorities.includes(priority) ? priority : 'medium'
@@ -32,6 +33,7 @@ exports.handler = async (event) => {
       title:        title.trim().slice(0, 200),
       description:  description?.trim().slice(0, 1000) || null,
       location:     location?.trim().slice(0, 200)     || null,
+      issue_type:   issue_type?.trim().slice(0, 100)   || null,
       priority:     pri,
       status:       'submitted',
       submitted_by: officer.display_name,
@@ -44,6 +46,7 @@ exports.handler = async (event) => {
   }
 
   if (action === 'update') {
+    if (!isOfficer) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Officers only' }) }
     const { id, status, assigned_to } = body
     if (!id || !status) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and status required' }) }
 

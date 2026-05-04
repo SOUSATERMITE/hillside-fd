@@ -82,7 +82,8 @@ exports.handler = async (event) => {
     if (!admin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Admin required' }) }
 
     if (action === 'add') {
-      const { unit_name, unit_type, status, location, notes } = body
+      const { unit_name, unit_type, status, location, notes,
+              primary_officer_id, primary_officer_name, secondary_officer_id, secondary_officer_name } = body
       if (!unit_name || !unit_type) return { statusCode: 400, headers, body: JSON.stringify({ error: 'unit_name and unit_type required' }) }
 
       const { data, error } = await supabase.from('apparatus').insert({
@@ -91,11 +92,34 @@ exports.handler = async (event) => {
         status:    status || 'in_service',
         location:  location || 'Station 1',
         notes:     notes || null,
+        primary_officer_id:     primary_officer_id   || null,
+        primary_officer_name:   primary_officer_name?.trim() || null,
+        secondary_officer_id:   secondary_officer_id   || null,
+        secondary_officer_name: secondary_officer_name?.trim() || null,
         last_updated: new Date().toISOString(),
         updated_by:   officer.display_name,
         active:    true
       }).select().single()
 
+      if (error) throw error
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
+    }
+
+    if (action === 'edit') {
+      const { id, unit_name, unit_type, status, location, notes,
+              primary_officer_id, primary_officer_name, secondary_officer_id, secondary_officer_name } = body
+      if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
+      const update = {}
+      if (unit_name              !== undefined) update.unit_name              = unit_name.trim().toUpperCase()
+      if (unit_type              !== undefined) update.unit_type              = unit_type.trim()
+      if (status                 !== undefined) update.status                 = status
+      if (location               !== undefined) update.location               = location || null
+      if (notes                  !== undefined) update.notes                  = notes || null
+      if (primary_officer_id     !== undefined) update.primary_officer_id     = primary_officer_id || null
+      if (primary_officer_name   !== undefined) update.primary_officer_name   = primary_officer_name?.trim() || null
+      if (secondary_officer_id   !== undefined) update.secondary_officer_id   = secondary_officer_id || null
+      if (secondary_officer_name !== undefined) update.secondary_officer_name = secondary_officer_name?.trim() || null
+      const { data, error } = await supabase.from('apparatus').update(update).eq('id', id).select().single()
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(data) }
     }

@@ -15,6 +15,7 @@ exports.handler = async (event) => {
 
   const officer = await verifySession(event)
   if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
+  if (officer.role === 'firefighter') return { statusCode: 403, headers, body: JSON.stringify({ error: 'Officers only' }) }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   const body = JSON.parse(event.body || '{}')

@@ -21,8 +21,10 @@ const AUTH = (() => {
   }
 
   function isLoggedIn() { return !!getSession() }
+  function isMember()  { return !!getSession() }   // any role: officer, admin, firefighter
   function isOfficer() { const s = getSession(); return !!(s && (s.role === 'officer' || s.role === 'admin')) }
-  function isAdmin() { const s = getSession(); return !!(s && s.role === 'admin') }
+  function isAdmin()   { const s = getSession(); return !!(s && s.role === 'admin') }
+  function isFF()      { const s = getSession(); return !!(s && s.role === 'firefighter') }
   function getDisplayName() { return getSession()?.display_name || null }
   function getHeaders() {
     const s = getSession()
@@ -234,7 +236,7 @@ const AUTH = (() => {
   document.addEventListener('DOMContentLoaded', init)
 
   return {
-    getSession, isLoggedIn, isOfficer, isAdmin, getDisplayName, getHeaders,
+    getSession, isLoggedIn, isMember, isOfficer, isAdmin, isFF, getDisplayName, getHeaders,
     showLoginModal, hideModal, showChangePinModal,
     logout, updateNav, loadOfficers, getActingOfficers,
     _doLogin, _doChangePin

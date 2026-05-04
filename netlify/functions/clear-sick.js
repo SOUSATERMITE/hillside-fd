@@ -16,6 +16,7 @@ exports.handler = async (event) => {
 
   const officer = await verifySession(event)
   if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
+  if (officer.role === 'firefighter') return { statusCode: 403, headers, body: JSON.stringify({ error: 'Officers only' }) }
 
   try {
     const { sick_log_id } = JSON.parse(event.body || '{}')

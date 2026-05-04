@@ -24,18 +24,39 @@ async function sendEmail({ to, subject, html, text }) {
   }
 }
 
-// Email all DCs (and optionally Chief) about a finding
-async function notifyFinding(supabase, { unitName, findingType, description, priority, officerName, timestamp }, includingChief = false) {
+async function getApparatusOfficerEmails(supabase, apparatusId) {
+  if (!apparatusId) return []
+  const { data: ap } = await supabase
+    .from('apparatus')
+    .select('primary_officer_name, secondary_officer_name')
+    .eq('id', apparatusId)
+    .single()
+  if (!ap) return []
+  const names = [ap.primary_officer_name, ap.secondary_officer_name].filter(Boolean)
+  if (!names.length) return []
+  const emailSet = new Set()
+  for (const name of names) {
+    const { data: ff } = await supabase.from('firefighters').select('email').ilike('name', `%${name.split(' ').pop()}%`).eq('active', true).limit(1)
+    if (ff?.[0]?.email) emailSet.add(ff[0].email)
+  }
+  return Array.from(emailSet)
+}
+
+// Email all DCs (and optionally Chief) about a finding, plus apparatus assigned officers
+async function notifyFinding(supabase, { unitName, findingType, description, priority, officerName, timestamp, apparatusId }, includingChief = false) {
   const rankFilter = ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4']
   if (includingChief) rankFilter.push('Chief')
 
-  const { data: recipients } = await supabase
-    .from('firefighters')
-    .select('name, email')
-    .in('rank', rankFilter)
-    .eq('active', true)
+  const [recipientsRes, apOfficerEmails] = await Promise.all([
+    supabase.from('firefighters').select('name, email').in('rank', rankFilter).eq('active', true),
+    getApparatusOfficerEmails(supabase, apparatusId)
+  ])
 
-  const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+  const emailSet = new Set([
+    ...(recipientsRes.data || []).filter(r => r.email).map(r => r.email),
+    ...apOfficerEmails
+  ])
+  const emails = Array.from(emailSet)
   if (!emails.length) return
 
   const priColor = priority === 'critical' ? '#dc2626' : priority === 'high' ? '#d97706' : priority === 'medium' ? '#2563eb' : '#6b7280'
@@ -71,14 +92,16 @@ async function notifyFinding(supabase, { unitName, findingType, description, pri
 }
 
 // Email DCs when a daily or weekly check has failed items
-async function notifyFailedCheck(supabase, { unitName, officerName, tour, checkType, failedItems, timestamp }) {
-  const { data: recipients } = await supabase
-    .from('firefighters')
-    .select('name, email')
-    .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4'])
-    .eq('active', true)
-
-  const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+async function notifyFailedCheck(supabase, { unitName, officerName, tour, checkType, failedItems, timestamp, apparatusId }) {
+  const [recipientsRes, apOfficerEmails] = await Promise.all([
+    supabase.from('firefighters').select('name, email').in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4']).eq('active', true),
+    getApparatusOfficerEmails(supabase, apparatusId)
+  ])
+  const emailSet = new Set([
+    ...(recipientsRes.data || []).filter(r => r.email).map(r => r.email),
+    ...apOfficerEmails
+  ])
+  const emails = Array.from(emailSet)
   if (!emails.length) return
 
   const checkLabel = checkType === 'weekly_check' ? 'Weekly' : 'Daily'
@@ -119,14 +142,16 @@ async function notifyFailedCheck(supabase, { unitName, officerName, tour, checkT
 }
 
 // Email DCs + Chief about an auto-generated equipment check finding
-async function notifyCheckIssue(supabase, { unitName, itemLabel, itemNotes, officerName, priority, timestamp }) {
-  const { data: recipients } = await supabase
-    .from('firefighters')
-    .select('name, email')
-    .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4', 'Chief'])
-    .eq('active', true)
-
-  const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+async function notifyCheckIssue(supabase, { unitName, itemLabel, itemNotes, officerName, priority, timestamp, apparatusId }) {
+  const [recipientsRes, apOfficerEmails] = await Promise.all([
+    supabase.from('firefighters').select('name, email').in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4', 'Chief']).eq('active', true),
+    getApparatusOfficerEmails(supabase, apparatusId)
+  ])
+  const emailSet = new Set([
+    ...(recipientsRes.data || []).filter(r => r.email).map(r => r.email),
+    ...apOfficerEmails
+  ])
+  const emails = Array.from(emailSet)
   if (!emails.length) return
 
   const priColor = priority === 'high' ? '#d97706' : '#2563eb'
@@ -249,7 +274,8 @@ exports.handler = async (event) => {
           tour: tour || '?',
           checkType: check_type,
           failedItems,
-          timestamp
+          timestamp,
+          apparatusId: apparatus_id
         })
       }
 
@@ -291,7 +317,8 @@ exports.handler = async (event) => {
             itemNotes:   item.notes?.trim() || null,
             officerName: officer.display_name,
             priority:    isScba ? 'high' : 'medium',
-            timestamp
+            timestamp,
+            apparatusId: apparatus_id
           })
         }
       }
@@ -348,7 +375,8 @@ exports.handler = async (event) => {
           description: description.trim(),
           priority: pri,
           officerName: officer.display_name,
-          timestamp
+          timestamp,
+          apparatusId: apparatus_id
         }, includingChief)
       }
 

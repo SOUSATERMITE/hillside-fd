@@ -353,6 +353,7 @@ function renderAll() {
   const banner = document.getElementById('oosBanner')
   const grid   = document.getElementById('apparatusGrid')
   const isOff  = AUTH.isOfficer()
+  const isMem  = AUTH.isMember()
 
   const oos  = apparatusData.filter(u => u.status === 'out_of_service')
   const rest = apparatusData.filter(u => u.status !== 'out_of_service')
@@ -365,10 +366,10 @@ function renderAll() {
     banner.classList.add('hidden')
   }
 
-  grid.innerHTML = sorted.map(u => renderCard(u, isOff)).join('')
+  grid.innerHTML = sorted.map(u => renderCard(u, isOff, isMem)).join('')
 }
 
-function renderCard(u, isOff) {
+function renderCard(u, isOff, isMem) {
   const st       = STATUS_CFG[u.status] || STATUS_CFG.in_service
   const isExp    = expandedId === u.id
   const tab      = activeTab[u.id] || 'status'
@@ -410,11 +411,11 @@ function renderCard(u, isOff) {
     </button>
 
     <!-- Expanded content -->
-    ${isExp ? renderExpanded(u, tab, isOff) : ''}
+    ${isExp ? renderExpanded(u, tab, isOff, isMem) : ''}
   </div>`
 }
 
-function renderExpanded(u, tab, isOff) {
+function renderExpanded(u, tab, isOff, isMem) {
   const findings = u.findings || []
 
   const tabBtn = (id, label, badge) => {
@@ -432,13 +433,13 @@ function renderExpanded(u, tab, isOff) {
   if (tab === 'status') {
     content = renderStatusTab(u, isOff)
   } else if (tab === 'findings') {
-    content = renderFindingsTab(u, openFindings, isOff)
+    content = renderFindingsTab(u, openFindings, isOff, isMem)
   } else if (tab === 'repairs') {
     content = renderRepairsTab(u, repairs, isOff)
   } else if (tab === 'scheduled') {
     content = renderScheduledTab(u, scheduled, isOff)
   } else if (tab === 'checks') {
-    content = renderChecksTab(u, isOff)
+    content = renderChecksTab(u, isOff, isMem)
   }
 
   return `<div class="border-t border-gray-200">
@@ -500,15 +501,15 @@ function renderStatusTab(u, isOff) {
   </div>`
 }
 
-function renderFindingsTab(u, openFindings, isOff) {
-  const addBtn = isOff ? `
+function renderFindingsTab(u, openFindings, isOff, isMem) {
+  const addBtn = isMem ? `
     <div class="flex gap-2 mb-4">
       <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','damage')" class="flex-1 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Report Damage</button>
       <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','repair_needed')" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Repair Needed</button>
       <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','inspection')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Inspection</button>
     </div>` : ''
 
-  const checkBtns = isOff ? `
+  const checkBtns = isMem ? `
     <div class="flex gap-2 mb-4">
       <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','daily_check')" class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Daily Check</button>
       <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','weekly_check')" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Weekly Check</button>
@@ -582,12 +583,12 @@ function renderScheduledTab(u, scheduled, isOff) {
   return `${addBtn}${list}`
 }
 
-function renderChecksTab(u, isOff) {
+function renderChecksTab(u, isOff, isMem) {
   const allFindings = u.findings || []
   const dailyChecks  = allFindings.filter(f => f.finding_type === 'daily_check').slice(0, 10)
   const weeklyChecks = allFindings.filter(f => f.finding_type === 'weekly_check').slice(0, 5)
 
-  const checkBtns = isOff ? `
+  const checkBtns = isMem ? `
     <div class="flex gap-2 mb-4">
       <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','daily_check')" class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Daily Check</button>
       <button onclick="openCheckModal('${u.id}','${esc(u.unit_name)}','${esc(u.unit_type)}','weekly_check')" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">✓ Weekly Check</button>
