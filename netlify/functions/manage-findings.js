@@ -428,7 +428,7 @@ exports.handler = async (event) => {
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid action' }) }
   } catch (e) {
-    console.error('[manage-findings] error:', e.message)
-    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }
+    console.error('[manage-findings] error:', e.message, JSON.stringify(e))
+    return { statusCode: 500, headers, body: JSON.stringify({ error: e.message || e.details || JSON.stringify(e) || 'Internal server error' }) }
   }
 }
