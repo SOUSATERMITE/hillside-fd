@@ -1440,52 +1440,70 @@ function renderEvents() {
        </div>`
     : ''
 
+  const evIsOff = AUTH.isOfficer(), evMyName = AUTH.getDisplayName(), evIsAdm = AUTH.isAdmin()
+
   const rows = Object.entries(byDate).map(([date, evs]) => {
     const g = groupForDate(new Date(date + 'T11:30:00Z'))
     const isToday = date === dashData.shift.todayStr
-    return `<div class="px-4 py-2 ${isToday ? 'bg-green-50' : ''}">
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-xs font-extrabold uppercase tracking-wide ${isToday ? 'text-green-700' : 'text-gray-700'}">${fmtDate(date)}${isToday ? ' — TODAY' : ''}</span>
-        <span class="badge bg-gray-700 text-white">Grp ${g} on duty</span>
-      </div>
-      ${evs.map(e => {
-        const catCls = CAT_COLORS[e.category] || CAT_COLORS.other
-        const groupBadge = e.group_number ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Group ${e.group_number} only</span>` : ''
-        const evIsOff = AUTH.isOfficer(), evMyName = AUTH.getDisplayName(), evIsAdm = AUTH.isAdmin()
-        const evCanEdit = evIsOff && (evIsAdm || e.created_by === evMyName)
-        const evCanDel  = evIsAdm || (evIsOff && e.created_by === evMyName)
-        const evEditBtn = evCanEdit ? `<button onclick="openEventEdit('${e.id}')" class="text-xs text-blue-500 hover:text-blue-700" style="min-height:0;">✏️</button>` : ''
-        const evDelBtn  = evCanDel  ? `<button onclick="deleteEvent('${e.id}','${esc(e.title).replace(/'/g,"&#39;")}')" class="text-xs text-red-400 hover:text-red-600" style="min-height:0;">🗑️</button>` : ''
-        // Strip edit mark from description
-        const rawDesc = e.description || ''
-        const descEditIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
-        const cleanDesc = descEditIdx >= 0 ? rawDesc.slice(0, descEditIdx).trim() : rawDesc
-        const descEditNote = descEditIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawDesc.slice(descEditIdx).trim())}</div>` : ''
-        const evAttHtml = e.attachments && e.attachments.length
-          ? `<div class="mt-1 flex flex-wrap gap-1">` +
-            e.attachments.map(a => `<button onclick="downloadAttachment('${a.id}')" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 rounded-lg px-2 py-0.5 transition" style="min-height:0;">📎 ${esc(a.file_name)}</button>`).join('') +
-            `</div>` : ''
-        return `<div class="flex items-start gap-2 py-1.5">
-          <div class="text-xs text-gray-600 font-semibold w-14 flex-shrink-0 pt-0.5">${fmtTime(e.event_time)||'All day'}</div>
+    const dateHeader = `<div class="px-4 py-1.5 flex items-center gap-2 border-b border-gray-100 ${isToday ? 'bg-blue-50' : 'bg-gray-50'}">
+      <span class="text-xs font-extrabold uppercase tracking-wide ${isToday ? 'text-blue-700' : 'text-gray-500'}">${fmtDate(date)}${isToday ? ' · TODAY' : ''}</span>
+      <span class="badge bg-gray-600 text-white">Grp ${g}</span>
+    </div>`
+
+    const eventRows = evs.map(e => {
+      const catCls = CAT_COLORS[e.category] || CAT_COLORS.other
+      const groupBadge = e.group_number ? `<span class="badge bg-blue-100 text-blue-700">Grp ${e.group_number} only</span>` : ''
+      const evCanEdit = evIsOff && (evIsAdm || e.created_by === evMyName)
+      const evCanDel  = evIsAdm || (evIsOff && e.created_by === evMyName)
+      const evEditBtn = evCanEdit ? `<button onclick="openEventEdit('${e.id}')" class="text-xs text-blue-500 hover:text-blue-700 ml-1" style="min-height:0;">✏️</button>` : ''
+      const evDelBtn  = evCanDel  ? `<button onclick="deleteEvent('${e.id}','${esc(e.title).replace(/'/g,"&#39;")}')" class="text-xs text-red-400 hover:text-red-600 ml-0.5" style="min-height:0;">🗑️</button>` : ''
+
+      const rawDesc = e.description || ''
+      const descEditIdx = rawDesc.lastIndexOf('\n\n— Edited by ')
+      const cleanDesc = descEditIdx >= 0 ? rawDesc.slice(0, descEditIdx).trim() : rawDesc
+      const descEditNote = descEditIdx >= 0 ? `<div class="text-xs italic text-gray-400 mt-0.5">${esc(rawDesc.slice(descEditIdx).trim())}</div>` : ''
+
+      const short = cleanDesc.length > 90 ? esc(cleanDesc.slice(0, 90)) : null
+      const full  = esc(cleanDesc)
+      const descHtml = cleanDesc
+        ? (short
+            ? `<p class="text-sm text-gray-600 mt-0.5" id="evc-${e.id}">${short}<span id="evmore-${e.id}">… <button onclick="expandEvent('${e.id}')" class="text-blue-700 font-semibold text-xs" style="min-height:0;">more</button></span><span id="evfull-${e.id}" class="hidden">${full.slice(short.length)}</span></p>`
+            : `<p class="text-sm text-gray-600 mt-0.5">${full}</p>`)
+        : ''
+
+      const evAttHtml = e.attachments && e.attachments.length
+        ? `<div class="mt-1 flex flex-wrap gap-1">` +
+          e.attachments.map(a => `<button onclick="downloadAttachment('${a.id}')" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium bg-blue-50 hover:bg-blue-100 rounded-lg px-2 py-0.5 transition" style="min-height:0;">📎 ${esc(a.file_name)}</button>`).join('') +
+          `</div>` : ''
+
+      return `<div class="px-4 py-2.5">
+        <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1">
-              <span style="font-size:1.1rem;font-weight:700;color:#1e3a5f;">${esc(e.title)}${newBadge(e.created_at)}</span>
+            <div class="flex items-center gap-1 flex-wrap">
+              <span style="font-size:1rem;font-weight:700;color:#1e3a5f;">${esc(e.title)}${newBadge(e.created_at)}</span>
               ${evEditBtn}${evDelBtn}
             </div>
-            ${cleanDesc ? `<div class="text-xs text-gray-600 mt-0.5">${esc(cleanDesc)}</div>` : ''}
-            ${descEditNote}
-            ${evAttHtml}
-            <div class="flex items-center gap-1 mt-1 flex-wrap">
-              <span class="badge ${catCls}">${e.category}</span>${groupBadge}
-              <span class="text-xs text-gray-500">— ${esc(e.created_by)}</span>
-            </div>
+            ${descHtml}${descEditNote}${evAttHtml}
           </div>
-        </div>`
-      }).join('')}
-    </div>`
+        </div>
+        <div class="flex items-center gap-1 mt-1.5 flex-wrap">
+          ${e.event_time ? `<span class="text-xs font-semibold text-gray-500">🕐 ${fmtTime(e.event_time)}</span>` : ''}
+          <span class="badge ${catCls}">${e.category}</span>
+          ${groupBadge}
+          <span class="text-xs text-gray-400 ml-auto">${esc(e.created_by)}</span>
+        </div>
+      </div>`
+    }).join('<div class="border-t border-gray-50"></div>')
+
+    return dateHeader + eventRows
   }).join('')
 
   list.innerHTML = rows + showAllBtn
+}
+
+function expandEvent(id) {
+  document.getElementById('evmore-' + id)?.classList.add('hidden')
+  document.getElementById('evfull-' + id)?.classList.remove('hidden')
 }
 
 function toggleEventForm() {
