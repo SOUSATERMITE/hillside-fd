@@ -846,13 +846,21 @@ function openCheckModal(id, name, unitType, checkType) {
   const items = isDaily ? getDailyItems(unitType, name) : WEEKLY_ITEMS
   const container = document.getElementById('checkItems')
   container.innerHTML = items.map(item => `
-    <div class="flex items-center justify-between gap-3 px-3 py-2.5" id="ck-row-${item.key}">
-      <label class="text-sm font-medium text-gray-700 flex-1">${esc(item.label)}</label>
-      <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
-        onchange="onCheckItemChange(this)"
-        class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
-        ${item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
-      </select>
+    <div id="ck-row-${item.key}" class="border-b border-gray-100 last:border-b-0">
+      <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+        <label class="text-sm font-medium text-gray-700 flex-1">${esc(item.label)}</label>
+        <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
+          onchange="onCheckItemChange(this)"
+          class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
+          ${item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+        </select>
+      </div>
+      <div id="ck-issue-${item.key}" style="max-height:0;overflow:hidden;transition:max-height 0.28s ease;">
+        <div class="px-3 pb-3">
+          <textarea id="ck_note_${item.key}" rows="2" maxlength="500" placeholder="Describe the issue..."
+            class="w-full border border-red-300 bg-red-50 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" style="min-height:0;"></textarea>
+        </div>
+      </div>
     </div>`).join('')
 
   document.getElementById('checkModal').classList.remove('hidden')
@@ -862,11 +870,24 @@ function onCheckItemChange(sel) {
   const passValues = JSON.parse(sel.dataset.pass)
   const isPass     = passValues.includes(sel.value)
   const row        = document.getElementById(`ck-row-${sel.dataset.key}`)
-  if (row) row.className = row.className.replace(/bg-red-50|bg-white/g, '') + (isPass ? '' : ' bg-red-50')
+  const issueBox   = document.getElementById(`ck-issue-${sel.dataset.key}`)
+
+  if (row) {
+    const baseClass = row.className.replace(/\s*bg-red-50/g, '')
+    row.className = baseClass + (isPass ? '' : ' bg-red-50')
+  }
   sel.className = sel.className.replace(/border-red-400|border-gray-200/g, '') + (isPass ? ' border-gray-200' : ' border-red-400')
-  // Require notes if any item fails
-  const anyFail = [...document.querySelectorAll('#checkItems select[data-key]')].some(s => !JSON.parse(s.dataset.pass).includes(s.value))
-  document.getElementById('ck_notes').required = anyFail
+
+  if (issueBox) {
+    if (!isPass) {
+      issueBox.style.maxHeight = '120px'
+      setTimeout(() => { document.getElementById(`ck_note_${sel.dataset.key}`)?.focus() }, 280)
+    } else {
+      issueBox.style.maxHeight = '0'
+      const ta = document.getElementById(`ck_note_${sel.dataset.key}`)
+      if (ta) ta.value = ''
+    }
+  }
 }
 
 async function submitCheck() {
@@ -878,16 +899,23 @@ async function submitCheck() {
     key:   sel.dataset.key,
     label: sel.dataset.label,
     value: sel.value,
-    pass:  JSON.parse(sel.dataset.pass).includes(sel.value)
+    pass:  JSON.parse(sel.dataset.pass).includes(sel.value),
+    notes: document.getElementById('ck_note_' + sel.dataset.key)?.value.trim() || null
   }))
 
   const notes     = document.getElementById('ck_notes').value.trim()
   const hasIssues = items.some(i => !i.pass)
 
-  if (hasIssues && !notes) {
-    err.textContent = 'Notes are required when any item has an issue'
+  // Require per-item description for each failed item
+  const failedMissingNotes = items.filter(i => !i.pass && !i.notes)
+  if (failedMissingNotes.length > 0) {
+    err.textContent = `Please describe the issue for: ${failedMissingNotes.map(i => i.label).join(', ')}`
     err.classList.remove('hidden')
-    document.getElementById('ck_notes').focus()
+    // Expand and focus the first missing textarea
+    const firstKey = failedMissingNotes[0].key
+    const box = document.getElementById(`ck-issue-${firstKey}`)
+    if (box) box.style.maxHeight = '120px'
+    setTimeout(() => document.getElementById(`ck_note_${firstKey}`)?.focus(), 50)
     return
   }
 

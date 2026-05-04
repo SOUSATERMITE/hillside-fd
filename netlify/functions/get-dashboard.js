@@ -21,16 +21,18 @@ function groupForDateStr(dateStr) {
 }
 
 function buildApparatusWithCounts(apparatus, findings) {
-  const countsByUnit = {}
+  const byUnit = {}
   for (const f of findings) {
-    if (!countsByUnit[f.apparatus_id]) countsByUnit[f.apparatus_id] = { total: 0, critical_high: 0 }
-    countsByUnit[f.apparatus_id].total++
-    if (['critical','high'].includes(f.priority)) countsByUnit[f.apparatus_id].critical_high++
+    if (!byUnit[f.apparatus_id]) byUnit[f.apparatus_id] = { total: 0, critical_high: 0, findings: [] }
+    byUnit[f.apparatus_id].total++
+    if (['critical','high'].includes(f.priority)) byUnit[f.apparatus_id].critical_high++
+    byUnit[f.apparatus_id].findings.push(f)
   }
   return apparatus.map(a => ({
     ...a,
-    open_findings: countsByUnit[a.id]?.total || 0,
-    critical_high: countsByUnit[a.id]?.critical_high || 0
+    open_findings: byUnit[a.id]?.total || 0,
+    critical_high: byUnit[a.id]?.critical_high || 0,
+    findings: byUnit[a.id]?.findings || []
   }))
 }
 
@@ -111,7 +113,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus_findings')
-        .select('apparatus_id, priority, status')
+        .select('id, apparatus_id, finding_type, description, priority, reported_by, status, created_at')
         .in('status', ['open', 'in_progress'])
         .in('finding_type', ['damage', 'repair_needed', 'inspection']),
 

@@ -118,6 +118,50 @@ async function notifyFailedCheck(supabase, { unitName, officerName, tour, checkT
   })
 }
 
+// Email DCs + Chief about an auto-generated equipment check finding
+async function notifyCheckIssue(supabase, { unitName, itemLabel, itemNotes, officerName, priority, timestamp }) {
+  const { data: recipients } = await supabase
+    .from('firefighters')
+    .select('name, email')
+    .in('rank', ['DC', 'D/C', 'D/C 1', 'D/C 2', 'D/C 3', 'D/C 4', 'Chief'])
+    .eq('active', true)
+
+  const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+  if (!emails.length) return
+
+  const priColor = priority === 'high' ? '#d97706' : '#2563eb'
+  const priLabel = priority.charAt(0).toUpperCase() + priority.slice(1)
+  const appUrl = 'https://hillside-fd.netlify.app/apparatus'
+  const subject = `Equipment Check Issue Found — ${unitName} — ${itemLabel} — ${officerName}`
+
+  const html = `
+<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;color:#1a1a1a;">
+  <div style="background:#92400e;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <h2 style="color:#fff;margin:0;font-size:18px;">Equipment Check Issue Found</h2>
+    <p style="color:#fde68a;margin:4px 0 0;font-size:14px;">${unitName} — Weekly Equipment Check</p>
+  </div>
+  <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+    <table style="width:100%;border-collapse:collapse;background:#fffbeb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr><td style="padding:8px 12px;font-weight:600;width:120px;">Unit</td><td style="padding:8px 12px;font-weight:700;">${unitName}</td></tr>
+      <tr style="background:#fef3c7;"><td style="padding:8px 12px;font-weight:600;">Item</td><td style="padding:8px 12px;font-weight:700;">${itemLabel}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Priority</td><td style="padding:8px 12px;font-weight:700;color:${priColor};">${priLabel}</td></tr>
+      ${itemNotes ? `<tr style="background:#fef3c7;"><td style="padding:8px 12px;font-weight:600;">Issue Notes</td><td style="padding:8px 12px;">${itemNotes}</td></tr>` : ''}
+      <tr style="background:#fef3c7;"><td style="padding:8px 12px;font-weight:600;">Reported By</td><td style="padding:8px 12px;">${officerName}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Time</td><td style="padding:8px 12px;">${new Date(timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</td></tr>
+    </table>
+    <p style="margin:0 0 16px;color:#92400e;font-size:14px;">A finding has been created and must be marked Repair Completed before the weekly check is considered resolved.</p>
+    <p style="margin:0;"><a href="${appUrl}" style="display:inline-block;background:#92400e;color:#fff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;font-size:14px;">View Apparatus →</a></p>
+  </div>
+</div>`
+
+  await sendEmail({
+    to: emails.join(', '),
+    subject,
+    html,
+    text: `Equipment Check Issue Found\nUnit: ${unitName}\nItem: ${itemLabel}\nPriority: ${priLabel}\n${itemNotes ? `Notes: ${itemNotes}\n` : ''}Reported by: ${officerName}\nTime: ${timestamp}\nView at: ${appUrl}`
+  })
+}
+
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
   const headers = {
@@ -177,7 +221,10 @@ exports.handler = async (event) => {
       }
       if (notes?.trim()) descParts.push(notes.trim())
 
-      const { data, error } = await supabase
+      // Weekly check with issues stays 'open' until all generated findings are resolved
+      const checkStatus = (check_type === 'weekly_check' && hasIssues) ? 'open' : 'completed'
+
+      const { data: checkRecord, error } = await supabase
         .from('apparatus_findings')
         .insert({
           apparatus_id,
@@ -186,7 +233,7 @@ exports.handler = async (event) => {
           priority:       hasIssues ? 'high' : 'low',
           reported_by:    officer.display_name,
           officer_id:     officer.officer_id,
-          status:         'completed',
+          status:         checkStatus,
           findings_data:  findingsData
         })
         .select()
@@ -206,7 +253,50 @@ exports.handler = async (event) => {
         })
       }
 
-      return { statusCode: 200, headers, body: JSON.stringify(data) }
+      // For weekly checks: auto-create individual apparatus_findings per failed item
+      if (check_type === 'weekly_check' && failedItems.length > 0 && unit) {
+        const SCBA_KEYWORDS = ['scba', 'breathing', 'mask', 'regulator', 'bottle', 'air pack', 'scott', 'msa']
+
+        const individualInserts = failedItems.map(item => {
+          const lbl = item.label.toLowerCase()
+          const isScba = SCBA_KEYWORDS.some(k => lbl.includes(k))
+          return {
+            apparatus_id,
+            finding_type:  'repair_needed',
+            description:   `Equipment Check Issue — ${item.label}`,
+            photos_notes:  item.notes?.trim() || null,
+            priority:      isScba ? 'high' : 'medium',
+            reported_by:   officer.display_name,
+            officer_id:    officer.officer_id,
+            status:        'open',
+            findings_data: {
+              source_check_id: checkRecord.id,
+              check_item_key:  item.key,
+              auto_generated:  true
+            }
+          }
+        })
+
+        await supabase.from('apparatus_findings').insert(individualInserts).catch(e2 => {
+          console.error('[manage-findings] auto-finding insert failed:', e2.message)
+        })
+
+        // Email per-item notifications
+        for (const item of failedItems) {
+          const lbl = item.label.toLowerCase()
+          const isScba = SCBA_KEYWORDS.some(k => lbl.includes(k))
+          await notifyCheckIssue(supabase, {
+            unitName:    unit.unit_name,
+            itemLabel:   item.label,
+            itemNotes:   item.notes?.trim() || null,
+            officerName: officer.display_name,
+            priority:    isScba ? 'high' : 'medium',
+            timestamp
+          })
+        }
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify(checkRecord) }
     }
 
     // ── REPORT FINDING (damage/repair_needed/inspection/scheduled_maintenance) ─
@@ -314,6 +404,25 @@ exports.handler = async (event) => {
         .single()
 
       if (error) throw error
+
+      // If this is an auto-generated check finding, check if all siblings are resolved
+      // and if so, mark the parent weekly check finding as completed too
+      if (['completed', 'cancelled'].includes(status) && data.findings_data?.source_check_id) {
+        const srcId = data.findings_data.source_check_id
+        try {
+          const { data: siblings } = await supabase
+            .from('apparatus_findings')
+            .select('id, status')
+            .filter('findings_data->>source_check_id', 'eq', srcId)
+          const allResolved = (siblings || []).every(s => ['completed', 'cancelled'].includes(s.status))
+          if (allResolved) {
+            await supabase.from('apparatus_findings').update({ status: 'completed' }).eq('id', srcId)
+          }
+        } catch (e2) {
+          console.error('[manage-findings] resolution propagation failed:', e2.message)
+        }
+      }
+
       return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
 
