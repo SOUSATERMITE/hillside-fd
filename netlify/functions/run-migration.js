@@ -89,6 +89,13 @@ const MIGRATION_SQL = `
   create index if not exists idx_daily_duties_active     on daily_duties(active, recurrence);
   create index if not exists idx_duty_completions_date   on duty_completions(duty_id, completed_date);
   create index if not exists idx_duty_log_date           on duty_log(duty_id, shift_date);
+
+  -- Manual issue reporting columns on apparatus_findings
+  alter table apparatus_findings alter column apparatus_id drop not null;
+  alter table apparatus_findings add column if not exists item_name        text;
+  alter table apparatus_findings add column if not exists item_category    text;
+  alter table apparatus_findings add column if not exists issue_type       text;
+  alter table apparatus_findings add column if not exists resolution_notes text;
 `
 
 async function tryPg(host, port, user, password, log) {

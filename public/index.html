@@ -138,11 +138,19 @@
 
   </div>
 
-  <!-- OOS & EQUIPMENT ALERT SECTION (hidden when nothing active) -->
-  <div id="oosSection" class="hidden rounded-2xl overflow-hidden shadow-lg" style="border:2px solid #b91c1c;">
+  <!-- OOS & EQUIPMENT ALERT SECTION (always visible) -->
+  <div id="oosSection" class="rounded-2xl overflow-hidden shadow-lg" style="border:2px solid #b91c1c;">
     <div class="px-4 py-2.5 flex items-center justify-between" style="background:#7f1d1d;">
       <h2 class="font-extrabold text-white text-sm tracking-wide">⚠️ OUT OF SERVICE &amp; MISSING EQUIPMENT</h2>
-      <a href="/apparatus" class="text-xs font-bold text-red-200 border border-red-400 rounded-lg px-3 py-1 hover:bg-red-800 transition" style="min-height:0;">View All →</a>
+      <div class="flex items-center gap-2">
+        <button id="reportIssueBtn" onclick="openIssueModal()" class="hidden text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">+ Report Issue</button>
+        <a href="/apparatus" class="text-xs font-bold text-red-200 border border-red-400 rounded-lg px-3 py-1 hover:bg-red-800 transition" style="min-height:0;">View All →</a>
+      </div>
+    </div>
+
+    <!-- All clear (shown when nothing active) -->
+    <div id="oosAllClear" class="hidden px-4 py-3 text-center text-sm font-semibold text-green-700 bg-green-50">
+      ✅ All apparatus in service — No open equipment issues
     </div>
 
     <!-- Apparatus OOS sub-list -->
@@ -153,12 +161,121 @@
       <div id="oosApparatusItems" class="divide-y divide-red-100 bg-red-50"></div>
     </div>
 
-    <!-- Open equipment issues sub-list -->
+    <!-- Open equipment issues sub-list (apparatus findings) -->
     <div id="oosIssuesWrap" class="hidden">
       <div class="px-3 py-1.5" style="background:#92400e;">
         <span class="font-bold text-orange-100 uppercase tracking-widest" style="font-size:0.6rem;">OPEN EQUIPMENT ISSUES</span>
       </div>
       <div id="oosIssuesItems" class="divide-y divide-orange-100 bg-orange-50"></div>
+    </div>
+
+    <!-- Manual reported issues sub-list -->
+    <div id="oosManualWrap" class="hidden">
+      <div class="px-3 py-1.5" style="background:#1e40af;">
+        <span class="font-bold text-blue-100 uppercase tracking-widest" style="font-size:0.6rem;">REPORTED ISSUES</span>
+      </div>
+      <div id="oosManualItems" class="divide-y divide-blue-100 bg-blue-50"></div>
+    </div>
+
+    <!-- Recently resolved accordion -->
+    <div id="oosResolvedWrap" class="hidden border-t border-gray-200">
+      <button onclick="toggleResolvedAccordion()" class="w-full flex items-center justify-between px-4 py-2 text-xs font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 transition" style="min-height:0;">
+        <span>Recently Resolved (last 7 days)</span>
+        <span id="oosResolvedChevron" class="transition-transform duration-200">▼</span>
+      </button>
+      <div id="oosResolvedItems" class="hidden divide-y divide-gray-100 bg-white"></div>
+    </div>
+  </div>
+
+  <!-- Issue Report Modal -->
+  <div id="issueModal" class="hidden fixed inset-0 z-50 flex items-end justify-center" style="background:rgba(0,0,0,0.5);">
+    <div class="bg-white w-full max-w-lg rounded-t-2xl p-4 pb-8" style="max-height:90vh;overflow-y:auto;">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="issueModalTitle" class="font-extrabold text-gray-900 text-base">Report Equipment Issue</h3>
+        <button onclick="closeIssueModal()" class="text-gray-400 hover:text-gray-700 font-bold text-xl" style="min-height:0;">✕</button>
+      </div>
+      <input type="hidden" id="issueModalId">
+      <div class="space-y-2">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Item / Equipment Name <span class="text-red-500">*</span></label>
+          <input id="issueItemName" type="text" maxlength="200" placeholder="e.g. SCBA Mask, Halligan Bar, Thermal Camera..."
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:40px;">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Category <span class="text-red-500">*</span></label>
+            <select id="issueCategory" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:40px;">
+              <option value="Apparatus">Apparatus</option>
+              <option value="Breathing Equipment">Breathing Equipment</option>
+              <option value="Hand Tools">Hand Tools</option>
+              <option value="Hose &amp; Nozzles">Hose &amp; Nozzles</option>
+              <option value="PPE &amp; Gear">PPE &amp; Gear</option>
+              <option value="Station Equipment">Station Equipment</option>
+              <option value="Vehicle">Vehicle</option>
+              <option value="Other" selected>Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Issue Type <span class="text-red-500">*</span></label>
+            <select id="issueType" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:40px;">
+              <option value="Damaged">Damaged</option>
+              <option value="Missing">Missing</option>
+              <option value="Needs Repair">Needs Repair</option>
+              <option value="Needs Inspection">Needs Inspection</option>
+              <option value="Out of Service">Out of Service</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Priority</label>
+            <select id="issuePriority" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:40px;">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Apparatus (optional)</label>
+            <select id="issueApparatus" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:40px;">
+              <option value="">Not apparatus-specific</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Description <span class="text-red-500">*</span></label>
+          <textarea id="issueDescription" maxlength="2000" placeholder="Describe the issue in detail..." rows="3"
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:80px;"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Additional Notes / Photos Location</label>
+          <textarea id="issueNotes" maxlength="2000" placeholder="Optional: photo location, additional notes..." rows="2"
+            class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button onclick="closeIssueModal()" class="flex-1 border border-gray-300 rounded-xl py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+        <button id="issueSubmitBtn" onclick="submitIssueReport()" class="flex-1 bg-red-700 text-white rounded-xl py-2 text-sm font-bold hover:bg-red-800 transition">Report Issue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resolve Modal -->
+  <div id="resolveModal" class="hidden fixed inset-0 z-50 flex items-end justify-center" style="background:rgba(0,0,0,0.5);">
+    <div class="bg-white w-full max-w-lg rounded-t-2xl p-4 pb-8">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-extrabold text-gray-900 text-base">Resolve Issue</h3>
+        <button onclick="closeResolveModal()" class="text-gray-400 hover:text-gray-700 font-bold text-xl" style="min-height:0;">✕</button>
+      </div>
+      <input type="hidden" id="resolveTargetId">
+      <p class="text-sm text-gray-600 mb-2">Briefly describe how this was resolved.</p>
+      <textarea id="resolveNotes" maxlength="2000" placeholder="Resolution notes (required)..." rows="3"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:80px;"></textarea>
+      <div class="flex gap-2">
+        <button onclick="closeResolveModal()" class="flex-1 border border-gray-300 rounded-xl py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">Cancel</button>
+        <button id="resolveSubmitBtn" onclick="submitResolveIssue()" class="flex-1 bg-green-700 text-white rounded-xl py-2 text-sm font-bold hover:bg-green-800 transition">Mark Resolved</button>
+      </div>
     </div>
   </div>
 
@@ -713,58 +830,69 @@ function scrollToBriefingSick() {
 }
 function scrollToApparatus() {
   const oos = document.getElementById('oosSection')
-  if (oos && !oos.classList.contains('hidden')) {
-    oos.scrollIntoView({ behavior:'smooth', block:'start' })
-  } else {
-    const el = document.getElementById('apparatusCard')
-    if (el) el.scrollIntoView({ behavior:'smooth', block:'start' })
-  }
+  if (oos) oos.scrollIntoView({ behavior:'smooth', block:'start' })
 }
 
 // ── SECTION: OOS & EQUIPMENT ALERTS ─────────────────────────────────────────
 function renderOOS() {
-  const units = dashData.apparatus || []
-  const APPARATUS_STATUS_LOCAL = {
-    out_of_service: { label:'Out of Service', cls:'bg-red-100 text-red-800',      dot:'bg-red-500' },
-    maintenance:    { label:'At Shop',         cls:'bg-orange-100 text-orange-800', dot:'bg-orange-500' }
-  }
+  const units         = dashData.apparatus      || []
+  const manualIssues  = dashData.manual_issues  || []
+  const recentlyResolved = dashData.recently_resolved || []
+
   const PRI_BADGE = {
     critical: 'bg-red-100 text-red-800',
     high:     'bg-orange-100 text-orange-800',
     medium:   'bg-yellow-100 text-yellow-800',
     low:      'bg-gray-100 text-gray-600'
   }
+  const ISSUE_TYPE_BADGE = {
+    'Out of Service':    'bg-red-100 text-red-800',
+    'Missing':           'bg-purple-100 text-purple-800',
+    'Damaged':           'bg-orange-100 text-orange-800',
+    'Needs Repair':      'bg-yellow-100 text-yellow-800',
+    'Needs Inspection':  'bg-blue-100 text-blue-800'
+  }
   const FTYPE_SHORT = {
     damage:'Damage', repair_needed:'Repair Needed', inspection:'Inspection'
   }
 
   const oosUnits = units.filter(u => ['out_of_service','maintenance'].includes(u.status))
-
-  const allFindings = []
+  const apparatusFindings = []
   for (const u of units) {
     for (const f of (u.findings || [])) {
-      allFindings.push({ ...f, unit_name: u.unit_name })
+      apparatusFindings.push({ ...f, unit_name: u.unit_name })
     }
   }
   const PRI_ORDER = { critical:0, high:1, medium:2, low:3 }
-  allFindings.sort((a,b) => (PRI_ORDER[a.priority]??3)-(PRI_ORDER[b.priority]??3))
+  apparatusFindings.sort((a,b) => (PRI_ORDER[a.priority]??3)-(PRI_ORDER[b.priority]??3))
+  manualIssues.sort((a,b) => (PRI_ORDER[a.priority]??3)-(PRI_ORDER[b.priority]??3))
 
-  const section     = document.getElementById('oosSection')
-  const appWrap     = document.getElementById('oosApparatusWrap')
-  const issuesWrap  = document.getElementById('oosIssuesWrap')
+  const isOff = AUTH.isOfficer()
+  const isAdm = AUTH.isAdmin()
+  const myId  = AUTH.getSession()?.officer_id || null
 
-  if (!oosUnits.length && !allFindings.length) {
-    section.classList.add('hidden')
-    return
-  }
-  section.classList.remove('hidden')
+  // Report Issue button
+  const reportBtn = document.getElementById('reportIssueBtn')
+  if (reportBtn) reportBtn.classList.toggle('hidden', !isOff)
+
+  const allClear = document.getElementById('oosAllClear')
+  const appWrap    = document.getElementById('oosApparatusWrap')
+  const issuesWrap = document.getElementById('oosIssuesWrap')
+  const manualWrap = document.getElementById('oosManualWrap')
+  const resolvedWrap = document.getElementById('oosResolvedWrap')
+  const now = Date.now()
+
+  const hasAnything = oosUnits.length || apparatusFindings.length || manualIssues.length
+
+  // All-clear vs active
+  if (allClear) allClear.classList.toggle('hidden', hasAnything)
 
   // Apparatus OOS
   if (oosUnits.length) {
     appWrap.classList.remove('hidden')
-    const now = Date.now()
     document.getElementById('oosApparatusItems').innerHTML = oosUnits.map(u => {
-      const st = APPARATUS_STATUS_LOCAL[u.status] || { label: u.status, cls:'bg-gray-100 text-gray-700' }
+      const ST = { out_of_service:{label:'Out of Service',cls:'bg-red-100 text-red-800'}, maintenance:{label:'At Shop',cls:'bg-orange-100 text-orange-800'} }
+      const st = ST[u.status] || { label: u.status, cls:'bg-gray-100 text-gray-700' }
       const hrs = u.last_updated ? Math.floor((now - new Date(u.last_updated)) / 3600000) : null
       const dur = hrs === null ? '' : hrs < 1 ? 'Less than 1hr' : hrs < 24 ? `${hrs}h` : `${Math.floor(hrs/24)}d`
       return `<div class="px-4 py-3 flex items-start justify-between gap-3">
@@ -784,12 +912,10 @@ function renderOOS() {
     appWrap.classList.add('hidden')
   }
 
-  // Open findings
-  if (allFindings.length) {
+  // Apparatus findings (damage / repair / inspection)
+  if (apparatusFindings.length) {
     issuesWrap.classList.remove('hidden')
-    const now = Date.now()
-    const isOff = AUTH.isOfficer()
-    document.getElementById('oosIssuesItems').innerHTML = allFindings.map(f => {
+    document.getElementById('oosIssuesItems').innerHTML = apparatusFindings.map(f => {
       const days = Math.floor((now - new Date(f.created_at)) / 86400000)
       const age  = days === 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`
       const pb   = PRI_BADGE[f.priority] || PRI_BADGE.medium
@@ -810,6 +936,66 @@ function renderOOS() {
   } else {
     issuesWrap.classList.add('hidden')
   }
+
+  // Manual reported issues
+  if (manualIssues.length) {
+    manualWrap.classList.remove('hidden')
+    document.getElementById('oosManualItems').innerHTML = manualIssues.map(f => {
+      const days  = Math.floor((now - new Date(f.created_at)) / 86400000)
+      const age   = days === 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`
+      const pb    = PRI_BADGE[f.priority] || PRI_BADGE.medium
+      const itb   = ISSUE_TYPE_BADGE[f.issue_type] || 'bg-gray-100 text-gray-600'
+      const stBadge = f.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
+      const stLabel = f.status === 'in_progress' ? 'In Progress' : 'Open'
+      const canEdit = isAdm || (isOff && f.officer_id === myId)
+      return `<div class="px-4 py-2.5 flex items-start gap-2" id="oos-manual-${f.id}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+            <span class="badge ${pb}">${f.priority}</span>
+            ${f.issue_type ? `<span class="badge ${itb}">${esc(f.issue_type)}</span>` : ''}
+            ${f.item_category ? `<span class="badge bg-gray-100 text-gray-600">${esc(f.item_category)}</span>` : ''}
+            <span class="badge ${stBadge}">${stLabel}</span>
+          </div>
+          <div class="text-sm text-gray-900 font-bold">${esc(f.item_name || 'Unknown item')}</div>
+          <div class="text-xs text-gray-700 mt-0.5">${esc(f.description)}</div>
+          <div class="text-xs text-gray-400 mt-0.5">${esc(f.reported_by)} · ${age} ago · ${days === 0 ? '&lt;1' : days} day${days===1?'':'s'} open</div>
+        </div>
+        <div class="flex flex-col gap-1 flex-shrink-0">
+          ${isOff && f.status === 'open' ? `<button onclick="markIssueInProgress('${f.id}')" class="text-xs font-bold text-blue-700 border border-blue-300 rounded-lg px-2 py-1 hover:bg-blue-50 transition" style="min-height:0;">→ In Progress</button>` : ''}
+          ${canEdit ? `<button onclick="openIssueModal('${f.id}')" class="text-xs font-bold text-gray-600 border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50 transition" style="min-height:0;">Edit</button>` : ''}
+          ${isOff ? `<button onclick="openResolveModal('${f.id}')" class="text-xs font-bold text-green-700 border border-green-300 rounded-lg px-2 py-1 hover:bg-green-50 transition" style="min-height:0;">✓ Resolve</button>` : ''}
+        </div>
+      </div>`
+    }).join('')
+  } else {
+    manualWrap.classList.add('hidden')
+  }
+
+  // Recently resolved accordion
+  if (recentlyResolved.length) {
+    resolvedWrap.classList.remove('hidden')
+    document.getElementById('oosResolvedItems').innerHTML = recentlyResolved.map(f => {
+      return `<div class="px-4 py-2.5">
+        <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+          <span class="badge bg-green-100 text-green-800">Resolved</span>
+          ${f.item_category ? `<span class="badge bg-gray-100 text-gray-600">${esc(f.item_category)}</span>` : ''}
+        </div>
+        <div class="text-sm text-gray-900 font-semibold">${esc(f.item_name || 'Unknown item')}</div>
+        <div class="text-xs text-gray-600 mt-0.5">${esc(f.description)}</div>
+        ${f.resolution_notes ? `<div class="text-xs text-green-700 mt-0.5 italic">Resolution: ${esc(f.resolution_notes)}</div>` : ''}
+        <div class="text-xs text-gray-400 mt-0.5">Resolved by ${esc(f.completed_by || f.reported_by)} · ${f.completed_date || ''}</div>
+      </div>`
+    }).join('')
+  } else {
+    resolvedWrap.classList.add('hidden')
+  }
+}
+
+function toggleResolvedAccordion() {
+  const items   = document.getElementById('oosResolvedItems')
+  const chevron = document.getElementById('oosResolvedChevron')
+  const open = items.classList.toggle('hidden')
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)'
 }
 
 async function resolveOOSFinding(findingId) {
@@ -821,7 +1007,6 @@ async function resolveOOSFinding(findingId) {
       body: JSON.stringify({ action: 'update', id: findingId, status: 'completed' })
     })
     if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return }
-    // Remove from dashData in-place and re-render
     for (const u of (dashData.apparatus || [])) {
       u.findings = (u.findings || []).filter(f => f.id !== findingId)
       u.open_findings = u.findings.length
@@ -830,6 +1015,146 @@ async function resolveOOSFinding(findingId) {
     renderOOS()
     renderApparatus()
     renderShift()
+  } catch(e) { alert(e.message) }
+}
+
+function openIssueModal(editId = null) {
+  const modal = document.getElementById('issueModal')
+  // Populate apparatus dropdown
+  const sel = document.getElementById('issueApparatus')
+  sel.innerHTML = '<option value="">Not apparatus-specific</option>'
+  for (const u of (dashData.apparatus || [])) {
+    const opt = document.createElement('option')
+    opt.value = u.id
+    opt.textContent = u.unit_name
+    sel.appendChild(opt)
+  }
+
+  if (editId) {
+    const f = (dashData.manual_issues || []).find(x => x.id === editId)
+    if (!f) return
+    document.getElementById('issueModalTitle').textContent = 'Edit Issue'
+    document.getElementById('issueSubmitBtn').textContent  = 'Save Changes'
+    document.getElementById('issueModalId').value          = editId
+    document.getElementById('issueItemName').value         = f.item_name || ''
+    document.getElementById('issueCategory').value         = f.item_category || 'Other'
+    document.getElementById('issueType').value             = f.issue_type || 'Damaged'
+    document.getElementById('issuePriority').value         = f.priority || 'medium'
+    document.getElementById('issueApparatus').value        = f.apparatus_id || ''
+    document.getElementById('issueDescription').value      = f.description || ''
+    document.getElementById('issueNotes').value            = f.photos_notes || ''
+  } else {
+    document.getElementById('issueModalTitle').textContent = 'Report Equipment Issue'
+    document.getElementById('issueSubmitBtn').textContent  = 'Report Issue'
+    document.getElementById('issueModalId').value          = ''
+    document.getElementById('issueItemName').value         = ''
+    document.getElementById('issueCategory').value         = 'Other'
+    document.getElementById('issueType').value             = 'Damaged'
+    document.getElementById('issuePriority').value         = 'medium'
+    document.getElementById('issueApparatus').value        = ''
+    document.getElementById('issueDescription').value      = ''
+    document.getElementById('issueNotes').value            = ''
+  }
+  modal.classList.remove('hidden')
+}
+function closeIssueModal() {
+  document.getElementById('issueModal').classList.add('hidden')
+}
+
+async function submitIssueReport() {
+  const btn  = document.getElementById('issueSubmitBtn')
+  const editId = document.getElementById('issueModalId').value
+  const item_name   = document.getElementById('issueItemName').value.trim()
+  const item_category = document.getElementById('issueCategory').value
+  const issue_type  = document.getElementById('issueType').value
+  const priority    = document.getElementById('issuePriority').value
+  const apparatus_id = document.getElementById('issueApparatus').value || null
+  const description = document.getElementById('issueDescription').value.trim()
+  const photos_notes = document.getElementById('issueNotes').value.trim()
+
+  if (!item_name) { alert('Item name is required.'); return }
+  if (!description) { alert('Description is required.'); return }
+
+  btn.disabled = true
+  btn.textContent = editId ? 'Saving...' : 'Reporting...'
+  try {
+    let body
+    if (editId) {
+      body = { action:'update', id:editId, status:'open', item_name, item_category, issue_type, apparatus_id, description, photos_notes, priority }
+    } else {
+      body = { action:'report_manual', item_name, item_category, issue_type, apparatus_id, priority, description, photos_notes }
+    }
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify(body)
+    })
+    const d = await res.json()
+    if (!res.ok) { alert(d.error || 'Failed'); return }
+    closeIssueModal()
+    if (editId) {
+      // Update in-place
+      const idx = (dashData.manual_issues || []).findIndex(x => x.id === editId)
+      if (idx !== -1) dashData.manual_issues[idx] = { ...dashData.manual_issues[idx], ...d }
+    } else {
+      if (!dashData.manual_issues) dashData.manual_issues = []
+      dashData.manual_issues.unshift(d)
+    }
+    renderOOS()
+    renderShift()
+  } catch(e) { alert(e.message) }
+  finally { btn.disabled = false; btn.textContent = editId ? 'Save Changes' : 'Report Issue' }
+}
+
+function openResolveModal(findingId) {
+  document.getElementById('resolveTargetId').value = findingId
+  document.getElementById('resolveNotes').value    = ''
+  document.getElementById('resolveModal').classList.remove('hidden')
+  setTimeout(() => document.getElementById('resolveNotes').focus(), 50)
+}
+function closeResolveModal() {
+  document.getElementById('resolveModal').classList.add('hidden')
+}
+
+async function submitResolveIssue() {
+  const btn = document.getElementById('resolveSubmitBtn')
+  const id  = document.getElementById('resolveTargetId').value
+  const resolution_notes = document.getElementById('resolveNotes').value.trim()
+  if (!resolution_notes) { alert('Resolution notes are required.'); return }
+
+  btn.disabled = true; btn.textContent = 'Resolving...'
+  try {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({ action:'update', id, status:'completed', resolution_notes, completed_date: today })
+    })
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return }
+    const resolved = (dashData.manual_issues || []).find(x => x.id === id)
+    dashData.manual_issues = (dashData.manual_issues || []).filter(x => x.id !== id)
+    if (resolved) {
+      if (!dashData.recently_resolved) dashData.recently_resolved = []
+      dashData.recently_resolved.unshift({ ...resolved, status:'completed', resolution_notes, completed_date: today })
+    }
+    closeResolveModal()
+    renderOOS()
+    renderShift()
+  } catch(e) { alert(e.message) }
+  finally { btn.disabled = false; btn.textContent = 'Mark Resolved' }
+}
+
+async function markIssueInProgress(findingId) {
+  try {
+    const res = await fetch(`${API}/manage-findings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({ action:'update', id:findingId, status:'in_progress' })
+    })
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); return }
+    const idx = (dashData.manual_issues || []).findIndex(x => x.id === findingId)
+    if (idx !== -1) dashData.manual_issues[idx].status = 'in_progress'
+    renderOOS()
   } catch(e) { alert(e.message) }
 }
 

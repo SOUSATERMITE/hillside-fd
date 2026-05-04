@@ -383,18 +383,75 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
 
+    // ── REPORT MANUAL ISSUE (non-apparatus equipment, PPE, tools, etc.) ────────
+    if (action === 'report_manual') {
+      const { item_name, item_category, issue_type, apparatus_id, priority, description, photos_notes } = body
+      if (!item_name?.trim() || !description?.trim() || !issue_type) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'item_name, issue_type, and description required' }) }
+      }
+      const VALID_ISSUE_TYPES = ['Out of Service', 'Missing', 'Damaged', 'Needs Inspection', 'Needs Repair']
+      const VALID_PRIS = ['low', 'medium', 'high', 'critical']
+      if (!VALID_ISSUE_TYPES.includes(issue_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid issue_type' }) }
+      const pri = VALID_PRIS.includes(priority) ? priority : 'medium'
+      const timestamp = new Date().toISOString()
+
+      let unitName = item_name.trim()
+      if (apparatus_id) {
+        const { data: unit } = await supabase.from('apparatus').select('unit_name').eq('id', apparatus_id).single()
+        if (unit) unitName = `${unit.unit_name} — ${item_name.trim()}`
+      }
+
+      const { data, error } = await supabase
+        .from('apparatus_findings')
+        .insert({
+          apparatus_id:  apparatus_id || null,
+          finding_type:  'manual_report',
+          item_name:     item_name.trim().slice(0, 200),
+          item_category: item_category || 'Other',
+          issue_type,
+          description:   description.trim().slice(0, 2000),
+          priority:      pri,
+          reported_by:   officer.display_name,
+          officer_id:    officer.officer_id,
+          photos_notes:  photos_notes?.trim().slice(0, 2000) || null,
+          status:        'open'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      await notifyFinding(supabase, {
+        unitName,
+        findingType: 'manual_report',
+        description: `${issue_type}: ${description.trim()}`,
+        priority: pri,
+        officerName: officer.display_name,
+        timestamp
+      }, pri === 'critical')
+
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
+    }
+
     // ── UPDATE FINDING STATUS ────────────────────────────────────────────────
     if (action === 'update') {
-      const { id, status, assigned_to, completed_by, completed_date } = body
+      const { id, status, assigned_to, completed_by, completed_date, item_name, item_category, issue_type, description, photos_notes, priority, resolution_notes } = body
       if (!id || !status) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and status required' }) }
 
       const VALID_STATUSES = ['open', 'in_progress', 'completed', 'cancelled']
       if (!VALID_STATUSES.includes(status)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid status' }) }
 
       const update = { status }
-      if (assigned_to  !== undefined) update.assigned_to   = assigned_to || null
-      if (completed_by !== undefined) update.completed_by  = completed_by || null
-      if (completed_date !== undefined) update.completed_date = completed_date || null
+      if (assigned_to        !== undefined) update.assigned_to       = assigned_to || null
+      if (completed_by       !== undefined) update.completed_by      = completed_by || null
+      if (completed_date     !== undefined) update.completed_date    = completed_date || null
+      if (item_name          !== undefined) update.item_name         = item_name?.trim().slice(0, 200) || null
+      if (item_category      !== undefined) update.item_category     = item_category || null
+      if (issue_type         !== undefined) update.issue_type        = issue_type || null
+      if (description        !== undefined) update.description       = description?.trim().slice(0, 2000) || null
+      if (photos_notes       !== undefined) update.photos_notes      = photos_notes?.trim().slice(0, 2000) || null
+      if (priority           !== undefined) update.priority          = priority || null
+      if (resolution_notes   !== undefined) update.resolution_notes  = resolution_notes?.trim().slice(0, 2000) || null
 
       const { data, error } = await supabase
         .from('apparatus_findings')

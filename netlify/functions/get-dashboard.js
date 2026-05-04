@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -113,14 +113,22 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus_findings')
-        .select('id, apparatus_id, finding_type, description, priority, reported_by, status, created_at')
+        .select('id, apparatus_id, finding_type, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at')
         .in('status', ['open', 'in_progress'])
-        .in('finding_type', ['damage', 'repair_needed', 'inspection']),
+        .in('finding_type', ['damage', 'repair_needed', 'inspection', 'manual_report']),
 
       supabase
         .from('board_attachments')
         .select('id, source_type, source_id, file_name, file_size, uploaded_by, created_at')
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }),
+
+      supabase
+        .from('apparatus_findings')
+        .select('id, apparatus_id, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at, resolution_notes, completed_by, completed_date')
+        .eq('finding_type', 'manual_report')
+        .in('status', ['completed', 'cancelled'])
+        .gte('completed_date', new Date(now - 7 * 86400000).toISOString().split('T')[0])
+        .order('completed_date', { ascending: false })
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -155,6 +163,10 @@ exports.handler = async (event) => {
       schedule.push({ date: ds, group: groupForDateStr(ds) })
     }
 
+    const allFindings = findingsRes.data || []
+    const apparatusFindings = allFindings.filter(f => f.apparatus_id != null && f.finding_type !== 'manual_report')
+    const manualIssues      = allFindings.filter(f => f.finding_type === 'manual_report')
+
     return {
       statusCode: 200, headers,
       body: JSON.stringify({
@@ -166,7 +178,9 @@ exports.handler = async (event) => {
         events,
         workOrders:          workOrderRes.data || [],
         contacts:            contactRes.data   || [],
-        apparatus:           buildApparatusWithCounts(apparatusRes.data || [], findingsRes.data || []),
+        apparatus:           buildApparatusWithCounts(apparatusRes.data || [], apparatusFindings),
+        manual_issues:       manualIssues,
+        recently_resolved:   resolvedRes.data  || [],
         schedule
       })
     }
