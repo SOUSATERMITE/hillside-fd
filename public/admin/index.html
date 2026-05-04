@@ -1575,7 +1575,15 @@
           fetch(`${API}/manage-checklist-items`, { method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()}, body:JSON.stringify({action:'list_weekly'}) }),
           fetch(`${API}/get-apparatus`, { headers: AUTH.getHeaders() })
         ])
-        clData.daily  = dailyRes.ok  ? (await dailyRes.json()  || []) : []
+
+        if (!dailyRes.ok) {
+          const err = await dailyRes.json().catch(() => ({}))
+          document.getElementById('dailyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Error loading daily items: ${err.error || dailyRes.status}</div>`
+          document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Error loading weekly items: ${err.error || weeklyRes.status}</div>`
+          return
+        }
+
+        clData.daily  = await dailyRes.json()  || []
         clData.weekly = weeklyRes.ok ? (await weeklyRes.json() || []) : []
         checklistsApparatus = apRes.ok ? (await apRes.json() || []) : []
         renderDailyItems()
@@ -1583,8 +1591,8 @@
         buildClApparatusCheckboxes('dailyAppliesTo', 'daily-ap-check')
         buildClApparatusCheckboxes('weeklyApparatusCBs', 'weekly-ap-check')
       } catch(e) {
-        document.getElementById('dailyItemsContainer').innerHTML  = `<div class="text-red-500 text-sm text-center py-4">${e.message}</div>`
-        document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">${e.message}</div>`
+        document.getElementById('dailyItemsContainer').innerHTML  = `<div class="text-red-500 text-sm text-center py-4">Load error: ${e.message}</div>`
+        document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Load error: ${e.message}</div>`
       }
     }
 
