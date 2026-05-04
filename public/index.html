@@ -249,9 +249,18 @@
             class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:80px;"></textarea>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Additional Notes / Photos Location</label>
-          <textarea id="issueNotes" maxlength="2000" placeholder="Optional: photo location, additional notes..." rows="2"
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Additional Notes</label>
+          <textarea id="issueNotes" maxlength="2000" placeholder="Optional: additional notes..." rows="2"
             class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600" style="min-height:60px;"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Photos <span class="text-gray-400 font-normal">(up to 3, 6MB each)</span></label>
+          <label class="flex items-center gap-2 cursor-pointer border-2 border-dashed border-gray-300 rounded-xl px-3 py-2.5 hover:border-red-400 transition" style="min-height:44px;">
+            <span class="text-gray-400 text-xl">📷</span>
+            <span id="issuePhotoLabel" class="text-sm text-gray-500">Tap to add photos</span>
+            <input id="issuePhotos" type="file" accept="image/*" multiple class="hidden" onchange="onIssuePhotosChange()">
+          </label>
+          <div id="issuePhotoPreview" class="flex gap-2 mt-2 flex-wrap"></div>
         </div>
       </div>
       <div class="flex gap-2 mt-4">
@@ -959,6 +968,7 @@ function renderOOS() {
           <div class="text-sm text-gray-900 font-bold">${esc(f.item_name || 'Unknown item')}</div>
           <div class="text-xs text-gray-700 mt-0.5">${esc(f.description)}</div>
           <div class="text-xs text-gray-400 mt-0.5">${esc(f.reported_by)} · ${age} ago · ${days === 0 ? '&lt;1' : days} day${days===1?'':'s'} open</div>
+          ${Array.isArray(f.photo_urls) && f.photo_urls.length ? `<div class="flex gap-1.5 mt-1.5 flex-wrap">${f.photo_urls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;" loading="lazy"></a>`).join('')}</div>` : ''}
         </div>
         <div class="flex flex-col gap-1 flex-shrink-0">
           ${isOff && f.status === 'open' ? `<button onclick="markIssueInProgress('${f.id}')" class="text-xs font-bold text-blue-700 border border-blue-300 rounded-lg px-2 py-1 hover:bg-blue-50 transition" style="min-height:0;">→ In Progress</button>` : ''}
@@ -1054,6 +1064,9 @@ function openIssueModal(editId = null) {
     document.getElementById('issueApparatus').value        = ''
     document.getElementById('issueDescription').value      = ''
     document.getElementById('issueNotes').value            = ''
+    document.getElementById('issuePhotos').value           = ''
+    document.getElementById('issuePhotoPreview').innerHTML = ''
+    document.getElementById('issuePhotoLabel').textContent = 'Tap to add photos'
   }
   modal.classList.remove('hidden')
 }
@@ -1061,28 +1074,71 @@ function closeIssueModal() {
   document.getElementById('issueModal').classList.add('hidden')
 }
 
+function onIssuePhotosChange() {
+  const input   = document.getElementById('issuePhotos')
+  const preview = document.getElementById('issuePhotoPreview')
+  const label   = document.getElementById('issuePhotoLabel')
+  const files   = Array.from(input.files).slice(0, 3)
+  label.textContent = files.length ? `${files.length} photo${files.length>1?'s':''} selected` : 'Tap to add photos'
+  preview.innerHTML = ''
+  files.forEach(f => {
+    const url = URL.createObjectURL(f)
+    const img = document.createElement('img')
+    img.src = url
+    img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid #e5e7eb;'
+    preview.appendChild(img)
+  })
+}
+
+async function uploadFindingPhotos() {
+  const input = document.getElementById('issuePhotos')
+  const files = Array.from(input.files).slice(0, 3)
+  if (!files.length) return []
+  const urls = []
+  for (const file of files) {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader()
+      r.onload  = () => res(r.result.split(',')[1])
+      r.onerror = rej
+      r.readAsDataURL(file)
+    })
+    const resp = await fetch(`${API}/upload-finding-photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({ file_name: file.name, file_type: file.type, data: b64 })
+    })
+    const d = await resp.json()
+    if (!resp.ok) throw new Error(d.error || 'Photo upload failed')
+    urls.push(d.url)
+  }
+  return urls
+}
+
 async function submitIssueReport() {
   const btn  = document.getElementById('issueSubmitBtn')
   const editId = document.getElementById('issueModalId').value
-  const item_name   = document.getElementById('issueItemName').value.trim()
+  const item_name    = document.getElementById('issueItemName').value.trim()
   const item_category = document.getElementById('issueCategory').value
-  const issue_type  = document.getElementById('issueType').value
-  const priority    = document.getElementById('issuePriority').value
+  const issue_type   = document.getElementById('issueType').value
+  const priority     = document.getElementById('issuePriority').value
   const apparatus_id = document.getElementById('issueApparatus').value || null
-  const description = document.getElementById('issueDescription').value.trim()
+  const description  = document.getElementById('issueDescription').value.trim()
   const photos_notes = document.getElementById('issueNotes').value.trim()
 
-  if (!item_name) { alert('Item name is required.'); return }
+  if (!item_name)   { alert('Item name is required.'); return }
   if (!description) { alert('Description is required.'); return }
 
   btn.disabled = true
-  btn.textContent = editId ? 'Saving...' : 'Reporting...'
+  btn.textContent = 'Uploading photos...'
   try {
+    const photo_urls = await uploadFindingPhotos()
+    btn.textContent = editId ? 'Saving...' : 'Reporting...'
     let body
     if (editId) {
       body = { action:'update', id:editId, status:'open', item_name, item_category, issue_type, apparatus_id, description, photos_notes, priority }
+      if (photo_urls.length) body.photo_urls = photo_urls
     } else {
-      body = { action:'report_manual', item_name, item_category, issue_type, apparatus_id, priority, description, photos_notes }
+      body = { action:'report_manual', item_name, item_category, issue_type, apparatus_id, priority, description, photos_notes, photo_urls }
     }
     const res = await fetch(`${API}/manage-findings`, {
       method: 'POST',
@@ -1093,7 +1149,6 @@ async function submitIssueReport() {
     if (!res.ok) { alert(d.error || 'Failed'); return }
     closeIssueModal()
     if (editId) {
-      // Update in-place
       const idx = (dashData.manual_issues || []).findIndex(x => x.id === editId)
       if (idx !== -1) dashData.manual_issues[idx] = { ...dashData.manual_issues[idx], ...d }
     } else {

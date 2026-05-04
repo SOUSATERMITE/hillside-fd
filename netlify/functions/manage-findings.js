@@ -414,6 +414,7 @@ exports.handler = async (event) => {
           reported_by:   officer.display_name,
           officer_id:    officer.officer_id,
           photos_notes:  photos_notes?.trim().slice(0, 2000) || null,
+          photo_urls:    (Array.isArray(body.photo_urls) && body.photo_urls.length) ? body.photo_urls : null,
           status:        'open'
         })
         .select()
@@ -452,6 +453,7 @@ exports.handler = async (event) => {
       if (photos_notes       !== undefined) update.photos_notes      = photos_notes?.trim().slice(0, 2000) || null
       if (priority           !== undefined) update.priority          = priority || null
       if (resolution_notes   !== undefined) update.resolution_notes  = resolution_notes?.trim().slice(0, 2000) || null
+      if (body.photo_urls    !== undefined) update.photo_urls        = (Array.isArray(body.photo_urls) && body.photo_urls.length) ? body.photo_urls : null
 
       const { data, error } = await supabase
         .from('apparatus_findings')

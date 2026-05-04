@@ -113,7 +113,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus_findings')
-        .select('id, apparatus_id, finding_type, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at')
+        .select('id, apparatus_id, finding_type, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at, photo_urls')
         .in('status', ['open', 'in_progress'])
         .in('finding_type', ['damage', 'repair_needed', 'inspection', 'manual_report']),
 
@@ -124,7 +124,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus_findings')
-        .select('id, apparatus_id, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at, resolution_notes, completed_by, completed_date')
+        .select('id, apparatus_id, item_name, item_category, issue_type, description, priority, reported_by, officer_id, status, created_at, resolution_notes, completed_by, completed_date, photo_urls')
         .eq('finding_type', 'manual_report')
         .in('status', ['completed', 'cancelled'])
         .gte('completed_date', new Date(now - 7 * 86400000).toISOString().split('T')[0])
