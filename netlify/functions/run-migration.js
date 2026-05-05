@@ -90,6 +90,12 @@ const MIGRATION_SQL = `
   create index if not exists idx_duty_completions_date   on duty_completions(duty_id, completed_date);
   create index if not exists idx_duty_log_date           on duty_log(duty_id, shift_date);
 
+  -- Expand recurrence constraint + add recurrence_config JSONB column
+  alter table daily_duties add column if not exists recurrence_config jsonb;
+  alter table daily_duties drop constraint if exists daily_duties_recurrence_check;
+  alter table daily_duties add constraint daily_duties_recurrence_check
+    check (recurrence in ('one_time','daily','weekly','biweekly','monthly_date','monthly_dow','yearly','monthly','specific_day'));
+
   -- Manual issue reporting columns on apparatus_findings
   alter table apparatus_findings alter column apparatus_id drop not null;
   alter table apparatus_findings add column if not exists item_name        text;

@@ -21,28 +21,45 @@ exports.handler = async (event) => {
   const { action } = body
   const isAdmin = officer.role === 'admin'
 
+  const VALID_DUTY_TYPES = ['administrative','training','maintenance','inspection','other']
+  const VALID_REC_TYPES  = ['one_time','daily','weekly','biweekly','monthly_date','monthly_dow','yearly']
+
+  // Build recurrence_config from body — accepts new recurrence_config object
+  // or falls back to legacy recurrence/recurrence_day/specific_date fields
+  function buildConfig(b) {
+    if (b.recurrence_config && b.recurrence_config.type) return b.recurrence_config
+    switch (b.recurrence) {
+      case 'one_time':     return { type: 'one_time',    date: b.specific_date || null }
+      case 'daily':        return { type: 'daily' }
+      case 'weekly':       return { type: 'weekly',      day: b.recurrence_day ?? 0 }
+      case 'specific_day': return { type: 'weekly',      day: b.recurrence_day ?? 0 }
+      case 'monthly':      return { type: 'monthly_date', date: 1 }
+      default:             return { type: 'one_time',    date: b.specific_date || null }
+    }
+  }
+
   try {
     // ── CREATE DUTY ────────────────────────────────────────────────────────────
     if (action === 'create') {
-      const { title, description, duty_type, recurrence, recurrence_day, specific_date, tour_specific, requires_report } = body
+      const { title, description, duty_type, tour_specific, requires_report } = body
       if (!title?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'title required' }) }
+      if (!VALID_DUTY_TYPES.includes(duty_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid duty_type' }) }
 
-      const VALID_TYPES = ['administrative','training','maintenance','inspection','other']
-      const VALID_REC   = ['one_time','daily','weekly','monthly','specific_day']
-      if (!VALID_TYPES.includes(duty_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid duty_type' }) }
-      if (!VALID_REC.includes(recurrence))  return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid recurrence' }) }
+      const cfg = buildConfig(body)
+      if (!VALID_REC_TYPES.includes(cfg.type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid recurrence type' }) }
 
       const { data, error } = await supabase.from('daily_duties').insert({
-        title:          title.trim().slice(0, 200),
-        description:    description?.trim().slice(0, 1000) || null,
+        title:             title.trim().slice(0, 200),
+        description:       description?.trim().slice(0, 1000) || null,
         duty_type,
-        recurrence,
-        recurrence_day: (recurrence === 'weekly' || recurrence === 'specific_day') ? (recurrence_day ?? null) : null,
-        specific_date:  recurrence === 'one_time' ? (specific_date || null) : null,
-        tour_specific:  tour_specific || null,
-        requires_report: requires_report === true,
-        created_by:     officer.display_name,
-        officer_id:     officer.officer_id
+        recurrence:        cfg.type,
+        recurrence_day:    cfg.day ?? null,
+        specific_date:     cfg.type === 'one_time' ? (cfg.date || null) : null,
+        recurrence_config: cfg,
+        tour_specific:     tour_specific || null,
+        requires_report:   requires_report === true,
+        created_by:        officer.display_name,
+        officer_id:        officer.officer_id
       }).select().single()
       if (error) throw error
       return { statusCode: 200, headers, body: JSON.stringify(data) }
@@ -50,7 +67,7 @@ exports.handler = async (event) => {
 
     // ── UPDATE DUTY ────────────────────────────────────────────────────────────
     if (action === 'update') {
-      const { id, title, description, duty_type, recurrence, recurrence_day, specific_date, tour_specific, requires_report, active } = body
+      const { id, title, description, duty_type, tour_specific, requires_report, active } = body
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
 
       const { data: existing } = await supabase.from('daily_duties').select('officer_id').eq('id', id).single()
@@ -63,10 +80,12 @@ exports.handler = async (event) => {
       if (title       !== undefined) update.title       = title.trim().slice(0, 200)
       if (description !== undefined) update.description = description?.trim().slice(0, 1000) || null
       if (duty_type   !== undefined) update.duty_type   = duty_type
-      if (recurrence  !== undefined) {
-        update.recurrence     = recurrence
-        update.recurrence_day = (recurrence === 'weekly' || recurrence === 'specific_day') ? (recurrence_day ?? null) : null
-        update.specific_date  = recurrence === 'one_time' ? (specific_date || null) : null
+      if (body.recurrence !== undefined || body.recurrence_config !== undefined) {
+        const cfg = buildConfig(body)
+        update.recurrence        = cfg.type
+        update.recurrence_day    = cfg.day ?? null
+        update.specific_date     = cfg.type === 'one_time' ? (cfg.date || null) : null
+        update.recurrence_config = cfg
       }
       if (tour_specific    !== undefined) update.tour_specific    = tour_specific || null
       if (requires_report  !== undefined) update.requires_report  = requires_report === true

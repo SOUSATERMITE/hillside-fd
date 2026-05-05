@@ -257,10 +257,12 @@
           </select>
           <select id="dutyAdminRecurrence" onchange="onAdminDutyRecurrenceChange()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
             <option value="one_time">One-time</option>
-            <option value="daily">Daily (every shift)</option>
-            <option value="weekly">Weekly (specific day)</option>
-            <option value="monthly">Monthly</option>
-            <option value="specific_day">Specific Day of Week</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Every other week</option>
+            <option value="monthly_date">Monthly — by date</option>
+            <option value="monthly_dow">Monthly — by weekday</option>
+            <option value="yearly">Yearly</option>
           </select>
           <select id="dutyAdminTour" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
             <option value="">All Tours</option>
@@ -270,22 +272,77 @@
             <option value="4">Tour 4</option>
           </select>
         </div>
-        <div id="dutyAdminDateRow" class="mb-3">
+        <!-- one_time -->
+        <div id="dutyAdminRowDate" class="mb-3">
           <label class="block text-xs font-semibold text-gray-600 mb-1">Date (for one-time duty)</label>
           <input id="dutyAdminDate" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
         </div>
-        <div id="dutyAdminDayRow" class="hidden mb-3">
+        <!-- weekly / biweekly -->
+        <div id="dutyAdminRowDay" class="hidden mb-3">
           <label class="block text-xs font-semibold text-gray-600 mb-1">Day of Week</label>
           <select id="dutyAdminDay" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
-            <option value="0">Sunday</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-            <option value="6">Saturday</option>
+            <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
           </select>
         </div>
+        <!-- monthly_date -->
+        <div id="dutyAdminRowMonthDate" class="hidden mb-3">
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Day of Month</label>
+          <select id="dutyAdminMonthDate" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+            <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+            <option value="6">6th</option><option value="7">7th</option><option value="8">8th</option><option value="9">9th</option><option value="10">10th</option>
+            <option value="11">11th</option><option value="12">12th</option><option value="13">13th</option><option value="14">14th</option><option value="15">15th</option>
+            <option value="16">16th</option><option value="17">17th</option><option value="18">18th</option><option value="19">19th</option><option value="20">20th</option>
+            <option value="21">21st</option><option value="22">22nd</option><option value="23">23rd</option><option value="24">24th</option><option value="25">25th</option>
+            <option value="26">26th</option><option value="27">27th</option><option value="28">28th</option><option value="29">29th</option><option value="30">30th</option>
+            <option value="31">31st</option>
+          </select>
+        </div>
+        <!-- monthly_dow -->
+        <div id="dutyAdminRowMonthDow" class="hidden mb-3">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Which occurrence</label>
+              <select id="dutyAdminWeekNum" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+                <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th (last)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Day of Week</label>
+              <select id="dutyAdminDowMonth" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+                <option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option>
+                <option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- yearly -->
+        <div id="dutyAdminRowYearly" class="hidden mb-3">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Month</label>
+              <select id="dutyAdminYearMonth" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+                <option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option>
+                <option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option>
+                <option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1">Day</label>
+              <select id="dutyAdminYearDay" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px;">
+                <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option>
+                <option value="6">6th</option><option value="7">7th</option><option value="8">8th</option><option value="9">9th</option><option value="10">10th</option>
+                <option value="11">11th</option><option value="12">12th</option><option value="13">13th</option><option value="14">14th</option><option value="15">15th</option>
+                <option value="16">16th</option><option value="17">17th</option><option value="18">18th</option><option value="19">19th</option><option value="20">20th</option>
+                <option value="21">21st</option><option value="22">22nd</option><option value="23">23rd</option><option value="24">24th</option><option value="25">25th</option>
+                <option value="26">26th</option><option value="27">27th</option><option value="28">28th</option><option value="29">29th</option><option value="30">30th</option>
+                <option value="31">31st</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- Preview -->
+        <div id="dutyAdminPreview" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-800 font-semibold"></div>
         <textarea id="dutyAdminDesc" placeholder="Description (optional)" maxlength="1000" rows="2"
           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:60px;resize:vertical;"></textarea>
         <div class="flex items-center gap-3 mb-3">
@@ -1352,13 +1409,77 @@
       inspection:     'bg-green-100 text-green-700',
       other:          'bg-gray-100 text-gray-600'
     }
-    const ADMIN_RECURRENCE_LABELS = { one_time:'One-time', daily:'Daily', weekly:'Weekly', monthly:'Monthly', specific_day:'Specific Day' }
-    const ADMIN_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    const ADMIN_DOW        = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    const ADMIN_DAYS       = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    const ADMIN_MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December']
+    const ADMIN_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+    function adminOrdSuffix(n) {
+      if (n >= 11 && n <= 13) return n + 'th'
+      return n + (['th','st','nd','rd'][n % 10] || 'th')
+    }
+
+    function adminDutyRecurrencePreview(cfg) {
+      if (!cfg) return ''
+      switch (cfg.type) {
+        case 'one_time':     return cfg.date ? `Runs once on ${cfg.date}` : 'Runs once on a specific date'
+        case 'daily':        return 'Repeats every day'
+        case 'weekly':       return cfg.day !== undefined ? `Repeats every ${ADMIN_DAYS[cfg.day]}` : 'Repeats weekly'
+        case 'biweekly':     return cfg.day !== undefined ? `Repeats every other ${ADMIN_DAYS[cfg.day]}` : 'Repeats every other week'
+        case 'monthly_date': return cfg.date ? `Repeats on the ${adminOrdSuffix(cfg.date)} of every month` : 'Repeats monthly on a specific date'
+        case 'monthly_dow':  return (cfg.week && cfg.day !== undefined) ? `Repeats every ${adminOrdSuffix(cfg.week)} ${ADMIN_DAYS[cfg.day]} of the month` : 'Repeats monthly on a specific weekday'
+        case 'yearly':       return (cfg.month && cfg.date) ? `Repeats every ${ADMIN_MONTHS[cfg.month - 1]} ${adminOrdSuffix(cfg.date)}` : 'Repeats yearly'
+        default:             return ''
+      }
+    }
+
+    function adminDutyShortLabel(d) {
+      const cfg = d.recurrence_config
+      if (!cfg) {
+        const m = { one_time:'One-time', daily:'Daily', weekly:'Weekly', monthly:'Monthly', specific_day:'Specific Day' }
+        const detail = (d.recurrence === 'weekly' || d.recurrence === 'specific_day') && d.recurrence_day !== null
+          ? ` (${ADMIN_DOW[d.recurrence_day]})` : d.recurrence === 'one_time' && d.specific_date ? ` (${d.specific_date})` : ''
+        return (m[d.recurrence] || d.recurrence) + detail
+      }
+      switch (cfg.type) {
+        case 'one_time':     return 'One-time' + (cfg.date ? ` (${cfg.date})` : '')
+        case 'daily':        return 'Daily'
+        case 'weekly':       return cfg.day !== undefined ? `Weekly (${ADMIN_DOW[cfg.day]})` : 'Weekly'
+        case 'biweekly':     return cfg.day !== undefined ? `Biweekly (${ADMIN_DOW[cfg.day]})` : 'Biweekly'
+        case 'monthly_date': return cfg.date ? `Monthly (${adminOrdSuffix(cfg.date)})` : 'Monthly'
+        case 'monthly_dow':  return (cfg.week && cfg.day !== undefined) ? `Monthly (${adminOrdSuffix(cfg.week)} ${ADMIN_DOW[cfg.day]})` : 'Monthly'
+        case 'yearly':       return (cfg.month && cfg.date) ? `Yearly (${ADMIN_MONTHS_SHORT[cfg.month-1]} ${cfg.date})` : 'Yearly'
+        default:             return cfg.type
+      }
+    }
+
+    function buildAdminDutyConfig() {
+      const rec = document.getElementById('dutyAdminRecurrence').value
+      const today = new Date().toISOString().slice(0, 10)
+      switch (rec) {
+        case 'one_time':     return { type: 'one_time', date: document.getElementById('dutyAdminDate').value || null }
+        case 'daily':        return { type: 'daily' }
+        case 'weekly':       return { type: 'weekly', day: parseInt(document.getElementById('dutyAdminDay').value) }
+        case 'biweekly':     return { type: 'biweekly', day: parseInt(document.getElementById('dutyAdminDay').value), anchor: today }
+        case 'monthly_date': return { type: 'monthly_date', date: parseInt(document.getElementById('dutyAdminMonthDate').value) }
+        case 'monthly_dow':  return { type: 'monthly_dow', week: parseInt(document.getElementById('dutyAdminWeekNum').value), day: parseInt(document.getElementById('dutyAdminDowMonth').value) }
+        case 'yearly':       return { type: 'yearly', month: parseInt(document.getElementById('dutyAdminYearMonth').value), date: parseInt(document.getElementById('dutyAdminYearDay').value) }
+        default:             return { type: 'one_time', date: null }
+      }
+    }
 
     function onAdminDutyRecurrenceChange() {
       const rec = document.getElementById('dutyAdminRecurrence').value
-      document.getElementById('dutyAdminDateRow').classList.toggle('hidden', rec !== 'one_time')
-      document.getElementById('dutyAdminDayRow').classList.toggle('hidden', rec !== 'weekly' && rec !== 'specific_day')
+      document.getElementById('dutyAdminRowDate').classList.toggle('hidden',     rec !== 'one_time')
+      document.getElementById('dutyAdminRowDay').classList.toggle('hidden',      rec !== 'weekly' && rec !== 'biweekly')
+      document.getElementById('dutyAdminRowMonthDate').classList.toggle('hidden', rec !== 'monthly_date')
+      document.getElementById('dutyAdminRowMonthDow').classList.toggle('hidden',  rec !== 'monthly_dow')
+      document.getElementById('dutyAdminRowYearly').classList.toggle('hidden',    rec !== 'yearly')
+      const cfg = buildAdminDutyConfig()
+      const text = adminDutyRecurrencePreview(cfg)
+      const prev = document.getElementById('dutyAdminPreview')
+      prev.textContent = text
+      prev.classList.toggle('hidden', !text || rec === 'one_time')
     }
 
     async function loadAdminDuties() {
@@ -1382,9 +1503,8 @@
       }
       el.innerHTML = duties.map(d => {
         const tc = ADMIN_DUTY_TYPE_COLORS[d.duty_type] || 'bg-gray-100 text-gray-600'
-        const recLbl = ADMIN_RECURRENCE_LABELS[d.recurrence] || d.recurrence
-        const recDetail = (d.recurrence === 'weekly' || d.recurrence === 'specific_day') && d.recurrence_day !== null
-          ? ` (${ADMIN_DOW[d.recurrence_day]})` : d.recurrence === 'one_time' && d.specific_date ? ` (${d.specific_date})` : ''
+        const recLbl = adminDutyShortLabel(d)
+        const recDetail = ''
         const tourBadge = d.tour_specific ? `<span class="ml-1 inline-block text-xs bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded-full">Tour ${d.tour_specific}</span>` : ''
         const statusBadge = d.active
           ? '<span class="inline-block text-xs bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">Active</span>'
@@ -1414,17 +1534,14 @@
     async function createAdminDuty() {
       const title = document.getElementById('dutyAdminTitle').value.trim()
       if (!title) { document.getElementById('dutyAdminResult').textContent = 'Title is required'; document.getElementById('dutyAdminResult').style.color = '#dc2626'; return }
-      const rec = document.getElementById('dutyAdminRecurrence').value
       const body = {
-        action: 'create',
+        action:            'create',
         title,
-        description:     document.getElementById('dutyAdminDesc').value.trim() || null,
-        duty_type:       document.getElementById('dutyAdminType').value,
-        recurrence:      rec,
-        recurrence_day:  (rec === 'weekly' || rec === 'specific_day') ? parseInt(document.getElementById('dutyAdminDay').value) : null,
-        specific_date:   rec === 'one_time' ? (document.getElementById('dutyAdminDate').value || null) : null,
-        tour_specific:   document.getElementById('dutyAdminTour').value ? parseInt(document.getElementById('dutyAdminTour').value) : null,
-        requires_report: document.getElementById('dutyAdminRequiresReport').checked
+        description:       document.getElementById('dutyAdminDesc').value.trim() || null,
+        duty_type:         document.getElementById('dutyAdminType').value,
+        recurrence_config: buildAdminDutyConfig(),
+        tour_specific:     document.getElementById('dutyAdminTour').value ? parseInt(document.getElementById('dutyAdminTour').value) : null,
+        requires_report:   document.getElementById('dutyAdminRequiresReport').checked
       }
       try {
         const res = await fetch(`${API}/manage-duties`, {

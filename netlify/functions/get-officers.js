@@ -40,16 +40,22 @@ exports.handler = async (event) => {
 
     if (error) throw error
 
-    // Deduplicate by name — keep highest rank (admin > officer > firefighter)
+    // Deduplicate by name AND display_name — keep highest rank (admin > officer > firefighter)
     const RANK = { admin: 0, officer: 1, firefighter: 2 }
-    const seen = {}
-    for (const o of (data || [])) {
-      const key = o.name.toLowerCase().trim()
-      if (!seen[key] || (RANK[o.role] ?? 3) < (RANK[seen[key].role] ?? 3)) {
-        seen[key] = o
+    // Sort by rank first so higher-ranked entries win dedup
+    const ranked = (data || []).slice().sort((a, b) => (RANK[a.role] ?? 3) - (RANK[b.role] ?? 3))
+    const seenName    = new Set()
+    const seenDisplay = new Set()
+    const deduped = []
+    for (const o of ranked) {
+      const nk = o.name.toLowerCase().trim()
+      const dk = o.display_name.toLowerCase().trim()
+      if (!seenName.has(nk) && !seenDisplay.has(dk)) {
+        seenName.add(nk)
+        seenDisplay.add(dk)
+        deduped.push(o)
       }
     }
-    const deduped = Object.values(seen)
     deduped.sort((a, b) => {
       // Temporary (acting) always last
       if (a.is_temporary !== b.is_temporary) return a.is_temporary ? 1 : -1

@@ -18,8 +18,48 @@ function etDateStr(ms) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+function isApplicableByConfig(cfg, dateStr, dayOfWeek) {
+  const d = new Date(dateStr + 'T12:00:00Z')
+  switch (cfg.type) {
+    case 'one_time':
+      return cfg.date === dateStr
+    case 'daily':
+      return true
+    case 'weekly':
+      return dayOfWeek === cfg.day
+    case 'biweekly': {
+      if (dayOfWeek !== cfg.day || !cfg.anchor) return false
+      const anchor = new Date(cfg.anchor + 'T12:00:00Z')
+      const diffDays = Math.round((d - anchor) / 86400000)
+      return diffDays >= 0 && diffDays % 14 === 0
+    }
+    case 'monthly_date': {
+      const dom = d.getUTCDate()
+      if (dom === cfg.date) return true
+      // Months shorter than cfg.date: fire on the last day of the month
+      if (cfg.date > 28) {
+        const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+        if (dom === lastDay && cfg.date > lastDay) return true
+      }
+      return false
+    }
+    case 'monthly_dow': {
+      if (dayOfWeek !== cfg.day) return false
+      const dom = d.getUTCDate()
+      return Math.floor((dom - 1) / 7) + 1 === cfg.week
+    }
+    case 'yearly':
+      return d.getUTCMonth() + 1 === cfg.month && d.getUTCDate() === cfg.date
+    default:
+      return false
+  }
+}
+
 function isDutyApplicable(duty, dateStr, dayOfWeek, group) {
   if (duty.tour_specific !== null && duty.tour_specific !== undefined && duty.tour_specific !== group) return false
+  const cfg = duty.recurrence_config
+  if (cfg && cfg.type) return isApplicableByConfig(cfg, dateStr, dayOfWeek)
+  // Legacy fallback
   switch (duty.recurrence) {
     case 'one_time':    return duty.specific_date === dateStr
     case 'daily':       return true
