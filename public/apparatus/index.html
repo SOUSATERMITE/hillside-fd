@@ -836,24 +836,16 @@ function getDailyItems(unitType, unitName) {
   return items
 }
 
-function openCheckModal(id, name, unitType, checkType) {
-  modalUnitId      = id
-  currentCheckType = checkType
-  const isDaily    = checkType === 'daily_check'
-  document.getElementById('checkModalTitle').textContent = `${isDaily ? '✓ Daily Check' : '✓ Weekly Equipment Check'} — ${name}`
-  document.getElementById('ck_notes').value  = ''
-  document.getElementById('ck_err').classList.add('hidden')
-
-  const items = isDaily ? getDailyItems(unitType, name) : WEEKLY_ITEMS
-  const container = document.getElementById('checkItems')
-  container.innerHTML = items.map(item => `
+function renderCheckItems(items) {
+  return items.map(item => `
     <div id="ck-row-${item.key}" class="border-b border-gray-100 last:border-b-0">
       <div class="flex items-center justify-between gap-3 px-3 py-2.5">
         <label class="text-sm font-medium text-gray-700 flex-1">${esc(item.label)}</label>
         <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
           onchange="onCheckItemChange(this)"
           class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
-          ${item.options.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+          <option value="Good">Good</option>
+          <option value="Issue">Issue</option>
         </select>
       </div>
       <div id="ck-issue-${item.key}" style="max-height:0;overflow:hidden;transition:max-height 0.28s ease;">
@@ -863,8 +855,53 @@ function openCheckModal(id, name, unitType, checkType) {
         </div>
       </div>
     </div>`).join('')
+}
 
+function renderCheckItemsGrouped(dbItems) {
+  const groups = new Map()
+  for (const item of dbItems) {
+    const cat = item.category || 'Other'
+    if (!groups.has(cat)) groups.set(cat, [])
+    groups.get(cat).push({ key: item.id, label: item.name, pass: ['Good'] })
+  }
+  let html = ''
+  for (const [cat, items] of groups) {
+    html += `<div class="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200">${esc(cat)}</div>`
+    html += renderCheckItems(items)
+  }
+  return html
+}
+
+function openCheckModal(id, name, unitType, checkType) {
+  modalUnitId      = id
+  currentCheckType = checkType
+  const isDaily    = checkType === 'daily_check'
+  document.getElementById('checkModalTitle').textContent = `${isDaily ? '✓ Daily Check' : '✓ Weekly Equipment Check'} — ${name}`
+  document.getElementById('ck_notes').value  = ''
+  document.getElementById('ck_err').classList.add('hidden')
   document.getElementById('checkModal').classList.remove('hidden')
+
+  const container = document.getElementById('checkItems')
+
+  if (isDaily) {
+    container.innerHTML = renderCheckItems(getDailyItems(unitType, name))
+    return
+  }
+
+  // Weekly: fetch from DB grouped by compartment
+  container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6">Loading items…</div>'
+  fetch(`${API}/get-checklist-items?type=weekly&apparatus=${encodeURIComponent(name)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!Array.isArray(data) || data.length === 0) {
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6">No weekly check items found for this apparatus.</div>'
+        return
+      }
+      container.innerHTML = renderCheckItemsGrouped(data)
+    })
+    .catch(() => {
+      container.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load checklist items.</div>'
+    })
 }
 
 function onCheckItemChange(sel) {
