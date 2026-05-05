@@ -410,8 +410,13 @@
           </div>
           <div class="flex items-center gap-2">
             <button onclick="loadChecklistsAdmin()" class="text-xs text-gray-400 hover:text-gray-600 font-semibold" style="min-height:0;">↻</button>
+            <button onclick="importChecklistItems('daily')" class="text-xs font-bold text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-xl px-3 py-1.5 transition" style="min-height:0;">⬇ Import</button>
             <button onclick="toggleClForm('daily')" class="text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl px-4 py-2 transition" style="min-height:0;">+ Add Item</button>
           </div>
+        </div>
+        <div class="px-5 py-2.5 border-b border-gray-100 bg-gray-50">
+          <input id="dailySearchInput" type="text" placeholder="Search daily check items…" oninput="renderDailyItems()"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white" style="min-height:36px;">
         </div>
 
         <div id="clDailyAddForm" class="hidden px-5 py-4 bg-red-50 border-b border-red-100">
@@ -447,32 +452,26 @@
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 class="font-bold text-gray-800">Weekly Check Items</h2>
-            <p class="text-xs text-gray-400 mt-0.5">Grouped by category — done once per week per apparatus</p>
+            <p class="text-xs text-gray-400 mt-0.5">Grouped by apparatus then compartment — checked once per week</p>
           </div>
           <div class="flex items-center gap-2">
             <button onclick="loadChecklistsAdmin()" class="text-xs text-gray-400 hover:text-gray-600 font-semibold" style="min-height:0;">↻</button>
+            <button onclick="importChecklistItems('weekly')" class="text-xs font-bold text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-xl px-3 py-1.5 transition" style="min-height:0;">⬇ Import</button>
             <button onclick="toggleClForm('weekly')" class="text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl px-4 py-2 transition" style="min-height:0;">+ Add Item</button>
           </div>
+        </div>
+        <div class="px-5 py-2.5 border-b border-gray-100 bg-gray-50">
+          <input id="weeklySearchInput" type="text" placeholder="Search weekly items by name, compartment, or apparatus…" oninput="renderWeeklyItems()"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-white" style="min-height:36px;">
         </div>
 
         <div id="clWeeklyAddForm" class="hidden px-5 py-4 bg-red-50 border-b border-red-100">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <input id="weeklyItemName" type="text" placeholder="Item name *" maxlength="200"
               class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 sm:col-span-2" style="min-height:40px;">
-            <select id="weeklyItemCategory" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
-              <option value="SCBA">SCBA</option>
-              <option value="Hose &amp; Nozzles">Hose &amp; Nozzles</option>
-              <option value="Hand Tools">Hand Tools</option>
-              <option value="Ladders">Ladders</option>
-              <option value="Medical">Medical</option>
-              <option value="Rope &amp; Rescue">Rope &amp; Rescue</option>
-              <option value="Forcible Entry">Forcible Entry</option>
-              <option value="Extrication">Extrication</option>
-              <option value="Thermal Imaging">Thermal Imaging</option>
-              <option value="Lighting">Lighting</option>
-              <option value="PPE">PPE</option>
-              <option value="Other">Other</option>
-            </select>
+            <input id="weeklyItemCategory" type="text" list="wkCatDatalist" placeholder="Compartment / Category *" maxlength="100"
+              class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
+            <datalist id="wkCatDatalist"></datalist>
             <select id="weeklyItemPriority" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
               <option value="low">Low — if failed</option>
               <option value="medium" selected>Medium — if failed</option>
@@ -1678,9 +1677,9 @@
     let checklistsApparatus = []
     let clData = { daily: [], weekly: [] }
     const CL_DAILY_TYPES = ['visual','fluid','electrical','mechanical','other']
-    const CL_WEEKLY_CATS = ['SCBA','Hose & Nozzles','Hand Tools','Ladders','Medical','Rope & Rescue','Forcible Entry','Extrication','Thermal Imaging','Lighting','PPE','Other']
     const CL_PRIORITIES  = ['low','medium','high']
     const PRI_LABEL      = { low:'Low', medium:'Medium', high:'High' }
+    const PRI_COLOR      = { high:'bg-red-100 text-red-700', medium:'bg-orange-100 text-orange-700', low:'bg-gray-100 text-gray-500' }
     const TYPE_LABEL     = { visual:'Visual', fluid:'Fluid', electrical:'Electrical', mechanical:'Mechanical', other:'Other' }
 
     async function loadChecklistsAdmin() {
@@ -1692,14 +1691,12 @@
           fetch(`${API}/manage-checklist-items`, { method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()}, body:JSON.stringify({action:'list_weekly'}) }),
           fetch(`${API}/get-apparatus`, { headers: AUTH.getHeaders() })
         ])
-
         if (!dailyRes.ok) {
           const err = await dailyRes.json().catch(() => ({}))
-          document.getElementById('dailyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Error loading daily items: ${err.error || dailyRes.status}</div>`
-          document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Error loading weekly items: ${err.error || weeklyRes.status}</div>`
+          document.getElementById('dailyItemsContainer').innerHTML  = `<div class="text-red-500 text-sm text-center py-4">Error: ${err.error || dailyRes.status}</div>`
+          document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Error: ${err.error || weeklyRes.status}</div>`
           return
         }
-
         clData.daily  = await dailyRes.json()  || []
         clData.weekly = weeklyRes.ok ? (await weeklyRes.json() || []) : []
         checklistsApparatus = apRes.ok ? (await apRes.json() || []) : []
@@ -1711,6 +1708,14 @@
         document.getElementById('dailyItemsContainer').innerHTML  = `<div class="text-red-500 text-sm text-center py-4">Load error: ${e.message}</div>`
         document.getElementById('weeklyItemsContainer').innerHTML = `<div class="text-red-500 text-sm text-center py-4">Load error: ${e.message}</div>`
       }
+    }
+
+    function updateWeeklyCatDatalist() {
+      const cats = [...new Set(clData.weekly.map(i => i.category).filter(Boolean))].sort()
+      ;['wkCatDatalist','clEditCatList'].forEach(id => {
+        const el = document.getElementById(id)
+        if (el) el.innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('')
+      })
     }
 
     function buildClApparatusCheckboxes(containerId, cls) {
@@ -1725,15 +1730,23 @@
     }
 
     function toggleClForm(type) {
-      const id = type === 'daily' ? 'clDailyAddForm' : 'clWeeklyAddForm'
-      document.getElementById(id).classList.toggle('hidden')
+      document.getElementById(type === 'daily' ? 'clDailyAddForm' : 'clWeeklyAddForm').classList.toggle('hidden')
     }
+
+    // ── RENDER DAILY ─────────────────────────────────────────────────────────────
 
     function renderDailyItems() {
       const container = document.getElementById('dailyItemsContainer')
-      const items = clData.daily
-      if (!items.length) { container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No daily check items yet. Add one above.</div>'; return }
-
+      const q = (document.getElementById('dailySearchInput')?.value || '').toLowerCase()
+      let items = clData.daily
+      if (q) items = items.filter(i =>
+        i.name.toLowerCase().includes(q) ||
+        (Array.isArray(i.applies_to) && i.applies_to.some(a => a.toLowerCase().includes(q)))
+      )
+      if (!items.length) {
+        container.innerHTML = `<div class="text-gray-400 text-sm text-center py-8">${q ? 'No items match your search.' : 'No daily check items yet. Add one above.'}</div>`
+        return
+      }
       const active   = items.filter(i => i.active !== false)
       const inactive = items.filter(i => i.active === false)
 
@@ -1741,73 +1754,155 @@
         const appList = Array.isArray(item.applies_to) && item.applies_to.length && !item.applies_to.includes('all')
           ? item.applies_to.join(', ') : 'All apparatus'
         const typeLabel = TYPE_LABEL[item.item_type] || item.item_type || '—'
-        return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition" id="daily-row-${item.id}">
+        const off = item.active === false
+        return `<div class="px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50 transition group ${off ? 'opacity-60' : ''}"
+            id="daily-row-${item.id}" data-item-id="${item.id}" data-item-type="daily" draggable="true">
+          <span class="text-gray-300 group-hover:text-gray-500 cursor-grab select-none flex-shrink-0 text-lg leading-none" title="Drag to reorder">⠿</span>
           <div class="flex-1 min-w-0">
-            <div class="font-semibold text-gray-800 text-sm">${esc(item.name)}</div>
+            <div class="font-semibold text-sm text-gray-800 ${off ? 'line-through text-gray-400' : ''}">${esc(item.name)}</div>
             <div class="text-xs text-gray-400 mt-0.5">${typeLabel} · ${esc(appList)}</div>
           </div>
-          <span class="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${item.active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${item.active !== false ? 'Active' : 'Inactive'}</span>
-          <button onclick="openClEditModal('daily','${item.id}')" class="flex-shrink-0 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg px-2.5 py-1 hover:bg-blue-50 transition" style="min-height:0;">Edit</button>
-          <button onclick="toggleDailyItem('${item.id}',${item.active === false})" class="flex-shrink-0 text-xs font-bold ${item.active !== false ? 'text-gray-500 border-gray-200' : 'text-green-600 border-green-200'} border rounded-lg px-2.5 py-1 hover:bg-gray-50 transition" style="min-height:0;">${item.active !== false ? 'Disable' : 'Enable'}</button>
-          <button onclick="deleteDailyItem('${item.id}')" class="flex-shrink-0 text-xs font-bold text-red-500 border border-red-200 rounded-lg px-2.5 py-1 hover:bg-red-50 transition" style="min-height:0;">Delete</button>
+          <span class="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ${off ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}">${off ? 'Inactive' : 'Active'}</span>
+          <button onclick="openClEditModal('daily','${item.id}')" class="flex-shrink-0 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg px-2 py-1 hover:bg-blue-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Edit</button>
+          ${off
+            ? `<button onclick="setClActive('daily','${item.id}',true)" class="flex-shrink-0 text-xs font-bold text-green-600 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Restore</button>`
+            : `<button onclick="deleteClItem('daily','${item.id}')" class="flex-shrink-0 text-xs font-bold text-red-500 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Delete</button>`
+          }
         </div>`
       }
 
       let html = ''
       if (active.length) {
-        html += `<div class="px-5 py-2 bg-green-50 border-b border-green-100"><span class="text-xs font-bold text-green-700 uppercase tracking-wide">Active (${active.length})</span></div>`
-        html += `<div class="divide-y divide-gray-100">${active.map(rowHtml).join('')}</div>`
+        html += `<div class="px-5 py-1.5 bg-green-50 border-b border-green-100"><span class="text-xs font-bold text-green-700 uppercase tracking-wide">Active (${active.length})</span></div>`
+        html += `<div class="divide-y divide-gray-100" data-drag-group="daily-active">${active.map(rowHtml).join('')}</div>`
       }
       if (inactive.length) {
-        html += `<div class="px-5 py-2 bg-gray-50 border-t border-gray-100"><span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Inactive (${inactive.length})</span></div>`
-        html += `<div class="divide-y divide-gray-100 opacity-60">${inactive.map(rowHtml).join('')}</div>`
+        html += `<div class="px-5 py-1.5 bg-gray-50 border-t border-gray-200"><span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Inactive (${inactive.length})</span></div>`
+        html += `<div class="divide-y divide-gray-100">${inactive.map(rowHtml).join('')}</div>`
       }
       container.innerHTML = html
+      initClDragDrop('daily')
     }
+
+    // ── RENDER WEEKLY ─────────────────────────────────────────────────────────────
 
     function renderWeeklyItems() {
       const container = document.getElementById('weeklyItemsContainer')
-      const items = clData.weekly
-      if (!items.length) { container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No weekly check items yet. Add one above.</div>'; return }
-
-      // Group by category
-      const byCategory = {}
-      for (const item of items) {
-        const cat = item.category || 'Other'
-        if (!byCategory[cat]) byCategory[cat] = []
-        byCategory[cat].push(item)
+      const q = (document.getElementById('weeklySearchInput')?.value || '').toLowerCase()
+      let items = clData.weekly
+      if (q) items = items.filter(i =>
+        i.name.toLowerCase().includes(q) ||
+        (i.category || '').toLowerCase().includes(q) ||
+        (Array.isArray(i.apparatus_ids) && i.apparatus_ids.some(a => a.toLowerCase().includes(q)))
+      )
+      if (!items.length) {
+        container.innerHTML = `<div class="text-gray-400 text-sm text-center py-8">${q ? 'No items match your search.' : 'No weekly check items yet. Add one above.'}</div>`
+        return
       }
 
+      // Group: apparatus key → Map<category, items[]>
+      const byAp = new Map()
+      for (const item of items) {
+        const apKey = (Array.isArray(item.apparatus_ids) && item.apparatus_ids.length)
+          ? item.apparatus_ids.join(', ') : 'All Apparatus'
+        if (!byAp.has(apKey)) byAp.set(apKey, new Map())
+        const cat = item.category || 'Other'
+        if (!byAp.get(apKey).has(cat)) byAp.get(apKey).set(cat, [])
+        byAp.get(apKey).get(cat).push(item)
+      }
+      const apOrder = [...byAp.keys()].sort((a,b) => a === 'All Apparatus' ? -1 : b === 'All Apparatus' ? 1 : a.localeCompare(b))
+
       function rowHtml(item) {
-        const apIds = Array.isArray(item.apparatus_ids) && item.apparatus_ids.length ? item.apparatus_ids.join(', ') : 'All apparatus'
-        const priLabel = PRI_LABEL[item.priority_if_failed] || item.priority_if_failed || 'Medium'
-        const priCls = item.priority_if_failed === 'high' ? 'text-red-700' : item.priority_if_failed === 'low' ? 'text-gray-500' : 'text-orange-700'
-        return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition" id="weekly-row-${item.id}">
+        const priCls = PRI_COLOR[item.priority_if_failed] || PRI_COLOR.medium
+        const off = item.active === false
+        return `<div class="px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50 transition group ${off ? 'opacity-60' : ''}"
+            id="weekly-row-${item.id}" data-item-id="${item.id}" data-item-type="weekly" draggable="true">
+          <span class="text-gray-300 group-hover:text-gray-500 cursor-grab select-none flex-shrink-0 text-lg leading-none" title="Drag to reorder">⠿</span>
           <div class="flex-1 min-w-0">
-            <div class="font-semibold text-gray-800 text-sm ${item.active === false ? 'line-through text-gray-400' : ''}">${esc(item.name)}</div>
-            <div class="text-xs text-gray-400 mt-0.5">${esc(apIds)} · <span class="font-semibold ${priCls}">${priLabel} if failed</span></div>
+            <div class="font-semibold text-sm text-gray-800 ${off ? 'line-through text-gray-400' : ''}">${esc(item.name)}</div>
+            <div class="mt-0.5">
+              <span class="text-xs px-1.5 py-0.5 rounded-full font-semibold ${priCls}">${PRI_LABEL[item.priority_if_failed] || 'Med'} if failed</span>
+            </div>
           </div>
-          <span class="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${item.active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${item.active !== false ? 'Active' : 'Inactive'}</span>
-          <button onclick="openClEditModal('weekly','${item.id}')" class="flex-shrink-0 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg px-2.5 py-1 hover:bg-blue-50 transition" style="min-height:0;">Edit</button>
-          <button onclick="toggleWeeklyItem('${item.id}',${item.active === false})" class="flex-shrink-0 text-xs font-bold ${item.active !== false ? 'text-gray-500 border-gray-200' : 'text-green-600 border-green-200'} border rounded-lg px-2.5 py-1 hover:bg-gray-50 transition" style="min-height:0;">${item.active !== false ? 'Disable' : 'Enable'}</button>
-          <button onclick="deleteWeeklyItem('${item.id}')" class="flex-shrink-0 text-xs font-bold text-red-500 border border-red-200 rounded-lg px-2.5 py-1 hover:bg-red-50 transition" style="min-height:0;">Delete</button>
+          <span class="text-xs px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ${off ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}">${off ? 'Inactive' : 'Active'}</span>
+          <button onclick="openClEditModal('weekly','${item.id}')" class="flex-shrink-0 text-xs font-bold text-blue-600 border border-blue-200 rounded-lg px-2 py-1 hover:bg-blue-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Edit</button>
+          ${off
+            ? `<button onclick="setClActive('weekly','${item.id}',true)" class="flex-shrink-0 text-xs font-bold text-green-600 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Restore</button>`
+            : `<button onclick="deleteClItem('weekly','${item.id}')" class="flex-shrink-0 text-xs font-bold text-red-500 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50 transition opacity-0 group-hover:opacity-100" style="min-height:0;">Delete</button>`
+          }
         </div>`
       }
 
       let html = ''
-      for (const [cat, catItems] of Object.entries(byCategory)) {
-        html += `<div class="px-5 py-2 bg-blue-50 border-t border-blue-100 first:border-t-0"><span class="text-xs font-bold text-blue-700 uppercase tracking-wide">${esc(cat)} (${catItems.length})</span></div>`
-        html += `<div class="divide-y divide-gray-100">${catItems.map(rowHtml).join('')}</div>`
+      for (const apKey of apOrder) {
+        const cats = byAp.get(apKey)
+        const total = [...cats.values()].reduce((s,a) => s + a.length, 0)
+        const activeCount = [...cats.values()].flatMap(a => a).filter(i => i.active !== false).length
+        html += `<div class="px-5 py-2.5 bg-gray-700 border-b border-gray-600 sticky top-0 z-10">
+          <span class="text-sm font-bold text-white">${esc(apKey)}</span>
+          <span class="ml-2 text-xs text-gray-400">${activeCount} active · ${total} total</span>
+        </div>`
+        for (const [cat, catItems] of cats) {
+          const catActive = catItems.filter(i => i.active !== false).length
+          const dragKey = ('weekly-' + apKey + '-' + cat).replace(/[^a-z0-9-]/gi, '_')
+          html += `<div class="px-5 py-1.5 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+            <span class="text-xs font-bold text-blue-700 uppercase tracking-wide">${esc(cat)}</span>
+            <span class="text-xs text-blue-500">${catActive}/${catItems.length}</span>
+          </div>`
+          html += `<div class="divide-y divide-gray-100" data-drag-group="${esc(dragKey)}">${catItems.map(rowHtml).join('')}</div>`
+        }
       }
       container.innerHTML = html
+      initClDragDrop('weekly')
+      updateWeeklyCatDatalist()
     }
 
-    // ── Edit Modal ────────────────────────────────────────────────────────────────
+    // ── DRAG AND DROP ─────────────────────────────────────────────────────────────
+
+    function initClDragDrop(type) {
+      const rows = [...document.querySelectorAll(`[data-item-type="${type}"][draggable="true"]`)]
+      let dragEl = null
+      rows.forEach(row => {
+        row.addEventListener('dragstart', e => {
+          dragEl = row; e.dataTransfer.effectAllowed = 'move'
+          setTimeout(() => row.classList.add('opacity-40'), 0)
+        })
+        row.addEventListener('dragend', () => {
+          rows.forEach(r => r.classList.remove('opacity-40','border-t-2','border-b-2','border-blue-400'))
+          dragEl = null
+        })
+        row.addEventListener('dragover', e => {
+          if (!dragEl || dragEl === row) return
+          if (dragEl.closest('[data-drag-group]') !== row.closest('[data-drag-group]')) return
+          e.preventDefault()
+          rows.forEach(r => r.classList.remove('border-t-2','border-b-2','border-blue-400'))
+          const after = e.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2
+          row.classList.add(after ? 'border-b-2' : 'border-t-2', 'border-blue-400')
+        })
+        row.addEventListener('dragleave', () => row.classList.remove('border-t-2','border-b-2','border-blue-400'))
+        row.addEventListener('drop', async e => {
+          row.classList.remove('border-t-2','border-b-2','border-blue-400')
+          if (!dragEl || dragEl === row) return
+          const grp = dragEl.closest('[data-drag-group]')
+          if (!grp || grp !== row.closest('[data-drag-group]')) return
+          e.preventDefault()
+          const after = e.clientY > row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2
+          after ? row.after(dragEl) : row.before(dragEl)
+          const newIds = [...grp.querySelectorAll('[data-item-id]')].map(r => r.dataset.itemId)
+          const arr = type === 'daily' ? clData.daily : clData.weekly
+          newIds.forEach((id, i) => { const it = arr.find(x => x.id === id); if (it) it.sort_order = i })
+          fetch(`${API}/manage-checklist-items`, {
+            method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+            body: JSON.stringify({ action: type === 'daily' ? 'reorder_daily' : 'reorder_weekly', ids: newIds })
+          }).catch(err => console.error('Reorder failed:', err.message))
+        })
+      })
+    }
+
+    // ── EDIT MODAL ────────────────────────────────────────────────────────────────
 
     function openClEditModal(type, id) {
-      const item = type === 'daily'
-        ? clData.daily.find(i => i.id === id)
-        : clData.weekly.find(i => i.id === id)
+      const item = type === 'daily' ? clData.daily.find(i => i.id === id) : clData.weekly.find(i => i.id === id)
       if (!item) return
       document.getElementById('clEditId').value   = id
       document.getElementById('clEditType').value = type
@@ -1824,54 +1919,46 @@
           ${esc(u.unit_name)}</label>`
       }).join('')
 
+      const activeTgl = `<label class="flex items-center gap-2 cursor-pointer select-none pt-1">
+        <input type="checkbox" id="clEditActive" class="accent-red-700 w-4 h-4" ${item.active !== false ? 'checked' : ''}>
+        <span class="text-sm font-semibold text-gray-700">Active</span>
+        <span class="text-xs text-gray-400">(uncheck to archive)</span>
+      </label>`
+
       if (type === 'daily') {
         document.getElementById('clEditModalBody').innerHTML = `
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Item Name *</label>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Item Name *</label>
             <input id="clEditName" type="text" value="${esc(item.name)}" maxlength="200"
-              class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Type</label>
+              class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;"></div>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Type</label>
             <select id="clEditType2" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
               ${CL_DAILY_TYPES.map(t => `<option value="${t}" ${item.item_type===t?'selected':''}>${TYPE_LABEL[t]||t}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Applies to — leave all unchecked for all apparatus</label>
-            <div class="flex flex-wrap gap-2">${apBoxes || '<span class="text-xs text-gray-400 italic">No apparatus</span>'}</div>
-          </div>`
+            </select></div>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Applies to — leave all unchecked for all apparatus</label>
+            <div class="flex flex-wrap gap-2">${apBoxes || '<span class="text-xs text-gray-400 italic">No apparatus</span>'}</div></div>
+          ${activeTgl}`
       } else {
+        const allCats = [...new Set(clData.weekly.map(i => i.category).filter(Boolean))].sort()
         document.getElementById('clEditModalBody').innerHTML = `
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Item Name *</label>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Item Name *</label>
             <input id="clEditName" type="text" value="${esc(item.name)}" maxlength="200"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;"></div>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Compartment / Category</label>
+            <input id="clEditCat" type="text" list="clEditCatList" value="${esc(item.category)}" maxlength="100"
               class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Category</label>
-            <select id="clEditCat" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
-              ${CL_WEEKLY_CATS.map(c => `<option value="${c}" ${item.category===c?'selected':''}>${c}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Priority if Failed</label>
+            <datalist id="clEditCatList">${allCats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Priority if Failed</label>
             <select id="clEditPri" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:40px;">
               ${CL_PRIORITIES.map(p => `<option value="${p}" ${item.priority_if_failed===p?'selected':''}>${PRI_LABEL[p]||p}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1">Apparatus — leave all unchecked for all</label>
-            <div class="flex flex-wrap gap-2">${apBoxes || '<span class="text-xs text-gray-400 italic">No apparatus</span>'}</div>
-          </div>`
+            </select></div>
+          <div><label class="block text-xs font-semibold text-gray-600 mb-1">Apparatus — leave all unchecked for all</label>
+            <div class="flex flex-wrap gap-2">${apBoxes || '<span class="text-xs text-gray-400 italic">No apparatus</span>'}</div></div>
+          ${activeTgl}`
       }
-
       document.getElementById('clEditModal').classList.remove('hidden')
     }
 
-    function closeClEditModal() {
-      document.getElementById('clEditModal').classList.add('hidden')
-    }
+    function closeClEditModal() { document.getElementById('clEditModal').classList.add('hidden') }
 
     async function saveClEdit() {
       const id      = document.getElementById('clEditId').value
@@ -1881,44 +1968,35 @@
       resultEl.textContent = ''
       if (!name) { resultEl.textContent = 'Name required'; resultEl.style.color = '#dc2626'; return }
 
-      let body = { id, name }
+      const active = document.getElementById('clEditActive')?.checked !== false
+      let body = { id, name, active: !!document.getElementById('clEditActive')?.checked }
       if (type === 'daily') {
         body.action    = 'update_daily'
         body.item_type = document.getElementById('clEditType2')?.value
         const checked  = [...document.querySelectorAll('.cl-edit-ap-check:checked')].map(el => el.value)
         body.applies_to = checked.length ? checked : ['all']
       } else {
-        body.action          = 'update_weekly'
-        body.category        = document.getElementById('clEditCat')?.value
+        body.action             = 'update_weekly'
+        body.category           = document.getElementById('clEditCat')?.value.trim() || 'Other'
         body.priority_if_failed = document.getElementById('clEditPri')?.value
-        const checked        = [...document.querySelectorAll('.cl-edit-ap-w-check:checked')].map(el => el.value)
-        body.apparatus_ids   = checked
+        const checked           = [...document.querySelectorAll('.cl-edit-ap-w-check:checked')].map(el => el.value)
+        body.apparatus_ids      = checked
       }
-
       try {
         const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify(body)
+          method: 'POST', headers: {'Content-Type':'application/json',...AUTH.getHeaders()}, body: JSON.stringify(body)
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
-
-        // Update local state
-        if (type === 'daily') {
-          const idx = clData.daily.findIndex(i => i.id === id)
-          if (idx >= 0) clData.daily[idx] = data
-          renderDailyItems()
-        } else {
-          const idx = clData.weekly.findIndex(i => i.id === id)
-          if (idx >= 0) clData.weekly[idx] = data
-          renderWeeklyItems()
-        }
+        const arr = type === 'daily' ? clData.daily : clData.weekly
+        const idx = arr.findIndex(i => i.id === id)
+        if (idx >= 0) arr[idx] = data
+        type === 'daily' ? renderDailyItems() : renderWeeklyItems()
         closeClEditModal()
       } catch(e) { resultEl.textContent = e.message; resultEl.style.color = '#dc2626' }
     }
 
-    // ── Add items ─────────────────────────────────────────────────────────────────
+    // ── ADD ITEMS ─────────────────────────────────────────────────────────────────
 
     async function addDailyItem() {
       const name      = document.getElementById('dailyItemName').value.trim()
@@ -1926,109 +2004,85 @@
       const resultEl  = document.getElementById('dailyItemResult')
       if (!name) { resultEl.textContent = 'Name required'; resultEl.style.color = '#dc2626'; return }
       const applies_to = [...document.querySelectorAll('.daily-ap-check:checked')].map(el => el.value)
-      resultEl.textContent = 'Saving...'
-      resultEl.style.color = '#6b7280'
+      resultEl.textContent = 'Saving...'; resultEl.style.color = '#6b7280'
       try {
         const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'add_daily', name, item_type, applies_to: applies_to.length ? applies_to : ['all'] })
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action:'add_daily', name, item_type, applies_to: applies_to.length ? applies_to : ['all'] })
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
         document.getElementById('dailyItemName').value = ''
         document.querySelectorAll('.daily-ap-check').forEach(el => el.checked = false)
-        resultEl.textContent = 'Added!'
-        resultEl.style.color = '#16a34a'
-        clData.daily.push(data)
-        renderDailyItems()
+        resultEl.textContent = 'Added!'; resultEl.style.color = '#16a34a'
+        clData.daily.push(data); renderDailyItems()
         setTimeout(() => { resultEl.textContent = '' }, 3000)
       } catch(e) { resultEl.textContent = e.message; resultEl.style.color = '#dc2626' }
     }
 
     async function addWeeklyItem() {
       const name             = document.getElementById('weeklyItemName').value.trim()
-      const category         = document.getElementById('weeklyItemCategory').value
+      const category         = document.getElementById('weeklyItemCategory').value.trim()
       const priority_if_failed = document.getElementById('weeklyItemPriority').value
       const apparatus_ids    = [...document.querySelectorAll('.weekly-ap-check:checked')].map(el => el.value)
       const resultEl         = document.getElementById('weeklyItemResult')
-      if (!name) { resultEl.textContent = 'Name required'; resultEl.style.color = '#dc2626'; return }
-      resultEl.textContent = 'Saving...'
-      resultEl.style.color = '#6b7280'
+      if (!name)     { resultEl.textContent = 'Name required';     resultEl.style.color = '#dc2626'; return }
+      if (!category) { resultEl.textContent = 'Category required'; resultEl.style.color = '#dc2626'; return }
+      resultEl.textContent = 'Saving...'; resultEl.style.color = '#6b7280'
       try {
         const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'add_weekly', name, category, priority_if_failed, apparatus_ids })
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action:'add_weekly', name, category, priority_if_failed, apparatus_ids })
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
         document.getElementById('weeklyItemName').value = ''
+        document.getElementById('weeklyItemCategory').value = ''
         document.querySelectorAll('.weekly-ap-check').forEach(el => el.checked = false)
-        resultEl.textContent = 'Added!'
-        resultEl.style.color = '#16a34a'
-        clData.weekly.push(data)
-        renderWeeklyItems()
+        resultEl.textContent = 'Added!'; resultEl.style.color = '#16a34a'
+        clData.weekly.push(data); renderWeeklyItems()
         setTimeout(() => { resultEl.textContent = '' }, 3000)
       } catch(e) { resultEl.textContent = e.message; resultEl.style.color = '#dc2626' }
     }
 
-    // ── Toggle / Delete ───────────────────────────────────────────────────────────
+    // ── DELETE / RESTORE ──────────────────────────────────────────────────────────
 
-    async function toggleDailyItem(id, active) {
+    async function deleteClItem(type, id) {
+      const arr  = type === 'daily' ? clData.daily : clData.weekly
+      const item = arr.find(i => i.id === id)
+      if (!confirm(`Archive "${item?.name || 'this item'}"? It moves to Inactive. Restore it anytime via Edit.`)) return
+      const action = type === 'daily' ? 'update_daily' : 'update_weekly'
       try {
         const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'update_daily', id, active })
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action, id, active: false })
         })
         const data = await res.json()
         if (!res.ok) { showError(data.error || 'Error'); return }
-        const idx = clData.daily.findIndex(i => i.id === id)
-        if (idx >= 0) clData.daily[idx] = data
-        renderDailyItems()
+        const idx = arr.findIndex(i => i.id === id)
+        if (idx >= 0) arr[idx] = data
+        type === 'daily' ? renderDailyItems() : renderWeeklyItems()
       } catch(e) { showError(e.message) }
     }
 
-    async function toggleWeeklyItem(id, active) {
+    async function setClActive(type, id, active) {
+      const action = type === 'daily' ? 'update_daily' : 'update_weekly'
+      const arr    = type === 'daily' ? clData.daily   : clData.weekly
       try {
         const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'update_weekly', id, active })
+          method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+          body: JSON.stringify({ action, id, active })
         })
         const data = await res.json()
         if (!res.ok) { showError(data.error || 'Error'); return }
-        const idx = clData.weekly.findIndex(i => i.id === id)
-        if (idx >= 0) clData.weekly[idx] = data
-        renderWeeklyItems()
+        const idx = arr.findIndex(i => i.id === id)
+        if (idx >= 0) arr[idx] = data
+        type === 'daily' ? renderDailyItems() : renderWeeklyItems()
       } catch(e) { showError(e.message) }
     }
 
-    async function deleteDailyItem(id) {
-      const item = clData.daily.find(i => i.id === id)
-      if (!confirm(`Delete "${item?.name || 'this item'}"? Cannot be undone.`)) return
-      try {
-        const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'delete_daily', id })
-        })
-        if (!res.ok) { const d = await res.json(); showError(d.error || 'Error'); return }
-        clData.daily = clData.daily.filter(i => i.id !== id)
-        renderDailyItems()
-      } catch(e) { showError(e.message) }
-    }
-
-    async function deleteWeeklyItem(id) {
-      const item = clData.weekly.find(i => i.id === id)
-      if (!confirm(`Delete "${item?.name || 'this item'}"? Cannot be undone.`)) return
-      try {
-        const res = await fetch(`${API}/manage-checklist-items`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
-          body: JSON.stringify({ action: 'delete_weekly', id })
-        })
-        if (!res.ok) { const d = await res.json(); showError(d.error || 'Error'); return }
-        clData.weekly = clData.weekly.filter(i => i.id !== id)
-        renderWeeklyItems()
-      } catch(e) { showError(e.message) }
+    function importChecklistItems(type) {
+      showError(`Import for ${type} check items — coming soon.`)
     }
 
     if ('serviceWorker' in navigator) {

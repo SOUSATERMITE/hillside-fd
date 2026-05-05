@@ -62,7 +62,7 @@ exports.handler = async (event) => {
     if (action === 'add_weekly') {
       const { name, category, apparatus_ids, priority_if_failed } = body
       if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'name required' }) }
-      const cat  = WEEKLY_CATS.includes(category) ? category : 'Other'
+      const cat  = (typeof category === 'string' && category.trim()) ? category.trim().slice(0,100) : 'Other'
       const pri  = PRIORITIES.includes(priority_if_failed) ? priority_if_failed : 'medium'
       const apps = Array.isArray(apparatus_ids) ? apparatus_ids : []
 
@@ -98,7 +98,7 @@ exports.handler = async (event) => {
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
       const update = {}
       if (name               !== undefined) update.name               = name.trim().slice(0, 200)
-      if (category           !== undefined) update.category           = WEEKLY_CATS.includes(category) ? category : 'Other'
+      if (category           !== undefined) update.category           = (typeof category === 'string' && category.trim()) ? category.trim().slice(0,100) : 'Other'
       if (apparatus_ids      !== undefined) update.apparatus_ids      = Array.isArray(apparatus_ids) ? apparatus_ids : []
       if (priority_if_failed !== undefined) update.priority_if_failed = PRIORITIES.includes(priority_if_failed) ? priority_if_failed : 'medium'
       if (active             !== undefined) update.active             = !!active
@@ -132,17 +132,17 @@ exports.handler = async (event) => {
     if (action === 'delete_daily') {
       const { id } = body
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
-      const { error } = await supabase.from('daily_check_items').delete().eq('id', id)
+      const { data, error } = await supabase.from('daily_check_items').update({ active: false }).eq('id', id).select().single()
       if (error) throw error
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
 
     if (action === 'delete_weekly') {
       const { id } = body
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
-      const { error } = await supabase.from('weekly_check_items').delete().eq('id', id)
+      const { data, error } = await supabase.from('weekly_check_items').update({ active: false }).eq('id', id).select().single()
       if (error) throw error
-      return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
     }
 
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid action' }) }
