@@ -1,4 +1,4 @@
-const CACHE = 'hillside-fd-v5'
+const CACHE = 'hillside-fd-v6'
 const SHELL = ['/', '/sick/', '/recall/', '/admin/', '/docs/', '/search/', '/vacation/', '/apparatus/', '/personnel/', '/manifest.json', '/auth.js']
 
 self.addEventListener('install', e => {
