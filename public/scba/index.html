@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>SCBA Management — Hillside FD</title>
+  <link rel="manifest" href="/manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/auth.js"></script>
+  <style>
+    nav { padding-top: max(12px, env(safe-area-inset-top)); background: #1a5c2a; }
+    nav button, nav a { min-height: 0 !important; }
+    .nav-active  { font-weight:700; border-bottom:2px solid rgba(255,255,255,0.85); }
+    .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
+    body { background:#f3f4f6; }
+    .badge-pass   { background:#dcfce7; color:#166534; }
+    .badge-fail   { background:#fee2e2; color:#991b1b; }
+    .badge-warn   { background:#fef9c3; color:#92400e; }
+    .badge-info   { background:#dbeafe; color:#1e40af; }
+    .toggle-pass  { background:#16a34a; color:#fff; }
+    .toggle-fail  { background:#dc2626; color:#fff; }
+    .toggle-idle  { background:#e5e7eb; color:#374151; }
+    .slide-down { max-height:0; overflow:hidden; transition:max-height 0.25s ease; }
+    .slide-down.open { max-height:400px; }
+    input[type=number]::-webkit-inner-spin-button { opacity:1; }
+  </style>
+</head>
+<body>
+
+<!-- Mobile menu overlay -->
+<div id="mobileMenuOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40" onclick="closeMobileMenu()"></div>
+<div id="mobileMenu" class="hidden fixed top-0 left-0 h-full w-72 bg-green-950 z-50 shadow-2xl flex flex-col pt-4 overflow-y-auto" style="padding-top: max(16px, env(safe-area-inset-top))">
+  <div class="flex items-center justify-between px-6 mb-4">
+    <span class="text-white font-extrabold text-lg tracking-tight">Hillside FD</span>
+    <button onclick="closeMobileMenu()" class="text-green-300 text-2xl font-bold" style="min-height:0;background:none;border:none;">✕</button>
+  </div>
+  <a href="/"         onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+  <a href="/sick"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+  <a href="/recall"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+  <a href="/docs"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+  <a href="/search"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
+  <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+  <a href="/apparatus" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Apparatus</a>
+  <a href="/scba" onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">SCBA Management</a>
+  <a href="/personnel" data-admin-only onclick="closeMobileMenu()" class="hidden flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Personnel</a>
+  <a href="/admin"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+</div>
+
+<nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-40">
+  <div class="flex items-center gap-1">
+    <button onclick="toggleMobileMenu()" class="mr-2 p-1 rounded hover:bg-green-800 md:hidden" style="min-height:0;background:none;border:none;">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="12" x2="19" y2="12"/><line x1="3" y1="18" x2="19" y2="18"/></svg>
+    </button>
+    <span class="font-black text-base tracking-tight mr-3">HFD</span>
+    <div class="hidden md:flex items-center gap-5 text-sm">
+      <a href="/"         class="hover:text-green-200 pb-0.5">Dashboard</a>
+      <a href="/sick"     class="hover:text-green-200 pb-0.5">Sick</a>
+      <a href="/recall"   class="hover:text-green-200 pb-0.5">Recall</a>
+      <a href="/docs"     class="hover:text-green-200 pb-0.5">Docs</a>
+      <a href="/search"   class="hover:text-green-200 pb-0.5">Search</a>
+      <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
+      <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
+      <a href="/scba"     class="nav-active pb-0.5">SCBA</a>
+      <a href="/personnel" data-admin-only class="hidden hover:text-green-200 pb-0.5">Personnel</a>
+      <a href="/admin"    class="hover:text-green-200 pb-0.5">Admin</a>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="navUser" class="text-xs text-green-200 hidden"></span>
+    <button id="loginBtn" onclick="openLoginModal()" class="text-xs font-bold bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg px-3 py-1.5 transition" style="min-height:0;">Login</button>
+    <button id="logoutBtn" onclick="doLogout()" class="hidden text-xs font-bold bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg px-3 py-1.5 transition" style="min-height:0;">Logout</button>
+  </div>
+</nav>
+
+<!-- Login Modal -->
+<div id="loginModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+    <h3 class="font-bold text-gray-800 text-lg mb-4">Officer Login</h3>
+    <select id="loginName" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <option value="">Select your name...</option>
+    </select>
+    <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" maxlength="8"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <div id="loginErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-2">
+      <button onclick="closeLoginModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="doLogin()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pack Edit/Add Modal -->
+<div id="packModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mb-10">
+    <h3 id="packModalTitle" class="font-bold text-gray-800 text-lg mb-4">Add Pack</h3>
+    <div class="space-y-3">
+      <input id="packIdInput" type="text" placeholder="Pack ID (e.g. E1-5)" maxlength="20"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <select id="packApparatusInput" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="">Select Apparatus...</option>
+        <option value="E1">E1 — Engine 1</option>
+        <option value="E5">E5 — Engine 5</option>
+        <option value="T1">T1 — Tower 1</option>
+        <option value="R1">R1 — Rescue 1</option>
+        <option value="R2">R2 — Rescue 2</option>
+        <option value="C1">C1</option>
+        <option value="C2">C2</option>
+        <option value="C4">C4</option>
+        <option value="C5">C5</option>
+        <option value="C6">C6</option>
+        <option value="M1">M1/C8</option>
+      </select>
+      <select id="packStatusInput" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <option value="in_service">In Service</option>
+        <option value="out_of_service">Out of Service</option>
+        <option value="at_shop">At Shop</option>
+        <option value="spare">Spare</option>
+      </select>
+      <textarea id="packNotesInput" placeholder="Notes (optional)" maxlength="500" rows="2"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 resize-none" style="min-height:0;"></textarea>
+    </div>
+    <div id="packModalErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="closePackModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="savePackModal()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottle Edit/Add Modal -->
+<div id="bottleModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mb-10">
+    <h3 id="bottleModalTitle" class="font-bold text-gray-800 text-lg mb-4">Add Spare Bottle</h3>
+    <div class="space-y-3">
+      <input id="bottleNumInput" type="text" placeholder="Bottle number / label" maxlength="50"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <input id="bottlePsiInput" type="number" placeholder="Current PSI" min="0" max="5000"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <input id="bottleApparatusInput" type="text" placeholder="Assigned apparatus (optional)" maxlength="50"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    </div>
+    <div id="bottleModalErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="closeBottleModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="saveBottleModal()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PSI Log Modal -->
+<div id="psiModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+    <h3 class="font-bold text-gray-800 text-lg mb-1">Log PSI</h3>
+    <p id="psiModalLabel" class="text-sm text-gray-500 mb-4"></p>
+    <input id="psiInput" type="number" placeholder="PSI reading" min="0" max="5000"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <input id="psiLoggedBy" type="text" placeholder="Your name"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <div id="psiModalErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-2">
+      <button onclick="closePsiModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="savePsi()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Battery Log Modal -->
+<div id="batteryModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+    <h3 class="font-bold text-gray-800 text-lg mb-4">Log Battery Change</h3>
+    <select id="batteryApparatusInput" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <option value="">Select Apparatus...</option>
+      <option>E1</option><option>E5</option><option>T1</option>
+      <option>R1</option><option>R2</option>
+      <option>C1</option><option>C2</option><option>C4</option>
+      <option>C5</option><option>C6</option><option>M1/C8</option>
+    </select>
+    <input id="batteryChangedBy" type="text" placeholder="Changed by"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <textarea id="batteryNotesInput" placeholder="Notes (optional)" rows="2" maxlength="300"
+      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600 resize-none" style="min-height:0;"></textarea>
+    <div id="batteryModalErr" class="hidden text-red-600 text-xs mb-2"></div>
+    <div class="flex gap-2">
+      <button onclick="closeBatteryModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="saveBattery()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-4xl mx-auto px-4 py-5">
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-black text-gray-900 tracking-tight">SCBA Management</h1>
+      <p class="text-sm text-gray-500">Pack registry · Inspections · Spare bottles · Battery tracking</p>
+    </div>
+  </div>
+
+  <!-- Section tabs -->
+  <div class="flex gap-1 bg-white rounded-2xl shadow p-1 mb-5 overflow-x-auto">
+    <button onclick="setSection('registry')" id="tab-registry" class="flex-1 text-xs font-bold rounded-xl px-3 py-2.5 transition whitespace-nowrap">Pack Registry</button>
+    <button onclick="setSection('inspection')" id="tab-inspection" class="flex-1 text-xs font-bold rounded-xl px-3 py-2.5 transition whitespace-nowrap">Run Inspection</button>
+    <button onclick="setSection('bottles')" id="tab-bottles" class="flex-1 text-xs font-bold rounded-xl px-3 py-2.5 transition whitespace-nowrap">Spare Bottles</button>
+    <button onclick="setSection('batteries')" id="tab-batteries" class="flex-1 text-xs font-bold rounded-xl px-3 py-2.5 transition whitespace-nowrap">Battery Tracker</button>
+  </div>
+
+  <!-- SECTION 1: PACK REGISTRY -->
+  <div id="sec-registry" class="hidden">
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-gray-800">SCBA Pack Registry</h2>
+          <p class="text-xs text-gray-400 mt-0.5">All packs grouped by apparatus</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadRegistry()" class="text-xs text-gray-400 hover:text-gray-600 font-semibold" style="min-height:0;">↻</button>
+          <button onclick="openAddPackModal()" id="addPackBtn" class="hidden text-sm font-bold text-white bg-green-700 hover:bg-green-800 rounded-xl px-4 py-2 transition" style="min-height:0;">+ Add Pack</button>
+        </div>
+      </div>
+      <div id="registryContainer"><div class="text-gray-400 text-sm text-center py-10">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: INSPECTION -->
+  <div id="sec-inspection" class="hidden">
+    <div class="bg-white rounded-2xl shadow overflow-hidden mb-4">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="font-bold text-gray-800 mb-3">Run Inspection</h2>
+        <div class="flex gap-3 flex-wrap">
+          <select id="inspApparatusSelect" onchange="loadInspectionForm()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 flex-1" style="min-height:40px;min-width:160px;">
+            <option value="">Select Apparatus...</option>
+            <option value="E1">E1 — Engine 1</option>
+            <option value="E5">E5 — Engine 5</option>
+            <option value="T1">T1 — Tower 1</option>
+            <option value="R1">R1 — Rescue 1</option>
+            <option value="R2">R2 — Rescue 2</option>
+            <option value="C1">C1</option>
+            <option value="C2">C2</option>
+            <option value="C4">C4</option>
+            <option value="C5">C5</option>
+            <option value="C6">C6</option>
+            <option value="M1">M1/C8</option>
+          </select>
+          <input id="inspectedByInput" type="text" placeholder="Inspected by (your name)"
+            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 flex-1" style="min-height:40px;min-width:160px;">
+        </div>
+      </div>
+
+      <!-- Live counter -->
+      <div id="inspCounter" class="hidden px-5 py-2 bg-gray-50 border-b border-gray-100 flex gap-4 text-sm font-semibold">
+        <span class="text-green-700"><span id="cntPass">0</span> Passed</span>
+        <span class="text-red-600"><span id="cntFail">0</span> Failed</span>
+        <span class="text-gray-500"><span id="cntPend">0</span> Pending</span>
+      </div>
+
+      <div id="inspFormContainer"><div class="text-gray-400 text-sm text-center py-10">Select an apparatus to begin.</div></div>
+
+      <div id="inspSubmitBar" class="hidden px-5 py-4 border-t border-gray-100">
+        <div id="inspErr" class="hidden text-red-600 text-sm mb-2"></div>
+        <button onclick="submitInspection()" id="inspSubmitBtn" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition">Submit All Inspections</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: SPARE BOTTLES -->
+  <div id="sec-bottles" class="hidden">
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-gray-800">Spare Bottles</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Weekly PSI tracking · 4-week rolling log</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadBottles()" class="text-xs text-gray-400 hover:text-gray-600 font-semibold" style="min-height:0;">↻</button>
+          <button onclick="openAddBottleModal()" id="addBottleBtn" class="hidden text-sm font-bold text-white bg-green-700 hover:bg-green-800 rounded-xl px-4 py-2 transition" style="min-height:0;">+ Add Bottle</button>
+        </div>
+      </div>
+      <div id="bottlesContainer"><div class="text-gray-400 text-sm text-center py-10">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: BATTERIES -->
+  <div id="sec-batteries" class="hidden">
+    <div class="bg-white rounded-2xl shadow overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-gray-800">SCBA Battery Tracker</h2>
+          <p class="text-xs text-gray-400 mt-0.5">4-week replacement cycle per apparatus</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadBatteries()" class="text-xs text-gray-400 hover:text-gray-600 font-semibold" style="min-height:0;">↻</button>
+          <button onclick="openBatteryModal()" class="text-sm font-bold text-white bg-green-700 hover:bg-green-800 rounded-xl px-4 py-2 transition" style="min-height:0;">+ Log Change</button>
+        </div>
+      </div>
+      <div id="batteriesContainer"><div class="text-gray-400 text-sm text-center py-10">Loading...</div></div>
+    </div>
+  </div>
+
+</div><!-- /max-w -->
+
+<script>
+const API = '/.netlify/functions'
+let scbaData = { packs: [], lastInsp: {} }
+let bottleData = { bottles: [], psiLogs: {} }
+let batteryData = []
+let editingPackId = null
+let editingBottleId = null
+let psiBottleId = null
+let inspPacks = []
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function toggleMobileMenu() {
+  document.getElementById('mobileMenu').classList.toggle('hidden')
+  document.getElementById('mobileMenuOverlay').classList.toggle('hidden')
+}
+function closeMobileMenu() {
+  document.getElementById('mobileMenu').classList.add('hidden')
+  document.getElementById('mobileMenuOverlay').classList.add('hidden')
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function updateAuthUI() {
+  const loggedIn = AUTH.isLoggedIn()
+  const name = AUTH.getSession()?.display_name || ''
+  document.getElementById('loginBtn').classList.toggle('hidden', loggedIn)
+  document.getElementById('logoutBtn').classList.toggle('hidden', !loggedIn)
+  const nu = document.getElementById('navUser')
+  if (loggedIn) { nu.textContent = name; nu.classList.remove('hidden') }
+  else nu.classList.add('hidden')
+
+  const isAdmin = AUTH.isAdmin()
+  document.querySelectorAll('[data-admin-only]').forEach(el => el.classList.toggle('hidden', !isAdmin))
+  document.getElementById('addPackBtn').classList.toggle('hidden', !isAdmin)
+  document.getElementById('addBottleBtn').classList.toggle('hidden', !loggedIn)
+}
+
+async function loadOfficers() {
+  try {
+    const r = await fetch(`${API}/get-officers`)
+    const data = await r.json()
+    const sel = document.getElementById('loginName')
+    ;(data || []).forEach(o => {
+      const opt = document.createElement('option')
+      opt.value = o.name; opt.textContent = o.display_name
+      sel.appendChild(opt)
+    })
+  } catch(e) {}
+}
+
+function openLoginModal() {
+  document.getElementById('loginModal').classList.remove('hidden')
+  document.getElementById('loginErr').classList.add('hidden')
+}
+function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden') }
+
+async function doLogin() {
+  const name = document.getElementById('loginName').value
+  const pin  = document.getElementById('loginPin').value
+  const err  = document.getElementById('loginErr')
+  err.classList.add('hidden')
+  if (!name || !pin) { err.textContent = 'Select name and enter PIN'; err.classList.remove('hidden'); return }
+  try {
+    const r = await fetch(`${API}/officer-login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, pin })
+    })
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Login failed'; err.classList.remove('hidden'); return }
+    AUTH.saveSession(d)
+    closeLoginModal()
+    updateAuthUI()
+    // Auto-fill inspected by
+    if (d.display_name) document.getElementById('inspectedByInput').value = d.display_name
+  } catch(e) { err.textContent = 'Login error'; err.classList.remove('hidden') }
+}
+
+function doLogout() {
+  fetch(`${API}/officer-logout`, { method:'POST', headers: AUTH.getHeaders() }).catch(()=>{})
+  AUTH.clearSession()
+  updateAuthUI()
+}
+
+// ── SECTION TABS ──────────────────────────────────────────────────────────────
+const SECTIONS = ['registry','inspection','bottles','batteries']
+function setSection(s) {
+  SECTIONS.forEach(id => {
+    document.getElementById(`sec-${id}`).classList.add('hidden')
+    const tab = document.getElementById(`tab-${id}`)
+    tab.className = 'flex-1 text-xs font-bold rounded-xl px-3 py-2.5 transition whitespace-nowrap ' +
+      (id === s ? 'bg-green-700 text-white shadow' : 'text-gray-600 hover:bg-gray-100')
+  })
+  document.getElementById(`sec-${s}`).classList.remove('hidden')
+  if (s === 'registry')   loadRegistry()
+  if (s === 'inspection') { /* user selects apparatus */ }
+  if (s === 'bottles')    loadBottles()
+  if (s === 'batteries')  loadBatteries()
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtDate(d) { if (!d) return '—'; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) }
+function statusBadge(s) {
+  const map = { in_service:'badge-pass', out_of_service:'badge-fail', at_shop:'badge-warn', spare:'badge-info' }
+  const lbl = { in_service:'In Service', out_of_service:'Out of Service', at_shop:'At Shop', spare:'Spare' }
+  return `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${map[s]||'badge-info'}">${lbl[s]||s}</span>`
+}
+function psiBadge(psi) {
+  if (!psi) return '<span class="text-xs text-gray-400">—</span>'
+  if (psi < 2000) return `<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-fail">${psi} PSI</span>`
+  if (psi < 4000) return `<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-warn">${psi} PSI</span>`
+  return `<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-pass">${psi} PSI</span>`
+}
+function postAuth(action, extra = {}) {
+  return fetch(`${API}/manage-scba`, {
+    method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
+    body: JSON.stringify({ action, ...extra })
+  })
+}
+
+// ── PACK REGISTRY ─────────────────────────────────────────────────────────────
+async function loadRegistry() {
+  const c = document.getElementById('registryContainer')
+  c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Loading...</div>'
+  try {
+    const r = await fetch(`${API}/manage-scba?section=packs`)
+    const data = await r.json()
+    scbaData = data
+    renderRegistry()
+  } catch(e) {
+    c.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load packs.</div>'
+  }
+}
+
+function renderRegistry() {
+  const c = document.getElementById('registryContainer')
+  const packs = scbaData.packs || []
+  const lastInsp = scbaData.lastInsp || {}
+  if (!packs.length) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">No packs found.</div>'; return }
+
+  // Group by apparatus_id
+  const byAp = new Map()
+  for (const p of packs) {
+    if (!byAp.has(p.apparatus_id)) byAp.set(p.apparatus_id, [])
+    byAp.get(p.apparatus_id).push(p)
+  }
+
+  let html = ''
+  for (const [apId, apPacks] of byAp) {
+    const lastDates = apPacks.map(p => lastInsp[p.id]?.inspection_date).filter(Boolean).sort().reverse()
+    const lastDate = lastDates[0] || null
+    const apLabel = apPacks[0].assigned_apparatus || apId
+    html += `
+    <div class="border-b border-gray-100 last:border-b-0">
+      <button onclick="toggleApRow('${apId}')" class="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition text-left" style="min-height:0;">
+        <div class="flex items-center gap-3">
+          <svg id="chevron-${apId}" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          <span class="font-bold text-gray-900">${esc(apLabel)}</span>
+          <span class="text-xs text-gray-500">${apPacks.length} pack${apPacks.length!==1?'s':''}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">${lastDate ? 'Last insp: '+fmtDate(lastDate) : 'No inspections'}</span>
+        </div>
+      </button>
+      <div id="aprow-${apId}" class="hidden bg-gray-50">
+        <table class="w-full text-sm">
+          <thead><tr class="border-b border-gray-200">
+            <th class="text-left px-5 py-2 text-xs font-semibold text-gray-500">Pack ID</th>
+            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
+            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last PSI</th>
+            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last Inspection</th>
+            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Inspected By</th>
+            <th class="px-3 py-2"></th>
+          </tr></thead>
+          <tbody>
+            ${apPacks.map(p => {
+              const li = lastInsp[p.id]
+              return `<tr class="border-b border-gray-100 last:border-b-0">
+                <td class="px-5 py-2.5 font-bold text-gray-800">${esc(p.pack_id)}</td>
+                <td class="px-3 py-2.5">${statusBadge(p.status)}</td>
+                <td class="px-3 py-2.5 hidden sm:table-cell">${psiBadge(li?.psi)}</td>
+                <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">${li ? fmtDate(li.inspection_date) : '—'}</td>
+                <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">${li ? esc(li.inspected_by) : '—'}</td>
+                <td class="px-3 py-2.5 text-right">
+                  <div class="flex items-center justify-end gap-2" id="packActions-${p.id}">
+                    <button onclick="openEditPackModal('${p.id}')" class="hidden text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50" style="min-height:0;">Edit</button>
+                    <button onclick="deletePack('${p.id}','${esc(p.pack_id)}')" class="hidden text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" style="min-height:0;">Delete</button>
+                  </div>
+                </td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+        ${p => ''}
+      </div>
+    </div>`
+  }
+  c.innerHTML = html
+  updatePackActionVisibility()
+}
+
+function updatePackActionVisibility() {
+  const isAdmin = AUTH.isAdmin()
+  document.querySelectorAll('[id^="packActions-"] button').forEach(btn => {
+    btn.classList.toggle('hidden', !isAdmin)
+  })
+}
+
+function toggleApRow(apId) {
+  const row = document.getElementById(`aprow-${apId}`)
+  const chev = document.getElementById(`chevron-${apId}`)
+  row.classList.toggle('hidden')
+  chev.style.transform = row.classList.contains('hidden') ? '' : 'rotate(90deg)'
+}
+
+// Pack modal
+function openAddPackModal() {
+  if (!AUTH.isAdmin()) { alert('Admin login required.'); return }
+  editingPackId = null
+  document.getElementById('packModalTitle').textContent = 'Add Pack'
+  document.getElementById('packIdInput').value = ''
+  document.getElementById('packIdInput').disabled = false
+  document.getElementById('packApparatusInput').value = ''
+  document.getElementById('packStatusInput').value = 'in_service'
+  document.getElementById('packNotesInput').value = ''
+  document.getElementById('packModalErr').classList.add('hidden')
+  document.getElementById('packModal').classList.remove('hidden')
+}
+function openEditPackModal(id) {
+  if (!AUTH.isAdmin()) { alert('Admin login required.'); return }
+  const pack = (scbaData.packs||[]).find(p => p.id === id)
+  if (!pack) return
+  editingPackId = id
+  document.getElementById('packModalTitle').textContent = 'Edit Pack'
+  document.getElementById('packIdInput').value = pack.pack_id
+  document.getElementById('packIdInput').disabled = true
+  document.getElementById('packApparatusInput').value = pack.apparatus_id
+  document.getElementById('packStatusInput').value = pack.status
+  document.getElementById('packNotesInput').value = pack.notes || ''
+  document.getElementById('packModalErr').classList.add('hidden')
+  document.getElementById('packModal').classList.remove('hidden')
+}
+function closePackModal() { document.getElementById('packModal').classList.add('hidden') }
+async function savePackModal() {
+  const err = document.getElementById('packModalErr')
+  err.classList.add('hidden')
+  const apparatus_id = document.getElementById('packApparatusInput').value
+  if (!apparatus_id) { err.textContent = 'Select apparatus'; err.classList.remove('hidden'); return }
+
+  const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6','M1':'M1/C8'}
+  const assigned_apparatus = APPARATUS_LABELS[apparatus_id] || apparatus_id
+  const status = document.getElementById('packStatusInput').value
+  const notes  = document.getElementById('packNotesInput').value
+
+  let action, extra
+  if (editingPackId) {
+    action = 'update_pack'
+    extra  = { id: editingPackId, apparatus_id, assigned_apparatus, status, notes }
+  } else {
+    const pack_id = document.getElementById('packIdInput').value.trim()
+    if (!pack_id) { err.textContent = 'Pack ID required'; err.classList.remove('hidden'); return }
+    action = 'add_pack'
+    extra  = { pack_id, apparatus_id, assigned_apparatus, status, notes }
+  }
+  try {
+    const r = await postAuth(action, extra)
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    closePackModal()
+    loadRegistry()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+async function deletePack(id, label) {
+  if (!confirm(`Delete pack "${label}"? This cannot be undone.`)) return
+  try {
+    const r = await postAuth('delete_pack', { id })
+    if (!r.ok) { const d=await r.json(); alert(d.error||'Failed'); return }
+    loadRegistry()
+  } catch(e) { alert(e.message) }
+}
+
+// ── INSPECTION ────────────────────────────────────────────────────────────────
+const CHECK_ITEMS = [
+  { key:'harness_frame',    label:'Harness & Frame' },
+  { key:'straps_buckles',   label:'Straps & Buckles' },
+  { key:'air_gauge',        label:'Air Gauge' },
+  { key:'heads_up_display', label:'Heads Up Display' },
+  { key:'first_stage_reg',  label:'1st Stage Regulator' },
+  { key:'audible_alarm',    label:'Audible Alarm' },
+  { key:'pass_alarm',       label:'Pass Alarm' },
+  { key:'rit_bottle',       label:'RIT Bottle Connection/Space' },
+]
+
+async function loadInspectionForm() {
+  const ap = document.getElementById('inspApparatusSelect').value
+  const c  = document.getElementById('inspFormContainer')
+  document.getElementById('inspSubmitBar').classList.add('hidden')
+  document.getElementById('inspCounter').classList.add('hidden')
+  if (!ap) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Select an apparatus to begin.</div>'; return }
+
+  c.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">Loading packs…</div>'
+  try {
+    const r = await fetch(`${API}/manage-scba?section=packs`)
+    const data = await r.json()
+    inspPacks = (data.packs||[]).filter(p => p.apparatus_id === ap && p.status !== 'out_of_service')
+    if (!inspPacks.length) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No active packs for this apparatus.</div>'; return }
+    renderInspectionForm(ap)
+  } catch(e) {
+    c.innerHTML = '<div class="text-red-500 text-sm text-center py-8">Failed to load packs.</div>'
+  }
+}
+
+function renderInspectionForm(ap) {
+  const c = document.getElementById('inspFormContainer')
+  document.getElementById('inspCounter').classList.remove('hidden')
+  document.getElementById('inspSubmitBar').classList.remove('hidden')
+
+  c.innerHTML = inspPacks.map(pack => `
+    <div class="border-b border-gray-100 last:border-b-0 px-5 py-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="font-black text-gray-900 text-base">${esc(pack.pack_id)}</span>
+          <span class="ml-2 text-xs text-gray-500">${esc(pack.assigned_apparatus||ap)}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="psi-${pack.id}" type="number" placeholder="PSI" min="0" max="5000"
+            class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:0;">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        ${CHECK_ITEMS.map(ci => `
+          <div class="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 gap-2">
+            <span class="text-sm text-gray-700 flex-1">${esc(ci.label)}</span>
+            <div class="flex gap-1">
+              <button id="btn-pass-${pack.id}-${ci.key}" onclick="setCheckVal('${pack.id}','${ci.key}','pass')"
+                class="text-xs font-bold px-2.5 py-1 rounded-lg toggle-idle transition" style="min-height:0;">Pass</button>
+              <button id="btn-fail-${pack.id}-${ci.key}" onclick="setCheckVal('${pack.id}','${ci.key}','fail')"
+                class="text-xs font-bold px-2.5 py-1 rounded-lg toggle-idle transition" style="min-height:0;">Fail</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div id="notes-wrap-${pack.id}" class="slide-down mt-2">
+        <textarea id="notes-${pack.id}" rows="2" maxlength="500" placeholder="Describe failed items…"
+          class="w-full border border-red-300 bg-red-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" style="min-height:0;"></textarea>
+      </div>
+    </div>`).join('')
+
+  updateInspCounter()
+}
+
+function setCheckVal(packId, key, val) {
+  const pass = document.getElementById(`btn-pass-${packId}-${key}`)
+  const fail = document.getElementById(`btn-fail-${packId}-${key}`)
+  if (val === 'pass') {
+    pass.className = pass.className.replace(/toggle-idle|toggle-fail/g, '') + ' toggle-pass'
+    fail.className = fail.className.replace(/toggle-idle|toggle-pass/g, '') + ' toggle-idle'
+  } else {
+    fail.className = fail.className.replace(/toggle-idle|toggle-pass/g, '') + ' toggle-fail'
+    pass.className = pass.className.replace(/toggle-idle|toggle-fail/g, '') + ' toggle-idle'
+  }
+  pass.dataset.val = val === 'pass' ? 'pass' : ''
+  fail.dataset.val = val === 'fail' ? 'fail' : ''
+
+  // Check if any fail on this pack
+  const anyFail = CHECK_ITEMS.some(ci => {
+    const f = document.getElementById(`btn-fail-${packId}-${ci.key}`)
+    return f && f.className.includes('toggle-fail')
+  })
+  const wrap = document.getElementById(`notes-wrap-${packId}`)
+  wrap.classList.toggle('open', anyFail)
+
+  updateInspCounter()
+}
+
+function getCheckVal(packId, key) {
+  const pass = document.getElementById(`btn-pass-${packId}-${key}`)
+  const fail = document.getElementById(`btn-fail-${packId}-${key}`)
+  if (pass && pass.className.includes('toggle-pass')) return 'pass'
+  if (fail && fail.className.includes('toggle-fail')) return 'fail'
+  return null
+}
+
+function updateInspCounter() {
+  let passed = 0, failed = 0, pending = 0
+  for (const pack of inspPacks) {
+    const allVals = CHECK_ITEMS.map(ci => getCheckVal(pack.id, ci.key))
+    const anyFail = allVals.some(v => v === 'fail')
+    const anyNull = allVals.some(v => v === null)
+    if (anyFail) failed++
+    else if (anyNull) pending++
+    else passed++
+  }
+  document.getElementById('cntPass').textContent = passed
+  document.getElementById('cntFail').textContent = failed
+  document.getElementById('cntPend').textContent = pending
+}
+
+async function submitInspection() {
+  const err = document.getElementById('inspErr')
+  err.classList.add('hidden')
+  if (!AUTH.isLoggedIn()) { err.textContent = 'Login required to submit inspections.'; err.classList.remove('hidden'); return }
+
+  const inspectedBy = document.getElementById('inspectedByInput').value.trim()
+  if (!inspectedBy) { err.textContent = 'Enter your name in "Inspected by".'; err.classList.remove('hidden'); return }
+
+  const ap = document.getElementById('inspApparatusSelect').value
+  const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6','M1':'M1/C8'}
+
+  const inspections = []
+  for (const pack of inspPacks) {
+    const vals = {}
+    for (const ci of CHECK_ITEMS) {
+      const v = getCheckVal(pack.id, ci.key)
+      if (!v) { err.textContent = `Complete all checks for ${pack.pack_id}.`; err.classList.remove('hidden'); return }
+      vals[ci.key] = v
+    }
+    const psi = document.getElementById(`psi-${pack.id}`)?.value
+    inspections.push({
+      pack_id: pack.id,
+      pack_label: pack.pack_id,
+      apparatus_assigned: APPARATUS_LABELS[ap] || ap,
+      psi: psi ? parseInt(psi) : null,
+      notes: document.getElementById(`notes-${pack.id}`)?.value?.trim() || null,
+      ...vals
+    })
+  }
+
+  const btn = document.getElementById('inspSubmitBtn')
+  btn.disabled = true; btn.textContent = 'Submitting…'
+  try {
+    const r = await postAuth('submit_inspection', { inspections, inspected_by: inspectedBy })
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    const msg = d.failed > 0
+      ? `Inspection submitted. ${d.failed} pack(s) FAILED — high-priority findings created and email sent.`
+      : `All ${d.saved} pack(s) passed inspection.`
+    document.getElementById('inspFormContainer').innerHTML = `<div class="px-5 py-8 text-center"><div class="text-2xl mb-2">${d.failed > 0 ? '⚠️' : '✅'}</div><p class="font-semibold text-gray-800">${msg}</p><button onclick="document.getElementById('inspApparatusSelect').value='';loadInspectionForm()" class="mt-4 text-sm text-green-700 font-bold hover:underline" style="min-height:0;">Run Another Inspection</button></div>`
+    document.getElementById('inspSubmitBar').classList.add('hidden')
+    document.getElementById('inspCounter').classList.add('hidden')
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+  finally { btn.disabled=false; btn.textContent='Submit All Inspections' }
+}
+
+// ── SPARE BOTTLES ─────────────────────────────────────────────────────────────
+async function loadBottles() {
+  const c = document.getElementById('bottlesContainer')
+  c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Loading...</div>'
+  try {
+    const r = await fetch(`${API}/manage-scba?section=bottles`)
+    bottleData = await r.json()
+    renderBottles()
+  } catch(e) {
+    c.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load bottles.</div>'
+  }
+}
+
+function renderBottles() {
+  const c = document.getElementById('bottlesContainer')
+  const bottles = (bottleData.bottles||[]).filter(b => b.active !== false)
+  const logs = bottleData.psiLogs || {}
+  if (!bottles.length) {
+    c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">No spare bottles found.</div>'
+    document.getElementById('addBottleBtn').classList.toggle('hidden', !AUTH.isLoggedIn())
+    return
+  }
+  document.getElementById('addBottleBtn').classList.toggle('hidden', !AUTH.isLoggedIn())
+
+  let html = `<table class="w-full text-sm">
+    <thead><tr class="border-b border-gray-200 bg-gray-50">
+      <th class="text-left px-5 py-2.5 text-xs font-semibold text-gray-500">Bottle</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Current PSI</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden sm:table-cell">Apparatus</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden md:table-cell">4-Week Log</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last Checked</th>
+      <th class="px-3 py-2.5"></th>
+    </tr></thead>
+    <tbody>`
+
+  for (const b of bottles) {
+    const bLogs = (logs[b.id]||[]).slice(0,4)
+    const psi = b.current_psi
+    let psiClass = 'badge-pass', warn = ''
+    if (psi && psi < 2000) { psiClass = 'badge-fail'; warn = ' 🔴 CRITICAL' }
+    else if (psi && psi < 4000) { psiClass = 'badge-warn'; warn = ' ⚠️ Low' }
+
+    const logDots = bLogs.map(l => {
+      const cl = l.psi < 2000 ? 'bg-red-500' : l.psi < 4000 ? 'bg-yellow-400' : 'bg-green-500'
+      return `<span class="${cl} inline-block w-2 h-2 rounded-full" title="${l.psi} PSI — ${l.logged_date}"></span>`
+    }).join(' ')
+
+    const loggedBy = AUTH.isLoggedIn()
+    html += `<tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+      <td class="px-5 py-3 font-bold text-gray-800">${esc(b.bottle_number)}</td>
+      <td class="px-3 py-3">
+        ${psi ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${psiClass}">${psi} PSI${warn}</span>` : '<span class="text-xs text-gray-400">—</span>'}
+      </td>
+      <td class="px-3 py-3 text-gray-500 text-xs hidden sm:table-cell">${esc(b.apparatus_assigned||'—')}</td>
+      <td class="px-3 py-3 hidden md:table-cell"><div class="flex items-center gap-1">${logDots||'<span class="text-gray-300 text-xs">no logs</span>'}</div></td>
+      <td class="px-3 py-3 text-gray-400 text-xs hidden sm:table-cell">${b.last_checked ? fmtDate(b.last_checked) : '—'}</td>
+      <td class="px-3 py-3 text-right">
+        <div class="flex items-center justify-end gap-2">
+          ${loggedBy ? `<button onclick="openPsiModal('${b.id}','${esc(b.bottle_number)}')" class="text-xs font-bold text-green-700 hover:text-green-900 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-50" style="min-height:0;">Log PSI</button>` : ''}
+          ${loggedBy ? `<button onclick="openEditBottleModal('${b.id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50" style="min-height:0;">Edit</button>` : ''}
+          ${loggedBy ? `<button onclick="deleteBottle('${b.id}','${esc(b.bottle_number)}')" class="text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" style="min-height:0;">Delete</button>` : ''}
+        </div>
+      </td>
+    </tr>`
+  }
+  html += '</tbody></table>'
+  c.innerHTML = html
+}
+
+function openAddBottleModal() {
+  if (!AUTH.isLoggedIn()) { alert('Login required.'); return }
+  editingBottleId = null
+  document.getElementById('bottleModalTitle').textContent = 'Add Spare Bottle'
+  document.getElementById('bottleNumInput').value = ''
+  document.getElementById('bottlePsiInput').value = ''
+  document.getElementById('bottleApparatusInput').value = ''
+  document.getElementById('bottleModalErr').classList.add('hidden')
+  document.getElementById('bottleModal').classList.remove('hidden')
+}
+function openEditBottleModal(id) {
+  if (!AUTH.isLoggedIn()) { alert('Login required.'); return }
+  const b = (bottleData.bottles||[]).find(x => x.id === id)
+  if (!b) return
+  editingBottleId = id
+  document.getElementById('bottleModalTitle').textContent = 'Edit Bottle'
+  document.getElementById('bottleNumInput').value = b.bottle_number || ''
+  document.getElementById('bottlePsiInput').value = b.current_psi || ''
+  document.getElementById('bottleApparatusInput').value = b.apparatus_assigned || ''
+  document.getElementById('bottleModalErr').classList.add('hidden')
+  document.getElementById('bottleModal').classList.remove('hidden')
+}
+function closeBottleModal() { document.getElementById('bottleModal').classList.add('hidden') }
+async function saveBottleModal() {
+  const err = document.getElementById('bottleModalErr')
+  err.classList.add('hidden')
+  const bottle_number = document.getElementById('bottleNumInput').value.trim()
+  if (!bottle_number) { err.textContent = 'Bottle number required'; err.classList.remove('hidden'); return }
+  const current_psi = document.getElementById('bottlePsiInput').value
+  const apparatus_assigned = document.getElementById('bottleApparatusInput').value.trim()
+  const action = editingBottleId ? 'update_bottle' : 'add_bottle'
+  const extra  = editingBottleId
+    ? { id: editingBottleId, bottle_number, current_psi, apparatus_assigned }
+    : { bottle_number, current_psi, apparatus_assigned }
+  try {
+    const r = await postAuth(action, extra)
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    closeBottleModal()
+    loadBottles()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+async function deleteBottle(id, label) {
+  if (!confirm(`Remove bottle "${label}"?`)) return
+  try {
+    const r = await postAuth('delete_bottle', { id })
+    if (!r.ok) { const d=await r.json(); alert(d.error||'Failed'); return }
+    loadBottles()
+  } catch(e) { alert(e.message) }
+}
+
+function openPsiModal(id, label) {
+  if (!AUTH.isLoggedIn()) { alert('Login required.'); return }
+  psiBottleId = id
+  document.getElementById('psiModalLabel').textContent = `Bottle: ${label}`
+  document.getElementById('psiInput').value = ''
+  document.getElementById('psiLoggedBy').value = AUTH.getSession()?.display_name || ''
+  document.getElementById('psiModalErr').classList.add('hidden')
+  document.getElementById('psiModal').classList.remove('hidden')
+}
+function closePsiModal() { document.getElementById('psiModal').classList.add('hidden') }
+async function savePsi() {
+  const err = document.getElementById('psiModalErr')
+  err.classList.add('hidden')
+  const psi = document.getElementById('psiInput').value
+  const logged_by = document.getElementById('psiLoggedBy').value.trim()
+  if (!psi) { err.textContent = 'Enter PSI reading'; err.classList.remove('hidden'); return }
+  try {
+    const r = await postAuth('log_psi', { bottle_id: psiBottleId, psi: parseInt(psi), logged_by })
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    closePsiModal()
+    loadBottles()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// ── BATTERIES ─────────────────────────────────────────────────────────────────
+async function loadBatteries() {
+  const c = document.getElementById('batteriesContainer')
+  c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Loading...</div>'
+  try {
+    const r = await fetch(`${API}/manage-scba?section=batteries`)
+    batteryData = await r.json()
+    renderBatteries()
+  } catch(e) {
+    c.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load.</div>'
+  }
+}
+
+function renderBatteries() {
+  const c = document.getElementById('batteriesContainer')
+  const today = new Date().toISOString().slice(0,10)
+
+  // Deduplicate: latest entry per apparatus
+  const latest = {}
+  for (const b of (batteryData||[])) {
+    if (!latest[b.apparatus] || b.changed_date > latest[b.apparatus].changed_date) latest[b.apparatus] = b
+  }
+  const rows = Object.values(latest).sort((a,b) => a.apparatus.localeCompare(b.apparatus))
+
+  // Also show apparatus with no batteries logged
+  const ALL_AP = ['E1','E5','T1','R1','R2','C1','C2','C4','C5','C6','M1/C8']
+  for (const ap of ALL_AP) {
+    if (!latest[ap]) rows.push({ apparatus: ap, changed_date: null, changed_by: null, next_due: null, notes: null })
+  }
+  rows.sort((a,b) => a.apparatus.localeCompare(b.apparatus))
+
+  if (!rows.length) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">No battery records.</div>'; return }
+
+  let html = `<table class="w-full text-sm">
+    <thead><tr class="border-b border-gray-200 bg-gray-50">
+      <th class="text-left px-5 py-2.5 text-xs font-semibold text-gray-500">Apparatus</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Last Changed</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden sm:table-cell">Changed By</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Next Due</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden md:table-cell">Notes</th>
+    </tr></thead>
+    <tbody>`
+
+  for (const b of rows) {
+    const overdue = b.next_due && b.next_due < today
+    const dueSoon = b.next_due && !overdue && b.next_due <= new Date(Date.now() + 7*86400000).toISOString().slice(0,10)
+    let dueClass = 'text-gray-500', dueBadge = ''
+    if (!b.next_due) { dueClass = 'text-gray-400'; dueBadge = '<span class="text-xs text-gray-400">—</span>' }
+    else if (overdue) { dueClass = 'text-red-700 font-bold'; dueBadge = `<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-fail">OVERDUE — ${fmtDate(b.next_due)}</span>` }
+    else if (dueSoon) { dueClass = 'text-yellow-700'; dueBadge = `<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-warn">Due ${fmtDate(b.next_due)}</span>` }
+    else { dueBadge = `<span class="text-xs text-gray-600">${fmtDate(b.next_due)}</span>` }
+
+    html += `<tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 ${overdue ? 'bg-red-50' : ''}">
+      <td class="px-5 py-3 font-bold text-gray-800">${esc(b.apparatus)}</td>
+      <td class="px-3 py-3 text-gray-600 text-xs">${b.changed_date ? fmtDate(b.changed_date) : '<span class="text-gray-400">Never logged</span>'}</td>
+      <td class="px-3 py-3 text-gray-500 text-xs hidden sm:table-cell">${esc(b.changed_by||'—')}</td>
+      <td class="px-3 py-3">${dueBadge}</td>
+      <td class="px-3 py-3 text-gray-400 text-xs hidden md:table-cell">${esc(b.notes||'—')}</td>
+    </tr>`
+  }
+  html += '</tbody></table>'
+
+  // Full history
+  if (batteryData.length > rows.length) {
+    html += `<div class="px-5 py-3 border-t border-gray-100">
+      <button onclick="toggleBatteryHistory()" class="text-xs font-semibold text-gray-500 hover:text-gray-700" style="min-height:0;">Show full history ▾</button>
+      <div id="batteryHistory" class="hidden mt-3 text-xs text-gray-500">
+        ${batteryData.map(b => `<div class="py-1 border-b border-gray-100">${esc(b.apparatus)} — ${fmtDate(b.changed_date)} — ${esc(b.changed_by||'?')} ${b.notes ? '— '+esc(b.notes) : ''}</div>`).join('')}
+      </div>
+    </div>`
+  }
+
+  c.innerHTML = html
+}
+
+function toggleBatteryHistory() {
+  const h = document.getElementById('batteryHistory')
+  if (h) h.classList.toggle('hidden')
+}
+
+function openBatteryModal() {
+  if (!AUTH.isLoggedIn()) { alert('Login required.'); return }
+  document.getElementById('batteryApparatusInput').value = ''
+  document.getElementById('batteryChangedBy').value = AUTH.getSession()?.display_name || ''
+  document.getElementById('batteryNotesInput').value = ''
+  document.getElementById('batteryModalErr').classList.add('hidden')
+  document.getElementById('batteryModal').classList.remove('hidden')
+}
+function closeBatteryModal() { document.getElementById('batteryModal').classList.add('hidden') }
+async function saveBattery() {
+  const err = document.getElementById('batteryModalErr')
+  err.classList.add('hidden')
+  const apparatus  = document.getElementById('batteryApparatusInput').value
+  const changed_by = document.getElementById('batteryChangedBy').value.trim()
+  const notes      = document.getElementById('batteryNotesInput').value.trim()
+  if (!apparatus) { err.textContent = 'Select apparatus'; err.classList.remove('hidden'); return }
+  try {
+    const r = await postAuth('log_battery', { apparatus, changed_by, notes })
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    closeBatteryModal()
+    loadBatteries()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
+// Close modals on backdrop click
+['loginModal','packModal','bottleModal','psiModal','batteryModal'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', function(e) {
+    if (e.target === this) document.getElementById(id).classList.add('hidden')
+  })
+})
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  updateAuthUI()
+  loadOfficers()
+  setSection('registry')
+  // Auto-fill inspected by if logged in
+  const sess = AUTH.getSession()
+  if (sess?.display_name) document.getElementById('inspectedByInput').value = sess.display_name
+})
+</script>
+</body>
+</html>
