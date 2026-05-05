@@ -222,43 +222,109 @@
 
   <!-- SECTION 2: INSPECTION -->
   <div id="sec-inspection" class="hidden">
-    <div class="bg-white rounded-2xl shadow overflow-hidden mb-4">
+
+    <!-- Setup card -->
+    <div id="inspSetup" class="bg-white rounded-2xl shadow overflow-hidden mb-4">
       <div class="px-5 py-4 border-b border-gray-100">
-        <h2 class="font-bold text-gray-800 mb-3">Run Inspection</h2>
-        <div class="flex gap-3 flex-wrap">
-          <select id="inspApparatusSelect" onchange="loadInspectionForm()" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 flex-1" style="min-height:40px;min-width:160px;">
-            <option value="">Select Apparatus...</option>
-            <option value="E1">E1 — Engine 1</option>
-            <option value="E5">E5 — Engine 5</option>
-            <option value="T1">T1 — Tower 1</option>
-            <option value="R1">R1 — Rescue 1</option>
-            <option value="R2">R2 — Rescue 2</option>
-            <option value="C1">C1</option>
-            <option value="C2">C2</option>
-            <option value="C4">C4</option>
-            <option value="C5">C5</option>
-            <option value="C6">C6</option>
-            <option value="M1">M1/C8</option>
-          </select>
-          <input id="inspectedByInput" type="text" placeholder="Inspected by (your name)"
-            class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 flex-1" style="min-height:40px;min-width:160px;">
+        <h2 class="font-bold text-gray-800">Run Inspection</h2>
+        <p class="text-xs text-gray-400 mt-0.5">Select apparatus and enter your name to begin</p>
+      </div>
+      <div class="px-5 py-4 space-y-3">
+        <select id="inspApparatusSelect" class="w-full border border-gray-300 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:52px;">
+          <option value="">Select Apparatus...</option>
+          <option value="E1">E1 — Engine 1</option>
+          <option value="E5">E5 — Engine 5</option>
+          <option value="T1">T1 — Tower 1</option>
+          <option value="R1">R1 — Rescue 1</option>
+          <option value="R2">R2 — Rescue 2</option>
+          <option value="C1">C1</option>
+          <option value="C2">C2</option>
+          <option value="C4">C4</option>
+          <option value="C5">C5</option>
+          <option value="C6">C6</option>
+          <option value="M1">M1/C8</option>
+        </select>
+        <input id="inspectedByInput" type="text" placeholder="Inspected by (your name)"
+          class="w-full border border-gray-300 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:52px;">
+        <div id="inspSetupErr" class="hidden text-red-600 text-sm"></div>
+        <button onclick="startInspection()" class="w-full bg-green-700 hover:bg-green-800 text-white font-black text-base rounded-xl transition" style="min-height:56px;">Start Inspection</button>
+      </div>
+    </div>
+
+    <!-- Full form (hidden until started) -->
+    <div id="inspFormWrap" class="hidden">
+
+      <!-- Sticky header -->
+      <div class="sticky z-30 rounded-2xl shadow-lg mb-4 px-4 py-3 text-white" style="top:57px;background:#1e3a5f;">
+        <div class="flex items-center justify-between mb-1">
+          <span id="inspHdrAp" class="font-black text-base leading-tight"></span>
+          <button onclick="resetInspection()" class="text-white font-semibold text-xs hover:opacity-100" style="min-height:0;opacity:0.6;">✕ Reset</button>
+        </div>
+        <div class="flex items-center justify-between">
+          <span id="inspHdrMeta" class="text-xs" style="opacity:0.65;"></span>
+          <div class="flex gap-1.5">
+            <span id="cntPass" class="text-xs font-bold px-2 py-0.5 rounded-full bg-green-500 text-white">0 Pass</span>
+            <span id="cntFail" class="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500 text-white">0 Fail</span>
+            <span id="cntPend" class="text-xs font-bold px-2 py-0.5 rounded-full text-white" style="background:rgba(255,255,255,0.25);">0 Pending</span>
+          </div>
         </div>
       </div>
 
-      <!-- Live counter -->
-      <div id="inspCounter" class="hidden px-5 py-2 bg-gray-50 border-b border-gray-100 flex gap-4 text-sm font-semibold">
-        <span class="text-green-700"><span id="cntPass">0</span> Passed</span>
-        <span class="text-red-600"><span id="cntFail">0</span> Failed</span>
-        <span class="text-gray-500"><span id="cntPend">0</span> Pending</span>
+      <!-- Mobile: one pack at a time (hidden on md+) -->
+      <div id="inspMobile" class="md:hidden">
+        <div id="inspPackCard" class="bg-white rounded-2xl shadow mb-3 overflow-hidden"></div>
+        <div class="flex items-center justify-center gap-2 mb-3">
+          <span id="inspProgressLabel" class="text-xs text-gray-400 mr-1"></span>
+          <div id="inspDots" class="flex gap-1.5"></div>
+        </div>
+        <div class="flex gap-3 mb-4">
+          <button onclick="inspNav(-1)" id="inspPrevBtn" class="flex-1 border-2 border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition" style="min-height:56px;">← Prev</button>
+          <button onclick="inspNavNext()" id="inspNextBtn" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl transition" style="min-height:56px;">Next →</button>
+        </div>
       </div>
 
-      <div id="inspFormContainer"><div class="text-gray-400 text-sm text-center py-10">Select an apparatus to begin.</div></div>
-
-      <div id="inspSubmitBar" class="hidden px-5 py-4 border-t border-gray-100">
-        <div id="inspErr" class="hidden text-red-600 text-sm mb-2"></div>
-        <button onclick="submitInspection()" id="inspSubmitBtn" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 transition">Submit All Inspections</button>
+      <!-- Desktop: full table (hidden on mobile) -->
+      <div id="inspDesktopWrap" class="hidden md:block bg-white rounded-2xl shadow overflow-hidden mb-4">
+        <div id="inspDesktopTableContainer" class="overflow-x-auto"></div>
       </div>
-    </div>
+
+      <!-- After-packs: bottles, battery, notes+submit -->
+      <div id="inspAfterPacks">
+
+        <div class="bg-white rounded-2xl shadow overflow-hidden mb-4">
+          <div class="px-5 py-3 border-b border-gray-100">
+            <h3 class="font-bold text-gray-800 text-sm">Spare Bottle PSI</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Update any bottles you checked this inspection</p>
+          </div>
+          <div id="inspBottleGrid" class="px-5 py-4">
+            <p class="text-gray-400 text-xs text-center py-2">Loading…</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow overflow-hidden mb-4">
+          <div class="px-5 py-3 border-b border-gray-100">
+            <h3 class="font-bold text-gray-800 text-sm">Battery Status</h3>
+          </div>
+          <div id="inspBatteryStatus" class="px-5 py-4">
+            <p class="text-gray-400 text-xs text-center py-2">Loading…</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow overflow-hidden mb-6">
+          <div class="px-5 py-3 border-b border-gray-100">
+            <h3 class="font-bold text-gray-800 text-sm">Notes &amp; Submit</h3>
+          </div>
+          <div class="px-5 py-4">
+            <textarea id="inspOverallNotes" rows="3" maxlength="1000" placeholder="Overall inspection notes (optional)…"
+              class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 resize-none mb-3" style="min-height:0;"></textarea>
+            <div id="inspErr" class="hidden text-red-600 text-sm mb-2"></div>
+            <button onclick="submitInspection()" id="inspSubmitBtn" class="w-full bg-green-700 hover:bg-green-800 text-white font-black text-base rounded-xl transition" style="min-height:56px;">Submit Inspection</button>
+          </div>
+        </div>
+
+      </div><!-- /inspAfterPacks -->
+    </div><!-- /inspFormWrap -->
+
   </div>
 
   <!-- SECTION 3: SPARE BOTTLES -->
@@ -296,6 +362,18 @@
   </div>
 
 </div><!-- /max-w -->
+
+<!-- Inspection Confirm Modal -->
+<div id="inspConfirmModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+    <h3 class="font-bold text-gray-800 text-lg mb-3">Submit Inspection?</h3>
+    <div id="inspConfirmSummary" class="text-sm text-gray-600 mb-5 leading-relaxed"></div>
+    <div class="flex gap-2">
+      <button onclick="document.getElementById('inspConfirmModal').classList.add('hidden')" class="flex-1 border border-gray-300 rounded-xl py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">← Review</button>
+      <button onclick="doSubmitInspection()" id="inspConfirmBtn" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-3 text-sm transition">Confirm &amp; Submit</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = '/.netlify/functions'
@@ -581,161 +659,426 @@ const CHECK_ITEMS = [
   { key:'harness_frame',    label:'Harness & Frame' },
   { key:'straps_buckles',   label:'Straps & Buckles' },
   { key:'air_gauge',        label:'Air Gauge' },
-  { key:'heads_up_display', label:'Heads Up Display' },
+  { key:'heads_up_display', label:'Heads Up Display (HUD)' },
   { key:'first_stage_reg',  label:'1st Stage Regulator' },
   { key:'audible_alarm',    label:'Audible Alarm' },
-  { key:'pass_alarm',       label:'Pass Alarm' },
-  { key:'rit_bottle',       label:'RIT Bottle Connection/Space' },
+  { key:'pass_alarm',       label:'PASS Alarm' },
+  { key:'rit_bottle',       label:'RIT Bottle' },
 ]
+const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6',M1:'M1/C8'}
 
-async function loadInspectionForm() {
-  const ap = document.getElementById('inspApparatusSelect').value
-  const c  = document.getElementById('inspFormContainer')
-  document.getElementById('inspSubmitBar').classList.add('hidden')
-  document.getElementById('inspCounter').classList.add('hidden')
-  if (!ap) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Select an apparatus to begin.</div>'; return }
+let inspCurrentIdx = 0
+let inspData = {}           // packId -> { psi, checks:{key:null/'pass'/'fail'}, notes }
+let inspBottleList = []
+let inspBottleUpdates = {}  // bottleId -> psi string
+let inspBatteryCache = []
+let inspApparatus = ''
 
-  c.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">Loading packs…</div>'
+function initInspData() {
+  inspData = {}
+  for (const p of inspPacks) {
+    inspData[p.id] = { psi:'', checks: Object.fromEntries(CHECK_ITEMS.map(ci=>[ci.key,null])), notes:'' }
+  }
+}
+
+async function startInspection() {
+  const ap  = document.getElementById('inspApparatusSelect').value
+  const by  = document.getElementById('inspectedByInput').value.trim()
+  const err = document.getElementById('inspSetupErr')
+  err.classList.add('hidden')
+  if (!ap) { err.textContent='Select an apparatus.'; err.classList.remove('hidden'); return }
+  if (!by) { err.textContent='Enter your name.'; err.classList.remove('hidden'); return }
+  if (!AUTH.isLoggedIn()) { err.textContent='Officer login required to submit inspections.'; err.classList.remove('hidden'); return }
+
+  const btn = document.querySelector('#inspSetup button[onclick="startInspection()"]')
+  const origText = btn.textContent
+  btn.textContent='Loading…'; btn.disabled=true
   try {
-    const r = await fetch(`${API}/manage-scba?section=packs`)
-    const data = await r.json()
-    inspPacks = (data.packs||[]).filter(p => p.apparatus_id === ap && p.status !== 'out_of_service')
-    if (!inspPacks.length) { c.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No active packs for this apparatus.</div>'; return }
-    renderInspectionForm(ap)
+    const [pr, br, btr] = await Promise.all([
+      fetch(`${API}/manage-scba?section=packs`),
+      fetch(`${API}/manage-scba?section=bottles`),
+      fetch(`${API}/manage-scba?section=batteries`),
+    ])
+    const pd  = await pr.json()
+    const bd  = await br.json()
+    const btd = await btr.json()
+
+    inspPacks = (pd.packs||[]).filter(p => p.apparatus_id===ap && p.status!=='out_of_service')
+    if (!inspPacks.length) { err.textContent='No active packs for this apparatus.'; err.classList.remove('hidden'); return }
+    inspBottleList = bd.bottles || []
+    inspBatteryCache = btd || []
+    inspApparatus = ap
+    inspCurrentIdx = 0
+    inspBottleUpdates = {}
+    initInspData()
+    renderFullInspectionForm()
   } catch(e) {
-    c.innerHTML = '<div class="text-red-500 text-sm text-center py-8">Failed to load packs.</div>'
+    err.textContent='Failed to load. Try again.'
+    err.classList.remove('hidden')
+  } finally {
+    btn.textContent=origText; btn.disabled=false
   }
 }
 
-function renderInspectionForm(ap) {
-  const c = document.getElementById('inspFormContainer')
-  document.getElementById('inspCounter').classList.remove('hidden')
-  document.getElementById('inspSubmitBar').classList.remove('hidden')
-
-  c.innerHTML = inspPacks.map(pack => `
-    <div class="border-b border-gray-100 last:border-b-0 px-5 py-4">
-      <div class="flex items-center justify-between mb-3">
-        <div>
-          <span class="font-black text-gray-900 text-base">${esc(pack.pack_id)}</span>
-          <span class="ml-2 text-xs text-gray-500">${esc(pack.assigned_apparatus||ap)}</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <input id="psi-${pack.id}" type="number" placeholder="PSI" min="0" max="5000"
-            class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:0;">
-        </div>
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        ${CHECK_ITEMS.map(ci => `
-          <div class="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 gap-2">
-            <span class="text-sm text-gray-700 flex-1">${esc(ci.label)}</span>
-            <div class="flex gap-1">
-              <button id="btn-pass-${pack.id}-${ci.key}" onclick="setCheckVal('${pack.id}','${ci.key}','pass')"
-                class="text-xs font-bold px-2.5 py-1 rounded-lg toggle-idle transition" style="min-height:0;">Pass</button>
-              <button id="btn-fail-${pack.id}-${ci.key}" onclick="setCheckVal('${pack.id}','${ci.key}','fail')"
-                class="text-xs font-bold px-2.5 py-1 rounded-lg toggle-idle transition" style="min-height:0;">Fail</button>
-            </div>
-          </div>`).join('')}
-      </div>
-      <div id="notes-wrap-${pack.id}" class="slide-down mt-2">
-        <textarea id="notes-${pack.id}" rows="2" maxlength="500" placeholder="Describe failed items…"
-          class="w-full border border-red-300 bg-red-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" style="min-height:0;"></textarea>
-      </div>
-    </div>`).join('')
-
-  updateInspCounter()
+function resetInspection() {
+  if (!confirm('Reset inspection? All entered data will be lost.')) return
+  inspPacks=[]; inspData={}; inspBottleUpdates={}
+  document.getElementById('inspSetup').classList.remove('hidden')
+  document.getElementById('inspFormWrap').classList.add('hidden')
 }
 
-function setCheckVal(packId, key, val) {
-  const pass = document.getElementById(`btn-pass-${packId}-${key}`)
-  const fail = document.getElementById(`btn-fail-${packId}-${key}`)
-  if (val === 'pass') {
-    pass.className = pass.className.replace(/toggle-idle|toggle-fail/g, '') + ' toggle-pass'
-    fail.className = fail.className.replace(/toggle-idle|toggle-pass/g, '') + ' toggle-idle'
+function resetAndSetupInspection() {
+  inspPacks=[]; inspData={}; inspBottleUpdates={}
+  document.getElementById('inspSetup').classList.remove('hidden')
+  document.getElementById('inspFormWrap').innerHTML=''
+  document.getElementById('inspFormWrap').classList.add('hidden')
+  document.getElementById('inspApparatusSelect').value=''
+}
+
+function renderFullInspectionForm() {
+  const apLabel = APPARATUS_LABELS[inspApparatus]||inspApparatus
+  const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+  const by = document.getElementById('inspectedByInput').value
+
+  document.getElementById('inspHdrAp').textContent = apLabel+' — SCBA'
+  document.getElementById('inspHdrMeta').textContent = today+' · '+by
+  document.getElementById('inspSetup').classList.add('hidden')
+  document.getElementById('inspFormWrap').classList.remove('hidden')
+
+  renderMobileCard(0)
+  updateCounter()
+  renderDesktopTable()
+  renderInspBottleGrid()
+  renderInspBatteryStatus()
+}
+
+function saveCurrentCardState() {
+  if (!inspPacks.length) return
+  const p = inspPacks[inspCurrentIdx]
+  if (!p || !inspData[p.id]) return
+  const psiEl   = document.getElementById(`mob-psi-${p.id}`)
+  const notesEl = document.getElementById(`mob-notes-${p.id}`)
+  if (psiEl)   inspData[p.id].psi   = psiEl.value
+  if (notesEl) inspData[p.id].notes = notesEl.value
+}
+
+function packStatus(packId) {
+  const d = inspData[packId]
+  if (!d) return 'pending'
+  const vals = Object.values(d.checks)
+  if (vals.some(v=>v==='fail')) return 'fail'
+  if (vals.some(v=>v===null))  return 'pending'
+  return 'pass'
+}
+
+function renderMobileCard(idx) {
+  inspCurrentIdx = idx
+  const p = inspPacks[idx]
+  if (!p) return
+  const d = inspData[p.id]
+  const status    = packStatus(p.id)
+  const headerBg  = status==='pass'?'#16a34a':status==='fail'?'#dc2626':'#1e3a5f'
+  const statusLbl = status==='pass'?'PASS ✓':status==='fail'?'FAIL ✗':'Pending'
+  const anyFail   = status==='fail'
+
+  const checksHtml = CHECK_ITEMS.map(ci => {
+    const val = d.checks[ci.key]
+    const pc = val==='pass'?'bg-green-600 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'
+    const fc = val==='fail'?'bg-red-600 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'
+    return `<div class="border-b border-gray-100 last:border-b-0 px-4 py-3">
+      <div class="text-sm font-semibold text-gray-800 mb-2">${esc(ci.label)}</div>
+      <div class="flex gap-2">
+        <button onclick="setInspCheck('${p.id}','${ci.key}','pass')" class="flex-1 font-bold text-sm rounded-xl py-3 transition ${pc}" style="min-height:44px;">PASS</button>
+        <button onclick="setInspCheck('${p.id}','${ci.key}','fail')" class="flex-1 font-bold text-sm rounded-xl py-3 transition ${fc}" style="min-height:44px;">FAIL</button>
+      </div>
+    </div>`
+  }).join('')
+
+  document.getElementById('inspPackCard').innerHTML = `
+    <div class="px-4 py-3 flex items-center justify-between text-white rounded-t-2xl" style="background:${headerBg};">
+      <div>
+        <div class="font-black text-xl">${esc(p.pack_id)}</div>
+        <div class="text-xs" style="opacity:0.7;">${esc(p.assigned_apparatus||inspApparatus)}</div>
+      </div>
+      <span class="text-sm font-bold px-3 py-1 rounded-full" style="background:rgba(255,255,255,0.2);">${statusLbl}</span>
+    </div>
+    <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
+      <label class="block text-xs font-semibold text-gray-500 mb-1.5">Bottle PSI</label>
+      <input id="mob-psi-${p.id}" type="number" inputmode="numeric" placeholder="e.g. 4500" min="0" max="5500"
+        value="${esc(d.psi)}"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white" style="min-height:44px;">
+    </div>
+    ${checksHtml}
+    <div id="mob-notes-wrap-${p.id}" class="${anyFail?'':'hidden'} border-t-2 border-red-200 bg-red-50 px-4 py-3">
+      <label class="block text-xs font-semibold text-red-700 mb-1.5">Failure Notes <span class="font-normal">(required)</span></label>
+      <textarea id="mob-notes-${p.id}" rows="3" maxlength="500" placeholder="Describe the failed items…"
+        class="w-full border border-red-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none bg-white" style="min-height:0;">${esc(d.notes)}</textarea>
+    </div>`
+
+  // Progress dots
+  const dotsEl = document.getElementById('inspDots')
+  const lblEl  = document.getElementById('inspProgressLabel')
+  if (dotsEl) dotsEl.innerHTML = inspPacks.map((pk,i)=>{
+    const st = packStatus(pk.id)
+    const bg = st==='pass'?'bg-green-500':st==='fail'?'bg-red-500':'bg-gray-300'
+    const ring = i===idx ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+    return `<button onclick="inspGoTo(${i})" class="rounded-full transition ${bg} ${ring}" style="min-height:0;min-width:0;width:12px;height:12px;" title="Pack ${i+1}"></button>`
+  }).join('')
+  if (lblEl) lblEl.textContent = `${idx+1} / ${inspPacks.length}`
+
+  // Prev/Next state
+  const prevBtn = document.getElementById('inspPrevBtn')
+  const nextBtn = document.getElementById('inspNextBtn')
+  if (prevBtn) { prevBtn.disabled=idx===0; prevBtn.style.opacity=idx===0?'0.35':'1' }
+  const isLast = idx===inspPacks.length-1
+  if (nextBtn) nextBtn.textContent = isLast ? 'Review & Submit →' : 'Next →'
+}
+
+function setInspCheck(packId, key, val) {
+  saveCurrentCardState()
+  inspData[packId].checks[key] = val
+  if (inspPacks[inspCurrentIdx]?.id === packId) renderMobileCard(inspCurrentIdx)
+  updateDesktopCell(packId, key)
+  updateCounter()
+}
+
+function inspNav(dir) {
+  saveCurrentCardState()
+  const next = inspCurrentIdx + dir
+  if (next < 0 || next >= inspPacks.length) return
+  renderMobileCard(next)
+  window.scrollTo({top:0,behavior:'smooth'})
+}
+
+function inspNavNext() {
+  saveCurrentCardState()
+  if (inspCurrentIdx === inspPacks.length-1) {
+    const el = document.getElementById('inspAfterPacks')
+    if (el) el.scrollIntoView({behavior:'smooth', block:'start'})
   } else {
-    fail.className = fail.className.replace(/toggle-idle|toggle-pass/g, '') + ' toggle-fail'
-    pass.className = pass.className.replace(/toggle-idle|toggle-fail/g, '') + ' toggle-idle'
+    renderMobileCard(inspCurrentIdx+1)
+    window.scrollTo({top:0,behavior:'smooth'})
   }
-  pass.dataset.val = val === 'pass' ? 'pass' : ''
-  fail.dataset.val = val === 'fail' ? 'fail' : ''
-
-  // Check if any fail on this pack
-  const anyFail = CHECK_ITEMS.some(ci => {
-    const f = document.getElementById(`btn-fail-${packId}-${ci.key}`)
-    return f && f.className.includes('toggle-fail')
-  })
-  const wrap = document.getElementById(`notes-wrap-${packId}`)
-  wrap.classList.toggle('open', anyFail)
-
-  updateInspCounter()
 }
 
-function getCheckVal(packId, key) {
-  const pass = document.getElementById(`btn-pass-${packId}-${key}`)
-  const fail = document.getElementById(`btn-fail-${packId}-${key}`)
-  if (pass && pass.className.includes('toggle-pass')) return 'pass'
-  if (fail && fail.className.includes('toggle-fail')) return 'fail'
-  return null
+function inspGoTo(idx) {
+  saveCurrentCardState()
+  renderMobileCard(idx)
+  window.scrollTo({top:0,behavior:'smooth'})
 }
 
-function updateInspCounter() {
-  let passed = 0, failed = 0, pending = 0
-  for (const pack of inspPacks) {
-    const allVals = CHECK_ITEMS.map(ci => getCheckVal(pack.id, ci.key))
-    const anyFail = allVals.some(v => v === 'fail')
-    const anyNull = allVals.some(v => v === null)
-    if (anyFail) failed++
-    else if (anyNull) pending++
-    else passed++
+function updateCounter() {
+  let passed=0, failed=0, pending=0
+  for (const p of inspPacks) {
+    const st = packStatus(p.id)
+    if (st==='pass') passed++
+    else if (st==='fail') failed++
+    else pending++
   }
-  document.getElementById('cntPass').textContent = passed
-  document.getElementById('cntFail').textContent = failed
-  document.getElementById('cntPend').textContent = pending
+  document.getElementById('cntPass').textContent = passed+' Pass'
+  document.getElementById('cntFail').textContent = failed+' Fail'
+  document.getElementById('cntPend').textContent = pending+' Pending'
 }
 
-async function submitInspection() {
+function renderDesktopTable() {
+  const c = document.getElementById('inspDesktopTableContainer')
+  if (!c) return
+  const thBase = 'text-xs font-semibold text-white px-3 py-2.5 text-center whitespace-nowrap'
+  let html = `<table class="w-full text-sm min-w-max">
+  <thead><tr style="background:#1e3a5f;">
+    <th class="text-xs font-semibold text-white px-4 py-2.5 text-left" style="min-width:130px;">Pack ID</th>
+    <th class="${thBase}" style="min-width:90px;">PSI</th>
+    ${CHECK_ITEMS.map(ci=>`<th class="${thBase}" style="min-width:110px;">${esc(ci.label)}</th>`).join('')}
+    <th class="${thBase}" style="min-width:160px;">Notes</th>
+  </tr></thead><tbody>`
+
+  for (const p of inspPacks) {
+    const d = inspData[p.id]
+    const status = packStatus(p.id)
+    const rowBg = status==='pass'?'bg-green-50':status==='fail'?'bg-red-50':''
+    html += `<tr class="border-b border-gray-100 ${rowBg}" id="drow-${p.id}">
+      <td id="dsticky-${p.id}" class="px-4 py-2.5 font-bold text-gray-900 border-r border-gray-200" style="background:${status==='pass'?'#f0fdf4':status==='fail'?'#fef2f2':'#fff'};">
+        ${esc(p.pack_id)}<br><span class="text-xs font-normal text-gray-400">${esc(p.assigned_apparatus||inspApparatus)}</span>
+      </td>
+      <td class="px-3 py-2 text-center">
+        <input type="number" inputmode="numeric" placeholder="PSI" min="0" max="5500"
+          value="${esc(d.psi)}"
+          oninput="inspData['${p.id}'].psi=this.value"
+          class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:0;">
+      </td>
+      ${CHECK_ITEMS.map(ci=>{
+        const val=d.checks[ci.key]
+        const pc=val==='pass'?'bg-green-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        const fc=val==='fail'?'bg-red-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        return `<td class="px-2 py-2 text-center" id="dcell-${p.id}-${ci.key}">
+          <div class="flex gap-1 justify-center">
+            <button onclick="setInspCheck('${p.id}','${ci.key}','pass')" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pc}" style="min-height:0;min-width:44px;">P</button>
+            <button onclick="setInspCheck('${p.id}','${ci.key}','fail')" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${fc}" style="min-height:0;min-width:44px;">F</button>
+          </div>
+        </td>`
+      }).join('')}
+      <td class="px-3 py-2">
+        <textarea rows="1" maxlength="500" placeholder="Notes…"
+          oninput="inspData['${p.id}'].notes=this.value"
+          class="w-full border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 resize-none" style="min-height:0;min-width:140px;">${esc(d.notes)}</textarea>
+      </td>
+    </tr>`
+  }
+  html += '</tbody></table>'
+  c.innerHTML = html
+}
+
+function updateDesktopCell(packId, key) {
+  const cell = document.getElementById(`dcell-${packId}-${key}`)
+  if (!cell) return
+  const val = inspData[packId]?.checks[key]
+  const pc = val==='pass'?'bg-green-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'
+  const fc = val==='fail'?'bg-red-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'
+  cell.innerHTML = `<div class="flex gap-1 justify-center">
+    <button onclick="setInspCheck('${packId}','${key}','pass')" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pc}" style="min-height:0;min-width:44px;">P</button>
+    <button onclick="setInspCheck('${packId}','${key}','fail')" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${fc}" style="min-height:0;min-width:44px;">F</button>
+  </div>`
+  const status = packStatus(packId)
+  const row = document.getElementById(`drow-${packId}`)
+  if (row) row.className = `border-b border-gray-100 ${status==='pass'?'bg-green-50':status==='fail'?'bg-red-50':''}`
+  const sticky = document.getElementById(`dsticky-${packId}`)
+  if (sticky) sticky.style.background = status==='pass'?'#f0fdf4':status==='fail'?'#fef2f2':'#fff'
+}
+
+function renderInspBottleGrid() {
+  const c = document.getElementById('inspBottleGrid')
+  if (!c) return
+  const bottles = (inspBottleList||[]).filter(b=>b.active!==false)
+  if (!bottles.length) { c.innerHTML='<p class="text-gray-400 text-xs text-center py-2">No spare bottles on record.</p>'; return }
+  c.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    ${bottles.map(b=>{
+      const cur = b.current_psi
+      const bc = !cur?'#d1d5db':cur<2000?'#fca5a5':cur<4000?'#fde68a':'#86efac'
+      return `<div class="border-2 rounded-xl p-3 bg-gray-50" id="ibcard-${b.id}" style="border-color:${bc};">
+        <div class="text-xs font-bold text-gray-700 mb-0.5 truncate">${esc(b.bottle_number)}</div>
+        ${b.apparatus_assigned?`<div class="text-xs text-gray-400 mb-1">${esc(b.apparatus_assigned)}</div>`:''}
+        <div class="text-xs text-gray-400 mb-2">Now: <strong>${cur?cur+' PSI':'—'}</strong></div>
+        <input type="number" inputmode="numeric" placeholder="New PSI" min="0" max="5500"
+          value="${inspBottleUpdates[b.id]||''}"
+          oninput="updateInspBottle('${b.id}',this.value,'ibcard-${b.id}')"
+          class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600 bg-white" style="min-height:0;">
+      </div>`
+    }).join('')}
+  </div>`
+}
+
+function updateInspBottle(bottleId, val, cardId) {
+  inspBottleUpdates[bottleId] = val
+  const psi = parseInt(val)
+  const card = document.getElementById(cardId)
+  if (card) card.style.borderColor = !val?'#d1d5db':psi<2000?'#fca5a5':psi<4000?'#fde68a':'#86efac'
+}
+
+function renderInspBatteryStatus() {
+  const c = document.getElementById('inspBatteryStatus')
+  if (!c) return
+  const today = new Date().toISOString().slice(0,10)
+  const latest = {}
+  for (const b of (inspBatteryCache||[])) {
+    if (!latest[b.apparatus]||b.changed_date>latest[b.apparatus].changed_date) latest[b.apparatus]=b
+  }
+  const ALL_AP = ['E1','E5','T1','R1','R2','C1','C2','C4','C5','C6','M1/C8']
+  const rows = ALL_AP.map(ap=>latest[ap]||{apparatus:ap,changed_date:null,next_due:null})
+  const in7 = new Date(Date.now()+7*86400000).toISOString().slice(0,10)
+  const overdue  = rows.filter(r=>r.next_due && r.next_due<today)
+  const dueSoon  = rows.filter(r=>r.next_due && r.next_due>=today && r.next_due<=in7)
+
+  if (!overdue.length && !dueSoon.length) {
+    c.innerHTML='<p class="text-green-700 text-sm font-semibold text-center py-2">✓ All batteries current</p>'; return
+  }
+  c.innerHTML = [
+    ...overdue.map(r=>`<div class="flex items-center justify-between py-1.5 border-b border-red-100 last:border-b-0">
+      <span class="font-bold text-red-700 text-sm">${esc(r.apparatus)}</span>
+      <span class="text-xs font-bold badge-fail px-2 py-0.5 rounded-full">OVERDUE</span></div>`),
+    ...dueSoon.map(r=>`<div class="flex items-center justify-between py-1.5 border-b border-yellow-100 last:border-b-0">
+      <span class="font-bold text-yellow-800 text-sm">${esc(r.apparatus)}</span>
+      <span class="text-xs font-bold badge-warn px-2 py-0.5 rounded-full">Due Soon</span></div>`)
+  ].join('')
+}
+
+function submitInspection() {
   const err = document.getElementById('inspErr')
   err.classList.add('hidden')
-  if (!AUTH.isLoggedIn()) { err.textContent = 'Login required to submit inspections.'; err.classList.remove('hidden'); return }
+  saveCurrentCardState()
 
-  const inspectedBy = document.getElementById('inspectedByInput').value.trim()
-  if (!inspectedBy) { err.textContent = 'Enter your name in "Inspected by".'; err.classList.remove('hidden'); return }
-
-  const ap = document.getElementById('inspApparatusSelect').value
-  const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6','M1':'M1/C8'}
-
-  const inspections = []
-  for (const pack of inspPacks) {
-    const vals = {}
+  for (const p of inspPacks) {
+    const d = inspData[p.id]
     for (const ci of CHECK_ITEMS) {
-      const v = getCheckVal(pack.id, ci.key)
-      if (!v) { err.textContent = `Complete all checks for ${pack.pack_id}.`; err.classList.remove('hidden'); return }
-      vals[ci.key] = v
+      if (!d.checks[ci.key]) {
+        err.textContent=`Complete all checks for ${p.pack_id}.`; err.classList.remove('hidden'); return
+      }
     }
-    const psi = document.getElementById(`psi-${pack.id}`)?.value
-    inspections.push({
-      pack_id: pack.id,
-      pack_label: pack.pack_id,
-      apparatus_assigned: APPARATUS_LABELS[ap] || ap,
-      psi: psi ? parseInt(psi) : null,
-      notes: document.getElementById(`notes-${pack.id}`)?.value?.trim() || null,
-      ...vals
-    })
+    const hasFail = Object.values(d.checks).some(v=>v==='fail')
+    if (hasFail && !d.notes.trim()) {
+      err.textContent=`Failure notes required for ${p.pack_id}.`; err.classList.remove('hidden'); return
+    }
   }
 
+  const passed = inspPacks.filter(p=>packStatus(p.id)==='pass').length
+  const failed = inspPacks.filter(p=>packStatus(p.id)==='fail').length
+  const bottleCount = Object.keys(inspBottleUpdates).filter(id=>inspBottleUpdates[id]).length
+  const lines = [
+    `<strong>${passed} pack${passed!==1?'s':''} pass</strong>, <strong class="text-red-700">${failed} fail</strong>.`,
+    failed>0 ? 'Failures will be logged and DCs notified.' : '',
+    bottleCount ? `${bottleCount} spare bottle PSI value${bottleCount!==1?'s':''} will be updated.` : '',
+  ].filter(Boolean).join('<br>')
+
+  document.getElementById('inspConfirmSummary').innerHTML = lines
+  document.getElementById('inspConfirmModal').classList.remove('hidden')
+}
+
+async function doSubmitInspection() {
+  document.getElementById('inspConfirmModal').classList.add('hidden')
   const btn = document.getElementById('inspSubmitBtn')
-  btn.disabled = true; btn.textContent = 'Submitting…'
+  btn.textContent='Submitting…'; btn.disabled=true
+  const err = document.getElementById('inspErr')
+  err.classList.add('hidden')
+
+  const inspectedBy  = document.getElementById('inspectedByInput').value
+  const overallNotes = document.getElementById('inspOverallNotes').value.trim()
+  const AP_LABELS    = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6',M1:'M1/C8'}
+
+  const inspections = inspPacks.map(p => {
+    const d = inspData[p.id]
+    return {
+      pack_id: p.id, pack_label: p.pack_id,
+      apparatus_assigned: AP_LABELS[inspApparatus]||inspApparatus,
+      psi: d.psi ? parseInt(d.psi) : null,
+      notes: d.notes || overallNotes || null,
+      ...d.checks
+    }
+  })
+
   try {
     const r = await postAuth('submit_inspection', { inspections, inspected_by: inspectedBy })
     const d = await r.json()
-    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
-    const msg = d.failed > 0
-      ? `Inspection submitted. ${d.failed} pack(s) FAILED — high-priority findings created and email sent.`
-      : `All ${d.saved} pack(s) passed inspection.`
-    document.getElementById('inspFormContainer').innerHTML = `<div class="px-5 py-8 text-center"><div class="text-2xl mb-2">${d.failed > 0 ? '⚠️' : '✅'}</div><p class="font-semibold text-gray-800">${msg}</p><button onclick="document.getElementById('inspApparatusSelect').value='';loadInspectionForm()" class="mt-4 text-sm text-green-700 font-bold hover:underline" style="min-height:0;">Run Another Inspection</button></div>`
-    document.getElementById('inspSubmitBar').classList.add('hidden')
-    document.getElementById('inspCounter').classList.add('hidden')
-  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
-  finally { btn.disabled=false; btn.textContent='Submit All Inspections' }
+    if (!r.ok) { err.textContent=d.error||'Failed'; err.classList.remove('hidden'); return }
+
+    // Log any bottle PSI updates
+    const bottleEntries = Object.entries(inspBottleUpdates).filter(([,v])=>v)
+    await Promise.allSettled(bottleEntries.map(([bid, psi]) =>
+      postAuth('log_psi', { bottle_id: bid, psi: parseInt(psi), logged_by: inspectedBy })
+    ))
+
+    const bottleMsg = bottleEntries.length ? ` ${bottleEntries.length} bottle PSI updated.` : ''
+    const msg = d.failed>0
+      ? `${d.failed} pack${d.failed!==1?'s':''} failed — findings created, DCs notified.${bottleMsg}`
+      : `All ${d.saved} pack${d.saved!==1?'s':''} passed.${bottleMsg}`
+
+    document.getElementById('inspFormWrap').innerHTML = `
+      <div class="bg-white rounded-2xl shadow px-6 py-10 text-center">
+        <div class="text-4xl mb-3">${d.failed>0?'⚠️':'✅'}</div>
+        <p class="font-bold text-gray-800 text-lg mb-2">Inspection Complete${d.failed>0?' — Issues Found':''}</p>
+        <p class="text-sm text-gray-500 mb-6">${msg}</p>
+        <button onclick="resetAndSetupInspection()" class="bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl px-6 py-3 transition text-sm">Run Another Inspection</button>
+      </div>`
+  } catch(e) { err.textContent=e.message; err.classList.remove('hidden') }
+  finally { btn.textContent='Submit Inspection'; btn.disabled=false }
 }
 
 // ── SPARE BOTTLES ─────────────────────────────────────────────────────────────
