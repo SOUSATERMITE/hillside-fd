@@ -5,6 +5,9 @@
 const { allowOrigin } = require('./_cors')
 
 const MIGRATION_SQL = `
+  -- contacts key_code column
+  alter table contacts add column if not exists key_code text;
+
   create table if not exists personnel_documents (
     id             uuid primary key default gen_random_uuid(),
     firefighter_id uuid references firefighters(id) not null,
@@ -143,54 +146,48 @@ exports.handler = async (event) => {
   const ref  = SUPABASE_URL.match(/\/\/([^.]+)/)?.[1] || ''
   const poolUser = `postgres.${ref}`
 
-  // ── Attempt 1: explicit DB_PASS via pooler ──────────────────────────────────
+  const poolHosts = [
+    'aws-0-us-east-1.pooler.supabase.com',
+    'aws-0-us-west-1.pooler.supabase.com',
+    'aws-0-eu-west-1.pooler.supabase.com',
+    'aws-0-ap-southeast-1.pooler.supabase.com',
+  ]
+
   if (DB_PASS) {
-    try {
-      await tryPg('aws-1-us-east-1.pooler.supabase.com', 6543, poolUser, DB_PASS, log)
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass', log }) }
-    } catch (e) {
-      log.push('pg (DB_PASS, pooler 6543) failed: ' + e.message)
-    }
-  }
-
-  // ── Attempt 2: service role JWT as password via pooler (Supavisor JWT auth) ─
-  try {
-    await tryPg('aws-1-us-east-1.pooler.supabase.com', 6543, poolUser, SERVICE_KEY, log)
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_pooler', log }) }
-  } catch (e) {
-    log.push('pg (JWT, pooler 6543) failed: ' + e.message)
-  }
-
-  // ── Attempt 3: service role JWT via pooler session mode port 5432 ──────────
-  try {
-    await tryPg('aws-1-us-east-1.pooler.supabase.com', 5432, poolUser, SERVICE_KEY, log)
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_pooler_5432', log }) }
-  } catch (e) {
-    log.push('pg (JWT, pooler 5432) failed: ' + e.message)
-  }
-
-  // ── Attempt 4: direct host with JWT ────────────────────────────────────────
-  try {
-    await tryPg(`db.${ref}.supabase.co`, 5432, 'postgres', SERVICE_KEY, log)
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_jwt_direct', log }) }
-  } catch (e) {
-    log.push('pg (JWT, direct 5432) failed: ' + e.message)
-  }
-
-  // ── Attempt 5: DB_PASS via session pooler (port 5432) ──────────────────────
-  if (DB_PASS) {
-    try {
-      await tryPg('aws-1-us-east-1.pooler.supabase.com', 5432, poolUser, DB_PASS, log)
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass_5432', log }) }
-    } catch (e) {
-      log.push('pg (DB_PASS, pooler 5432) failed: ' + e.message)
-    }
-    // ── Attempt 6: DB_PASS via direct host ───────────────────────────────────
+    // ── Attempt 1: DB_PASS via direct host (most reliable for DDL) ─────────
     try {
       await tryPg(`db.${ref}.supabase.co`, 5432, 'postgres', DB_PASS, log)
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass_direct', log }) }
     } catch (e) {
       log.push('pg (DB_PASS, direct 5432) failed: ' + e.message)
+    }
+    // ── Attempt 2–5: DB_PASS via each pooler region (transaction mode) ──────
+    for (const host of poolHosts) {
+      try {
+        await tryPg(host, 6543, poolUser, DB_PASS, log)
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_dbpass_${host}`, log }) }
+      } catch (e) {
+        log.push(`pg (DB_PASS, ${host}:6543) failed: ${e.message}`)
+      }
+    }
+    // ── Attempt 6–9: DB_PASS via each pooler region (session mode) ──────────
+    for (const host of poolHosts) {
+      try {
+        await tryPg(host, 5432, poolUser, DB_PASS, log)
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_dbpass_sess_${host}`, log }) }
+      } catch (e) {
+        log.push(`pg (DB_PASS, ${host}:5432) failed: ${e.message}`)
+      }
+    }
+  }
+
+  // ── Fallback: service role JWT via pooler ───────────────────────────────────
+  for (const host of poolHosts) {
+    try {
+      await tryPg(host, 6543, poolUser, SERVICE_KEY, log)
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_jwt_${host}`, log }) }
+    } catch (e) {
+      log.push(`pg (JWT, ${host}:6543) failed: ${e.message}`)
     }
   }
 
