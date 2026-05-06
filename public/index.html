@@ -468,6 +468,7 @@
       <button id="ctf-firefighters" onclick="setContactFilter('firefighters')" class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Firefighters</button>
       <button id="ctf-staff"        onclick="setContactFilter('staff')"        class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Admin Staff</button>
       <button id="ctf-external"     onclick="setContactFilter('external')"     class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">Vendors/Other</button>
+      <button id="ctf-keycodes"     onclick="setContactFilter('keycodes')"     class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">🔑 Key Codes</button>
       <button id="ctf-all"          onclick="setContactFilter('all')"          class="ctf-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 transition" style="min-height:0;">All</button>
     </div>
     <div id="contactForm" class="hidden px-4 py-3 border-t border-gray-100 bg-green-50">
@@ -489,6 +490,7 @@
           <option value="firefighter">Firefighters</option>
           <option value="staff">Admin Staff</option>
           <option value="external">Vendors/Other</option>
+          <option value="key_codes">🔑 Key Codes</option>
         </select>
         <select id="ctTour" class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
           <option value="">No Tour</option>
@@ -1816,6 +1818,9 @@ function isExternalContact(c) {
 function isAdminStaff(c) {
   return c.category === 'staff' && !isOfficerContact(c) && !isFFContact(c)
 }
+function isKeyCodeContact(c) {
+  return c.category === 'key_codes'
+}
 
 function setContactFilter(f) {
   contactFilter = f
@@ -1860,6 +1865,8 @@ function renderContacts() {
       contacts = contacts.filter(isAdminStaff)
     } else if (contactFilter === 'external') {
       contacts = contacts.filter(isExternalContact)
+    } else if (contactFilter === 'keycodes') {
+      contacts = contacts.filter(isKeyCodeContact)
     }
   }
 
@@ -1871,6 +1878,7 @@ function renderContacts() {
   const ctIsOff = AUTH.isOfficer(), ctIsAdm = AUTH.isAdmin()
   list.innerHTML = contacts.map(c => {
     const isExp = expandedContactId === c.id
+    const isKeyCode = c.category === 'key_codes'
     // Parse tour from notes
     const tourMatch = (c.notes||'').match(/\bTour\s*([1-4])\b/i)
     const tourBadge = tourMatch ? `<span class="badge bg-blue-100 text-blue-700 ml-1">Tour ${tourMatch[1]}</span>` : ''
@@ -1878,11 +1886,26 @@ function renderContacts() {
     const expandedHtml = isExp ? `
       <div class="mt-1.5 text-xs space-y-0.5">
         ${c.email ? `<div><a href="mailto:${esc(c.email)}" class="text-blue-600 hover:underline">${esc(c.email)}</a></div>` : ''}
-        ${c.key_code ? `<div class="inline-flex items-center gap-1 font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 mt-0.5">🔑 ${esc(c.key_code)}</div>` : ''}
+        ${!isKeyCode && c.key_code ? `<div class="inline-flex items-center gap-1 font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 mt-0.5">🔑 ${esc(c.key_code)}</div>` : ''}
         ${cleanNotes ? `<div class="text-gray-500">${esc(cleanNotes)}</div>` : ''}
       </div>` : ''
     const editBtn = ctIsOff ? `<button onclick="editContactById('${c.id}')" class="flex-shrink-0 text-blue-400 hover:text-blue-600 text-sm" style="min-height:0;" title="Edit">✏️</button>` : ''
     const delBtn  = ctIsOff ? `<button onclick="deleteContact('${c.id}','${esc(c.name).replace(/'/g,"&#39;")}')" class="flex-shrink-0 text-red-300 hover:text-red-600 text-sm" style="min-height:0;" title="Delete">🗑️</button>` : ''
+
+    // Key code entries: show location name + code prominently, no expand needed
+    if (isKeyCode) {
+      return `<div class="px-4 py-2.5 flex items-center justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold text-gray-800">${highlightMatch(c.name, q)}${newBadge(c.created_at)}</div>
+          ${c.title ? `<div class="text-xs text-gray-500">${highlightMatch(c.title, q)}</div>` : ''}
+          ${cleanNotes ? `<div class="text-xs text-gray-400">${esc(cleanNotes)}</div>` : ''}
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${c.key_code ? `<span class="font-mono font-bold text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1">🔑 ${highlightMatch(c.key_code, q)}</span>` : '<span class="text-xs text-gray-400 italic">no code</span>'}
+          ${editBtn}${delBtn}
+        </div>
+      </div>`
+    }
 
     return `<div class="px-4 py-2.5">
       <div class="flex items-start gap-2">
@@ -1933,6 +1956,7 @@ function editContactById(id) {
   // Map old categories to new ones
   let cat = c.category || 'officer'
   if (cat === 'vendor' || cat === 'utility' || cat === 'emergency' || cat === 'other') cat = 'external'
+  if (cat === 'key_codes') cat = 'key_codes'
   // Parse tour from notes
   const tourMatch = (c.notes||'').match(/\bTour\s*([1-4])\b/i)
   const cleanNotes = (c.notes||'').replace(/\s*\bTour\s*[1-4]\b/i, '').trim()
