@@ -40,15 +40,24 @@ exports.handler = async (event) => {
 
     if (error) throw error
 
-    // Deduplicate by display_name only — keep highest rank when names collide
+    // Deduplicate by base name (strip rank prefix) — keep highest rank when names collide
+    // e.g. "CAPT J. Bananzio" and "J. Bananzio" are the same person; keep the Captain entry
     const RANK = { admin: 0, officer: 1, firefighter: 2 }
+    function baseName(dn) {
+      return (dn || '')
+        .replace(/^Acting:\s*/i, '')
+        .replace(/\s*\([^)]*\)\s*$/, '')
+        .replace(/^(Chief|DC|CAPT)\s+/i, '')
+        .toLowerCase()
+        .trim()
+    }
     const ranked = (data || []).slice().sort((a, b) => (RANK[a.role] ?? 3) - (RANK[b.role] ?? 3))
-    const seenDisplay = new Set()
+    const seenBase = new Set()
     const deduped = []
     for (const o of ranked) {
-      const dk = (o.display_name || '').toLowerCase().trim()
-      if (dk && !seenDisplay.has(dk)) {
-        seenDisplay.add(dk)
+      const bk = baseName(o.display_name)
+      if (bk && !seenBase.has(bk)) {
+        seenBase.add(bk)
         deduped.push(o)
       }
     }
