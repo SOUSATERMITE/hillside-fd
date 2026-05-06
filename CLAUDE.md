@@ -328,9 +328,51 @@ FF list and Captain list are separate. DCs and Chiefs do not appear on the recal
 
 ---
 
+## Database Safety Rules — MANDATORY
+
+**These rules apply every time, no exceptions.**
+
+### 1. Always back up before any destructive operation
+Before any DELETE, UPDATE (bulk), or ALTER on `firefighters`, `officers`, or `recall_list`, create backup tables using the Management API:
+
+```bash
+# PAT is stored in Netlify env var SUPABASE_ACCESS_TOKEN (token name "Claude" in Supabase dashboard)
+PAT="<value of SUPABASE_ACCESS_TOKEN Netlify env var>"
+DATE=$(date +%Y%m%d)
+curl -s -X POST "https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query" \
+  -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
+  -d "{\"query\":\"CREATE TABLE IF NOT EXISTS firefighters_backup_$DATE AS SELECT * FROM firefighters\"}"
+curl -s -X POST "https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query" \
+  -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
+  -d "{\"query\":\"CREATE TABLE IF NOT EXISTS officers_backup_$DATE AS SELECT * FROM officers\"}"
+curl -s -X POST "https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query" \
+  -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
+  -d "{\"query\":\"CREATE TABLE IF NOT EXISTS recall_list_backup_$DATE AS SELECT * FROM recall_list\"}"
+```
+
+To restore from backup: `INSERT INTO firefighters SELECT * FROM firefighters_backup_YYYYMMDD ON CONFLICT DO NOTHING`
+
+### 2. Never delete from firefighters or recall_list without explicit confirmation
+Before any DELETE on these tables, run a SELECT to show exactly what will be deleted and **stop to show the user** before proceeding. Do not proceed without user confirmation.
+
+```sql
+-- Always run this FIRST and show results to user:
+SELECT id, name, rank, group_number, active FROM firefighters WHERE <your condition>;
+SELECT firefighter_id, rank_type, list_position, last_recall_date FROM recall_list WHERE <your condition>;
+```
+
+### 3. Never cascade-delete operational history
+Do NOT delete from `sick_log`, `recall_log`, or `recall_list` as part of cleaning up other tables. These are audit/history tables — losing them is permanent and breaks rotation fairness. If a firefighter record must be removed, set `active = false` instead of deleting.
+
+### 4. Prefer soft deletes
+`UPDATE firefighters SET active = false` is always safer than `DELETE FROM firefighters`. Only hard-delete with explicit user instruction AND a backup already in place.
+
+---
+
 ## Important Known Issues / History
 
 - **Officer name mismatch**: Officers table stores names like `"CAPT M. Gwidzz"` but firefighters table has `"M. Gwidzz"`. The `findOfficerInFirefighters()` helper in `_auth.js` handles this with 4-strategy matching. Do NOT use `.eq('name', officer.name)` directly in any new function — always use the shared helper.
 - **Netlify accounts**: There are TWO Netlify accounts. `hillside-fd.netlify.app` is under `sousatermite@gmail.com`. The AOL account has other sites (sousa-referral, sousapest.com). Always deploy hillside-fd from the gmail account.
-- **Database migrations**: The 4 dashboard tables (`bulletin_posts`, `scheduled_events`, `work_orders`, `contacts`) require running `supabase/migration_dashboard.sql` in the Supabase SQL editor. The service role key CANNOT run DDL — only a database password or Supabase Personal Access Token (sbp_...) can.
+- **Database migrations**: DDL requires a Supabase Personal Access Token (`SUPABASE_ACCESS_TOKEN` Netlify env var, token name "Claude"). Use the Management API: `POST https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query`. The service role key cannot run DDL.
 - **Magic tokens table**: `supabase/magic_tokens.sql` must also be run in Supabase if not already done.
+- **Captains in firefighters table**: Captains and DCs appear in BOTH the `officers` table (for login) AND the `firefighters` table (for sick tracking and recall list). Do not remove officers from `firefighters` — it breaks operational tracking.

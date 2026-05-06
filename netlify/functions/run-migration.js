@@ -106,19 +106,33 @@ const MIGRATION_SQL = `
   alter table apparatus_findings add column if not exists resolution_notes text;
 `
 
-async function tryManagementApi(ref, accessToken, log) {
+async function runQuery(ref, accessToken, sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ query: MIGRATION_SQL })
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: sql })
   })
   const body = await res.json()
-  if (!res.ok) {
-    throw new Error(`Management API ${res.status}: ${JSON.stringify(body)}`)
+  if (!res.ok) throw new Error(`Management API ${res.status}: ${JSON.stringify(body)}`)
+  return body
+}
+
+async function backupTables(ref, accessToken, log) {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const tables = ['firefighters', 'officers', 'recall_list']
+  for (const t of tables) {
+    try {
+      await runQuery(ref, accessToken, `CREATE TABLE IF NOT EXISTS ${t}_backup_${date} AS SELECT * FROM ${t}`)
+      log.push(`Backup created: ${t}_backup_${date}`)
+    } catch (e) {
+      log.push(`Backup warning (${t}): ${e.message}`)
+    }
   }
+}
+
+async function tryManagementApi(ref, accessToken, log) {
+  await backupTables(ref, accessToken, log)
+  await runQuery(ref, accessToken, MIGRATION_SQL)
   log.push('Migration SQL executed via Management API')
 }
 
