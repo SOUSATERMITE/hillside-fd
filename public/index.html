@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -36,7 +36,6 @@
     <a href="/sick"    class="hover:text-green-200 pb-0.5">Sick</a>
     <a href="/recall"  class="hover:text-green-200 pb-0.5">Recall</a>
     <a href="/docs"    class="hover:text-green-200 pb-0.5">Docs</a>
-    <a href="/search"  class="hover:text-green-200 pb-0.5">Search</a>
     <a href="/vacation"   class="hover:text-green-200 pb-0.5">Vacation</a>
     <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
     <a href="/scba"      class="hover:text-green-200 pb-0.5">SCBA</a>
@@ -54,7 +53,6 @@
   <a href="/sick"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
   <a href="/recall"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
   <a href="/docs"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
-  <a href="/search"  onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Search</a>
   <a href="/vacation"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
   <a href="/apparatus" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Apparatus</a>
   <a href="/scba"      onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">SCBA Management</a>
@@ -500,9 +498,11 @@
           <option value="4">Tour 4</option>
         </select>
       </div>
-      <div class="mb-2">
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <input id="ctKeyCode" type="text" placeholder="Key Code (optional)" maxlength="100"
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
         <input id="ctNotes" type="text" placeholder="Notes" maxlength="500"
-          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          class="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
       </div>
       <div id="ctEditId" data-id=""></div>
       <div class="flex gap-2">
@@ -1847,7 +1847,8 @@ function renderContacts() {
       c.name.toLowerCase().includes(ql) ||
       (c.title||'').toLowerCase().includes(ql) ||
       (c.phone||'').includes(ql) ||
-      (c.email||'').toLowerCase().includes(ql)
+      (c.email||'').toLowerCase().includes(ql) ||
+      (c.key_code||'').toLowerCase().includes(ql)
     )
   } else {
     // Apply filter
@@ -1877,6 +1878,7 @@ function renderContacts() {
     const expandedHtml = isExp ? `
       <div class="mt-1.5 text-xs space-y-0.5">
         ${c.email ? `<div><a href="mailto:${esc(c.email)}" class="text-blue-600 hover:underline">${esc(c.email)}</a></div>` : ''}
+        ${c.key_code ? `<div class="inline-flex items-center gap-1 font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 mt-0.5">🔑 ${esc(c.key_code)}</div>` : ''}
         ${cleanNotes ? `<div class="text-gray-500">${esc(cleanNotes)}</div>` : ''}
       </div>` : ''
     const editBtn = ctIsOff ? `<button onclick="editContactById('${c.id}')" class="flex-shrink-0 text-blue-400 hover:text-blue-600 text-sm" style="min-height:0;" title="Edit">✏️</button>` : ''
@@ -1921,7 +1923,7 @@ function toggleContactForm() {
 function cancelContactForm() {
   document.getElementById('contactForm').classList.add('hidden')
   document.getElementById('ctEditId').dataset.id = ''
-  ;['ctName','ctTitle','ctPhone','ctEmail','ctNotes'].forEach(id => document.getElementById(id).value = '')
+  ;['ctName','ctTitle','ctPhone','ctEmail','ctKeyCode','ctNotes'].forEach(id => document.getElementById(id).value = '')
   document.getElementById('ctTour').value = ''
 }
 
@@ -1941,9 +1943,10 @@ function editContactById(id) {
   document.getElementById('ctTitle').value = c.title || ''
   document.getElementById('ctPhone').value = c.phone || ''
   document.getElementById('ctEmail').value = c.email || ''
-  document.getElementById('ctCat').value   = cat
-  document.getElementById('ctTour').value  = tourMatch ? tourMatch[1] : ''
-  document.getElementById('ctNotes').value = cleanNotes
+  document.getElementById('ctCat').value     = cat
+  document.getElementById('ctTour').value    = tourMatch ? tourMatch[1] : ''
+  document.getElementById('ctKeyCode').value = c.key_code || ''
+  document.getElementById('ctNotes').value   = cleanNotes
   document.getElementById('contactForm').scrollIntoView({ behavior:'smooth', block:'start' })
 }
 
@@ -1970,6 +1973,7 @@ async function saveContact() {
   const email    = document.getElementById('ctEmail').value.trim() || null
   const category = document.getElementById('ctCat').value
   const tour     = document.getElementById('ctTour').value
+  const key_code = document.getElementById('ctKeyCode').value.trim() || null
   const baseNotes = document.getElementById('ctNotes').value.trim()
   // Combine tour back into notes
   const notes    = (baseNotes + (tour ? ` Tour ${tour}` : '')).trim() || null
@@ -1979,7 +1983,7 @@ async function saveContact() {
   try {
     const res = await fetch(`${API}/manage-contacts`, {
       method:'POST', headers:{'Content-Type':'application/json',...AUTH.getHeaders()},
-      body: JSON.stringify({ action, id:id||undefined, name, title, phone, email, category, notes })
+      body: JSON.stringify({ action, id:id||undefined, name, title, phone, email, category, notes, key_code })
     })
     const data = await res.json()
     if (!res.ok) { err.textContent = data.error||'Error'; err.classList.remove('hidden'); return }
@@ -1989,7 +1993,7 @@ async function saveContact() {
       dashData.contacts.sort((a,b) => a.category.localeCompare(b.category)||a.name.localeCompare(b.name))
     } else {
       const idx = dashData.contacts.findIndex(c => c.id === id)
-      if (idx >= 0) dashData.contacts[idx] = { ...dashData.contacts[idx], name, title, phone, email, category, notes }
+      if (idx >= 0) dashData.contacts[idx] = { ...dashData.contacts[idx], name, title, phone, email, category, notes, key_code }
     }
     cancelContactForm()
     renderContacts()

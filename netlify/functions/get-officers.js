@@ -40,18 +40,14 @@ exports.handler = async (event) => {
 
     if (error) throw error
 
-    // Deduplicate by name AND display_name — keep highest rank (admin > officer > firefighter)
+    // Deduplicate by display_name only — keep highest rank when names collide
     const RANK = { admin: 0, officer: 1, firefighter: 2 }
-    // Sort by rank first so higher-ranked entries win dedup
     const ranked = (data || []).slice().sort((a, b) => (RANK[a.role] ?? 3) - (RANK[b.role] ?? 3))
-    const seenName    = new Set()
     const seenDisplay = new Set()
     const deduped = []
     for (const o of ranked) {
-      const nk = o.name.toLowerCase().trim()
-      const dk = o.display_name.toLowerCase().trim()
-      if (!seenName.has(nk) && !seenDisplay.has(dk)) {
-        seenName.add(nk)
+      const dk = (o.display_name || '').toLowerCase().trim()
+      if (dk && !seenDisplay.has(dk)) {
         seenDisplay.add(dk)
         deduped.push(o)
       }

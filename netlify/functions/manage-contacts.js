@@ -22,7 +22,7 @@ exports.handler = async (event) => {
   const cats = ['officer', 'firefighter', 'staff', 'external', 'vendor', 'emergency', 'utility', 'other']
 
   if (action === 'add') {
-    const { name, title, phone, email, category, notes } = body
+    const { name, title, phone, email, category, notes, key_code } = body
     if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Name required' }) }
 
     const { data, error } = await supabase.from('contacts').insert({
@@ -32,6 +32,7 @@ exports.handler = async (event) => {
       email:    email?.trim().slice(0, 150)    || null,
       category: cats.includes(category) ? category : 'other',
       notes:    notes?.trim().slice(0, 500)    || null,
+      key_code: key_code?.trim().slice(0, 100) || null,
       active:   true
     }).select().single()
 
@@ -40,7 +41,7 @@ exports.handler = async (event) => {
   }
 
   if (action === 'edit') {
-    const { id, name, title, phone, email, category, notes } = body
+    const { id, name, title, phone, email, category, notes, key_code } = body
     if (!id || !name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and name required' }) }
 
     const { error } = await supabase.from('contacts').update({
@@ -49,7 +50,8 @@ exports.handler = async (event) => {
       phone:    phone?.trim().slice(0, 30)     || null,
       email:    email?.trim().slice(0, 150)    || null,
       category: cats.includes(category) ? category : 'other',
-      notes:    notes?.trim().slice(0, 500)    || null
+      notes:    notes?.trim().slice(0, 500)    || null,
+      key_code: key_code?.trim().slice(0, 100) || null
     }).eq('id', id)
 
     if (error) return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
