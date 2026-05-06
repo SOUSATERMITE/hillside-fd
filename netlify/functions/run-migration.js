@@ -1,6 +1,7 @@
 // One-shot migration runner — protected by ADMIN_PASSWORD
 // Call: GET /.netlify/functions/run-migration?secret=<ADMIN_PASSWORD>
-// After successful run, this function can be deleted.
+// Primary method: Supabase Management API (requires SUPABASE_ACCESS_TOKEN env var)
+// Fallback: direct pg connection (requires SUPABASE_DB_PASS env var)
 
 const { allowOrigin } = require('./_cors')
 
@@ -93,19 +94,33 @@ const MIGRATION_SQL = `
   create index if not exists idx_duty_completions_date   on duty_completions(duty_id, completed_date);
   create index if not exists idx_duty_log_date           on duty_log(duty_id, shift_date);
 
-  -- Expand recurrence constraint + add recurrence_config JSONB column
   alter table daily_duties add column if not exists recurrence_config jsonb;
   alter table daily_duties drop constraint if exists daily_duties_recurrence_check;
   alter table daily_duties add constraint daily_duties_recurrence_check
     check (recurrence in ('one_time','daily','weekly','biweekly','monthly_date','monthly_dow','yearly','monthly','specific_day'));
 
-  -- Manual issue reporting columns on apparatus_findings
   alter table apparatus_findings alter column apparatus_id drop not null;
   alter table apparatus_findings add column if not exists item_name        text;
   alter table apparatus_findings add column if not exists item_category    text;
   alter table apparatus_findings add column if not exists issue_type       text;
   alter table apparatus_findings add column if not exists resolution_notes text;
 `
+
+async function tryManagementApi(ref, accessToken, log) {
+  const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ query: MIGRATION_SQL })
+  })
+  const body = await res.json()
+  if (!res.ok) {
+    throw new Error(`Management API ${res.status}: ${JSON.stringify(body)}`)
+  }
+  log.push('Migration SQL executed via Management API')
+}
 
 async function tryPg(host, port, user, password, log) {
   const { Client } = require('pg')
@@ -119,7 +134,7 @@ async function tryPg(host, port, user, password, log) {
   await client.connect()
   log.push(`Connected via pg (${host}:${port})`)
   await client.query(MIGRATION_SQL)
-  log.push('Migration SQL executed successfully')
+  log.push('Migration SQL executed via pg')
   await client.end()
 }
 
@@ -138,14 +153,28 @@ exports.handler = async (event) => {
     return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL
-  const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const DB_PASS      = process.env.SUPABASE_DB_PASS
+  const SUPABASE_URL    = process.env.SUPABASE_URL
+  const SERVICE_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const DB_PASS         = process.env.SUPABASE_DB_PASS
+  const ACCESS_TOKEN    = process.env.SUPABASE_ACCESS_TOKEN
 
   const log = []
-  const ref  = SUPABASE_URL.match(/\/\/([^.]+)/)?.[1] || ''
+  const ref      = SUPABASE_URL.match(/\/\/([^.]+)/)?.[1] || ''
   const poolUser = `postgres.${ref}`
 
+  // ── Primary: Supabase Management API (works from any network, just needs PAT) ──
+  if (ACCESS_TOKEN) {
+    try {
+      await tryManagementApi(ref, ACCESS_TOKEN, log)
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'management_api', log }) }
+    } catch (e) {
+      log.push('Management API failed: ' + e.message)
+    }
+  } else {
+    log.push('SUPABASE_ACCESS_TOKEN not set — skipping Management API')
+  }
+
+  // ── Fallback: direct pg connection ────────────────────────────────────────────
   const poolHosts = [
     'aws-0-us-east-1.pooler.supabase.com',
     'aws-0-us-west-1.pooler.supabase.com',
@@ -154,58 +183,20 @@ exports.handler = async (event) => {
   ]
 
   if (DB_PASS) {
-    // ── Attempt 1: DB_PASS via direct host (most reliable for DDL) ─────────
     try {
       await tryPg(`db.${ref}.supabase.co`, 5432, 'postgres', DB_PASS, log)
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_dbpass_direct', log }) }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'pg_direct', log }) }
     } catch (e) {
-      log.push('pg (DB_PASS, direct 5432) failed: ' + e.message)
+      log.push('pg direct failed: ' + e.message)
     }
-    // ── Attempt 2–5: DB_PASS via each pooler region (transaction mode) ──────
     for (const host of poolHosts) {
       try {
         await tryPg(host, 6543, poolUser, DB_PASS, log)
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_dbpass_${host}`, log }) }
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_pool_${host}`, log }) }
       } catch (e) {
-        log.push(`pg (DB_PASS, ${host}:6543) failed: ${e.message}`)
+        log.push(`pg pool ${host}:6543 failed: ${e.message}`)
       }
     }
-    // ── Attempt 6–9: DB_PASS via each pooler region (session mode) ──────────
-    for (const host of poolHosts) {
-      try {
-        await tryPg(host, 5432, poolUser, DB_PASS, log)
-        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_dbpass_sess_${host}`, log }) }
-      } catch (e) {
-        log.push(`pg (DB_PASS, ${host}:5432) failed: ${e.message}`)
-      }
-    }
-  }
-
-  // ── Fallback: service role JWT via pooler ───────────────────────────────────
-  for (const host of poolHosts) {
-    try {
-      await tryPg(host, 6543, poolUser, SERVICE_KEY, log)
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: `pg_jwt_${host}`, log }) }
-    } catch (e) {
-      log.push(`pg (JWT, ${host}:6543) failed: ${e.message}`)
-    }
-  }
-
-  // ── Fallback: check if tables already exist via REST ───────────────────────
-  const [chk1, chk2] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/personnel_documents?limit=0`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
-    }),
-    fetch(`${SUPABASE_URL}/rest/v1/personnel_notes?limit=0`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }
-    })
-  ])
-  const docsOk  = chk1.ok  || chk1.status  === 206
-  const notesOk = chk2.ok  || chk2.status  === 206
-
-  if (docsOk && notesOk) {
-    log.push('Tables already exist — no migration needed')
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, method: 'already_exists', log }) }
   }
 
   return {
@@ -213,9 +204,7 @@ exports.handler = async (event) => {
     headers,
     body: JSON.stringify({
       ok: false,
-      message: 'All pg connection attempts failed. Go to Supabase dashboard → Project Settings → Database → Database password → copy it → set SUPABASE_DB_PASS in Netlify env vars → call this endpoint again.',
-      personnel_documents_exists: docsOk,
-      personnel_notes_exists: notesOk,
+      message: 'All methods failed. Set SUPABASE_ACCESS_TOKEN in Netlify env vars (get it from supabase.com → Account → Access Tokens) then call this endpoint again.',
       log
     })
   }
