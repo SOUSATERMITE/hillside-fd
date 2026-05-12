@@ -186,6 +186,7 @@ exports.handler = async (event) => {
           apparatus_assigned: insp.apparatus_assigned || null,
           psi: null,
           pressure_full: insp.pressure_full !== undefined ? insp.pressure_full : null,
+          bottle_number: insp.bottle_number?.trim() || null,
           harness_frame:    insp.harness_frame    || null,
           straps_buckles:   insp.straps_buckles   || null,
           air_gauge:        insp.air_gauge        || null,
