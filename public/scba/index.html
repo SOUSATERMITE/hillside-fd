@@ -65,27 +65,10 @@
   </div>
   <div class="flex items-center gap-3">
     <span id="navUser" class="text-xs text-green-200 hidden"></span>
-    <button id="loginBtn" onclick="openLoginModal()" class="text-xs font-bold bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg px-3 py-1.5 transition" style="min-height:0;">Login</button>
+    <button id="loginBtn" onclick="AUTH.showLoginModal(onLoginSuccess)" class="text-xs font-bold bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg px-3 py-1.5 transition" style="min-height:0;">Login</button>
     <button id="logoutBtn" onclick="doLogout()" class="hidden text-xs font-bold bg-white bg-opacity-15 hover:bg-opacity-25 text-white rounded-lg px-3 py-1.5 transition" style="min-height:0;">Logout</button>
   </div>
 </nav>
-
-<!-- Login Modal -->
-<div id="loginModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
-  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-    <h3 class="font-bold text-gray-800 text-lg mb-4">Officer Login</h3>
-    <select id="loginName" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
-      <option value="">Select your name...</option>
-    </select>
-    <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" maxlength="8"
-      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
-    <div id="loginErr" class="hidden text-red-600 text-xs mb-2"></div>
-    <div class="flex gap-2">
-      <button onclick="closeLoginModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-      <button onclick="doLogin()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Login</button>
-    </div>
-  </div>
-</div>
 
 <!-- Pack Edit/Add Modal -->
 <div id="packModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
@@ -446,51 +429,13 @@ function updateAuthUI() {
   updatePackActionVisibility()
 }
 
-async function loadOfficers() {
-  try {
-    const r = await fetch(`${API}/get-officers`)
-    const data = await r.json()
-    const sel = document.getElementById('loginName')
-    ;(data || []).forEach(o => {
-      const opt = document.createElement('option')
-      opt.value = o.name; opt.textContent = o.display_name
-      sel.appendChild(opt)
-    })
-  } catch(e) {}
-}
-
-function openLoginModal() {
-  document.getElementById('loginModal').classList.remove('hidden')
-  document.getElementById('loginErr').classList.add('hidden')
-}
-function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden') }
-
-async function doLogin() {
-  const name = document.getElementById('loginName').value
-  const pin  = document.getElementById('loginPin').value
-  const err  = document.getElementById('loginErr')
-  err.classList.add('hidden')
-  if (!name || !pin) { err.textContent = 'Select name and enter PIN'; err.classList.remove('hidden'); return }
-  try {
-    const r = await fetch(`${API}/officer-login`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, pin })
-    })
-    const d = await r.json()
-    if (!r.ok) { err.textContent = d.error||'Login failed'; err.classList.remove('hidden'); return }
-    AUTH.saveSession(d)
-    closeLoginModal()
-    updateAuthUI()
-    // Auto-fill inspected by
-    if (d.display_name) document.getElementById('inspectedByInput').value = d.display_name
-  } catch(e) { err.textContent = 'Login error'; err.classList.remove('hidden') }
-}
-
-function doLogout() {
-  fetch(`${API}/officer-logout`, { method:'POST', headers: AUTH.getHeaders() }).catch(()=>{})
-  AUTH.clearSession()
+function onLoginSuccess() {
   updateAuthUI()
+  const s = AUTH.getSession()
+  if (s?.display_name) document.getElementById('inspectedByInput').value = s.display_name
 }
+
+function doLogout() { AUTH.logout() }
 
 // ── SECTION TABS ──────────────────────────────────────────────────────────────
 const SECTIONS = ['registry','inspection','bottles','batteries']
@@ -728,7 +673,8 @@ const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1'
 let inspCurrentIdx = 0
 let inspData = {}           // packId -> { pressure_full:null/true/false, checks:{key:null/'pass'/'fail'}, notes }
 let inspBottleList = []
-let inspBottleUpdates = {}  // bottleId -> true/false/null (is_full)
+let inspBottleUpdates = {}     // bottleId -> true/false/null (is_full)
+let newBottleEntries  = []     // [{number, is_full}] bottles entered freeform during inspection
 let inspBatteryCache = []
 let inspApparatus = ''
 let flowTestData = {}       // packId -> most recent flow test
@@ -782,13 +728,13 @@ async function startInspection() {
 
 function resetInspection() {
   if (!confirm('Reset inspection? All entered data will be lost.')) return
-  inspPacks=[]; inspData={}; inspBottleUpdates={}
+  inspPacks=[]; inspData={}; inspBottleUpdates={}; newBottleEntries=[]
   document.getElementById('inspSetup').classList.remove('hidden')
   document.getElementById('inspFormWrap').classList.add('hidden')
 }
 
 function resetAndSetupInspection() {
-  inspPacks=[]; inspData={}; inspBottleUpdates={}
+  inspPacks=[]; inspData={}; inspBottleUpdates={}; newBottleEntries=[]
   document.getElementById('inspSetup').classList.remove('hidden')
   document.getElementById('inspFormWrap').innerHTML=''
   document.getElementById('inspFormWrap').classList.add('hidden')
@@ -1047,12 +993,11 @@ function renderInspBottleGrid() {
   const c = document.getElementById('inspBottleGrid')
   if (!c) return
   const bottles = (inspBottleList||[]).filter(b=>b.active!==false)
-  if (!bottles.length) { c.innerHTML='<p class="text-gray-400 text-xs text-center py-2">No spare bottles on record.</p>'; return }
-  c.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+  const registeredGrid = bottles.length ? `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
     ${bottles.map(b=>{
       const curFull = b.is_full
       const bc = curFull===true?'#86efac':curFull===false?'#fca5a5':'#d1d5db'
-      const sel = inspBottleUpdates[b.id]  // true/false/null
+      const sel = inspBottleUpdates[b.id]
       const btnFull    = sel===true  ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'
       const btnNotFull = sel===false ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'
       return `<div class="border-2 rounded-xl p-3 bg-gray-50" id="ibcard-${b.id}" style="border-color:${bc};">
@@ -1065,7 +1010,72 @@ function renderInspBottleGrid() {
         </div>
       </div>`
     }).join('')}
-  </div>`
+  </div>` : '<p class="text-gray-400 text-xs mb-4">No pre-registered spare bottles.</p>'
+
+  c.innerHTML = registeredGrid + `
+    <div class="border-t border-gray-200 pt-4">
+      <p class="text-xs font-bold text-gray-600 mb-2">Add a bottle by number:</p>
+      <div class="flex gap-2 items-center mb-3">
+        <input id="newBottleNumInput" type="text" placeholder="Bottle # (e.g. S1)" maxlength="30"
+          class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+        <button onclick="addNewInspBottle()" class="bg-green-700 hover:bg-green-800 text-white text-sm font-bold rounded-xl px-4 py-2 transition" style="min-height:40px;">Add</button>
+      </div>
+      <div id="newBottleList"></div>
+    </div>`
+  renderNewBottleList()
+}
+
+function renderNewBottleList() {
+  const c = document.getElementById('newBottleList')
+  if (!c) return
+  if (!newBottleEntries.length) { c.innerHTML = ''; return }
+  c.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">` +
+    newBottleEntries.map((e, idx) => {
+      const btnFull    = e.is_full===true  ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+      const btnNotFull = e.is_full===false ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'
+      const bc = e.is_full===true?'#86efac':e.is_full===false?'#fca5a5':'#d1d5db'
+      return `<div class="border-2 rounded-xl p-3 bg-gray-50" style="border-color:${bc};">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs font-bold text-gray-700 truncate">${esc(e.number)}</span>
+          <button onclick="removeNewBottle(${idx})" class="text-gray-300 hover:text-red-500 text-xs font-bold ml-1" style="min-height:0;background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div class="flex gap-1.5">
+          <button onclick="setNewBottleStatus(${idx},true)" class="flex-1 text-xs font-bold rounded-lg py-2 transition ${btnFull}" style="min-height:0;">FULL</button>
+          <button onclick="setNewBottleStatus(${idx},false)" class="flex-1 text-xs font-bold rounded-lg py-2 transition ${btnNotFull}" style="min-height:0;">NOT</button>
+        </div>
+      </div>`
+    }).join('') + `</div>`
+}
+
+function addNewInspBottle() {
+  const input = document.getElementById('newBottleNumInput')
+  const num = input?.value.trim()
+  if (!num) return
+  // If it matches a registered bottle, toggle that instead
+  const existing = (inspBottleList||[]).find(b => b.bottle_number.toLowerCase() === num.toLowerCase())
+  if (existing) {
+    input.value = ''
+    const card = document.getElementById(`ibcard-${existing.id}`)
+    if (card) card.scrollIntoView({ behavior:'smooth', block:'center' })
+    card?.style && (card.style.outline = '3px solid #16a34a')
+    setTimeout(() => { if (card) card.style.outline = '' }, 2000)
+    return
+  }
+  // Prevent duplicates in newBottleEntries
+  if (newBottleEntries.find(e => e.number.toLowerCase() === num.toLowerCase())) { input.value=''; return }
+  newBottleEntries.push({ number: num, is_full: null })
+  input.value = ''
+  renderNewBottleList()
+}
+
+function setNewBottleStatus(idx, isFull) {
+  if (newBottleEntries[idx]) newBottleEntries[idx].is_full = isFull
+  renderNewBottleList()
+}
+
+function removeNewBottle(idx) {
+  newBottleEntries.splice(idx, 1)
+  renderNewBottleList()
 }
 
 function updateInspBottle(bottleId, isFull, cardId) {
@@ -1171,13 +1181,30 @@ async function doSubmitInspection() {
     const d = await r.json()
     if (!r.ok) { err.textContent=d.error||'Failed'; err.classList.remove('hidden'); return }
 
-    // Log any bottle status updates
+    // Log registered bottle status updates
     const bottleEntries = Object.entries(inspBottleUpdates).filter(([,v])=>v!==undefined && v!==null)
     await Promise.allSettled(bottleEntries.map(([bid, isFull]) =>
       postAuth('log_psi', { bottle_id: bid, is_full: isFull, logged_by: inspectedBy })
     ))
 
-    const bottleMsg = bottleEntries.length ? ` ${bottleEntries.length} bottle status updated.` : ''
+    // Log freeform bottle entries (create bottle if needed, then log status)
+    let newBottleLogged = 0
+    for (const entry of newBottleEntries.filter(e => e.is_full !== null)) {
+      try {
+        const existing = (inspBottleList||[]).find(b => b.bottle_number.toLowerCase() === entry.number.toLowerCase())
+        let bottleId = existing?.id
+        if (!bottleId) {
+          const cr = await postAuth('add_bottle', { bottle_number: entry.number, apparatus_assigned: inspApparatus || '' })
+          if (cr.ok) { const cd = await cr.json(); bottleId = cd?.id }
+        }
+        if (bottleId) {
+          await postAuth('log_psi', { bottle_id: bottleId, is_full: entry.is_full, logged_by: inspectedBy })
+          newBottleLogged++
+        }
+      } catch {}
+    }
+
+    const bottleMsg = (bottleEntries.length + newBottleLogged) ? ` ${bottleEntries.length + newBottleLogged} bottle status updated.` : ''
     const notFullCount = d.notFull || 0
     const msg = d.failed>0 || notFullCount>0
       ? `${d.failed>0 ? d.failed+' pack'+(d.failed!==1?'s':'')+' failed — findings created, DCs notified. ' : ''}${notFullCount>0 ? notFullCount+' pack'+(notFullCount!==1?'s':'')+' not at full pressure — marked OOS, DCs notified.' : ''}${bottleMsg}`
@@ -1516,18 +1543,18 @@ async function saveFlowTest() {
 }
 
 // Close modals on backdrop click
-['loginModal','packModal','bottleModal','psiModal','batteryModal','flowTestModal'].forEach(id => {
+['packModal','bottleModal','psiModal','batteryModal','flowTestModal'].forEach(id => {
   document.getElementById(id)?.addEventListener('click', function(e) {
     if (e.target === this) document.getElementById(id).classList.add('hidden')
   })
 })
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('hfd:login', onLoginSuccess)
+
 document.addEventListener('DOMContentLoaded', () => {
   updateAuthUI()
-  loadOfficers()
   setSection('registry')
-  // Auto-fill inspected by if logged in
   const sess = AUTH.getSession()
   if (sess?.display_name) document.getElementById('inspectedByInput').value = sess.display_name
 })
