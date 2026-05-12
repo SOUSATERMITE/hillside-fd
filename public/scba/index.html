@@ -145,19 +145,55 @@
   </div>
 </div>
 
-<!-- PSI Log Modal -->
+<!-- Bottle Status Log Modal -->
 <div id="psiModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center px-4">
   <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-    <h3 class="font-bold text-gray-800 text-lg mb-1">Log PSI</h3>
+    <h3 class="font-bold text-gray-800 text-lg mb-1">Log Bottle Status</h3>
     <p id="psiModalLabel" class="text-sm text-gray-500 mb-4"></p>
-    <input id="psiInput" type="number" placeholder="PSI reading" min="0" max="5000"
-      class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+    <div class="mb-4">
+      <label class="block text-sm font-bold text-gray-700 mb-2">Bottle Pressure</label>
+      <div class="flex gap-3">
+        <button id="psiFullBtn" onclick="setPsiToggle(true)" class="flex-1 font-black text-base rounded-xl py-4 transition bg-gray-100 text-gray-700 hover:bg-green-100" style="min-height:56px;">FULL</button>
+        <button id="psiNotFullBtn" onclick="setPsiToggle(false)" class="flex-1 font-black text-base rounded-xl py-4 transition bg-gray-100 text-gray-700 hover:bg-red-100" style="min-height:56px;">NOT FULL</button>
+      </div>
+    </div>
     <input id="psiLoggedBy" type="text" placeholder="Your name"
       class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
     <div id="psiModalErr" class="hidden text-red-600 text-xs mb-2"></div>
     <div class="flex gap-2">
       <button onclick="closePsiModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
       <button onclick="savePsi()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Flow Test Modal -->
+<div id="flowTestModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mb-10">
+    <h3 class="font-bold text-gray-800 text-lg mb-1">Log Flow Test</h3>
+    <p id="flowTestModalLabel" class="text-sm text-gray-500 mb-4"></p>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Test Date</label>
+        <input id="flowTestDate" type="date"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-2">Result</label>
+        <div class="flex gap-3">
+          <button id="ftPassBtn" onclick="setFlowTestResult('passed')" class="flex-1 font-black text-base rounded-xl py-3.5 transition bg-gray-100 text-gray-700 hover:bg-green-100" style="min-height:52px;">PASSED</button>
+          <button id="ftFailBtn" onclick="setFlowTestResult('failed')" class="flex-1 font-black text-base rounded-xl py-3.5 transition bg-gray-100 text-gray-700 hover:bg-red-100" style="min-height:52px;">FAILED</button>
+        </div>
+      </div>
+      <input id="flowTestTestedBy" type="text" placeholder="Tested by"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      <textarea id="flowTestNotes" placeholder="Notes (optional)" rows="2" maxlength="500"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 resize-none" style="min-height:0;"></textarea>
+    </div>
+    <div id="flowTestModalErr" class="hidden text-red-600 text-xs mt-2"></div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="closeFlowTestModal()" class="flex-1 border border-gray-300 rounded-xl py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+      <button onclick="saveFlowTest()" class="flex-1 bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl py-2.5 text-sm transition">Save</button>
     </div>
   </div>
 </div>
@@ -407,6 +443,7 @@ function updateAuthUI() {
   document.querySelectorAll('[data-admin-only]').forEach(el => el.classList.toggle('hidden', !isAdmin))
   document.getElementById('addPackBtn').classList.toggle('hidden', !isAdmin)
   document.getElementById('addBottleBtn').classList.toggle('hidden', !loggedIn)
+  updatePackActionVisibility()
 }
 
 async function loadOfficers() {
@@ -497,9 +534,18 @@ async function loadRegistry() {
   const c = document.getElementById('registryContainer')
   c.innerHTML = '<div class="text-gray-400 text-sm text-center py-10">Loading...</div>'
   try {
-    const r = await fetch(`${API}/manage-scba?section=packs`)
-    const data = await r.json()
+    const [pr, fr] = await Promise.all([
+      fetch(`${API}/manage-scba?section=packs`),
+      fetch(`${API}/manage-scba?section=flow_tests`)
+    ])
+    const data = await pr.json()
+    const ftData = await fr.json()
     scbaData = data
+    // Build flowTestData map: most recent per pack
+    flowTestData = {}
+    for (const ft of (ftData || [])) {
+      if (!flowTestData[ft.pack_id]) flowTestData[ft.pack_id] = ft
+    }
     renderRegistry()
   } catch(e) {
     c.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load packs.</div>'
@@ -517,6 +563,24 @@ function renderRegistry() {
   for (const p of packs) {
     if (!byAp.has(p.apparatus_id)) byAp.set(p.apparatus_id, [])
     byAp.get(p.apparatus_id).push(p)
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const in60 = new Date(Date.now() + 60 * 86400000).toISOString().split('T')[0]
+
+  function flowTestBadge(packId) {
+    const ft = flowTestData[packId]
+    if (!ft) return '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No flow test on record</span>'
+    if (ft.next_due < today) return `<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Flow test OVERDUE (${fmtDate(ft.next_due)})</span>`
+    if (ft.next_due <= in60) return `<span class="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Flow test due ${fmtDate(ft.next_due)}</span>`
+    return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Flow test OK (next: ${fmtDate(ft.next_due)})</span>`
+  }
+
+  function pressureCheckBadge(li) {
+    if (!li) return '<span class="text-xs text-gray-400">—</span>'
+    if (li.pressure_full === true)  return '<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-pass">Last check: FULL ✓</span>'
+    if (li.pressure_full === false) return '<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-fail">Last check: NOT FULL ⚠</span>'
+    return '<span class="text-xs text-gray-400">—</span>'
   }
 
   let html = ''
@@ -537,34 +601,26 @@ function renderRegistry() {
         </div>
       </button>
       <div id="aprow-${apId}" class="hidden bg-gray-50">
-        <table class="w-full text-sm">
-          <thead><tr class="border-b border-gray-200">
-            <th class="text-left px-5 py-2 text-xs font-semibold text-gray-500">Pack ID</th>
-            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
-            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last PSI</th>
-            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last Inspection</th>
-            <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 hidden sm:table-cell">Inspected By</th>
-            <th class="px-3 py-2"></th>
-          </tr></thead>
-          <tbody>
-            ${apPacks.map(p => {
-              const li = lastInsp[p.id]
-              return `<tr class="border-b border-gray-100 last:border-b-0">
-                <td class="px-5 py-2.5 font-bold text-gray-800">${esc(p.pack_id)}</td>
-                <td class="px-3 py-2.5">${statusBadge(p.status)}</td>
-                <td class="px-3 py-2.5 hidden sm:table-cell">${psiBadge(li?.psi)}</td>
-                <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">${li ? fmtDate(li.inspection_date) : '—'}</td>
-                <td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">${li ? esc(li.inspected_by) : '—'}</td>
-                <td class="px-3 py-2.5 text-right">
-                  <div class="flex items-center justify-end gap-2" id="packActions-${p.id}">
-                    <button onclick="openEditPackModal('${p.id}')" class="hidden text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50" style="min-height:0;">Edit</button>
-                    <button onclick="deletePack('${p.id}','${esc(p.pack_id)}')" class="hidden text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" style="min-height:0;">Delete</button>
-                  </div>
-                </td>
-              </tr>`
-            }).join('')}
-          </tbody>
-        </table>
+        ${apPacks.map(p => {
+          const li = lastInsp[p.id]
+          return `<div class="border-b border-gray-200 last:border-b-0 px-5 py-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-3 flex-wrap">
+                <span class="font-bold text-gray-800 text-sm">${esc(p.pack_id)}</span>
+                ${statusBadge(p.status)}
+                ${pressureCheckBadge(li)}
+                <span class="text-xs text-gray-400 hidden sm:inline">${li ? fmtDate(li.inspection_date) : 'No inspections'}</span>
+                <span class="text-xs text-gray-400 hidden sm:inline">${li ? esc(li.inspected_by) : ''}</span>
+              </div>
+              <div class="flex items-center gap-2" id="packActions-${p.id}">
+                <button onclick="openFlowTestModal('${p.id}','${esc(p.pack_id)}')" class="officer-only hidden text-xs font-bold text-blue-700 hover:text-blue-900 border border-blue-200 rounded-lg px-2 py-1 hover:bg-blue-50" style="min-height:0;">Log Flow Test</button>
+                <button onclick="openEditPackModal('${p.id}')" class="admin-only hidden text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50" style="min-height:0;">Edit</button>
+                <button onclick="deletePack('${p.id}','${esc(p.pack_id)}')" class="admin-only hidden text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" style="min-height:0;">Delete</button>
+              </div>
+            </div>
+            <div class="mt-1.5">${flowTestBadge(p.id)}</div>
+          </div>`
+        }).join('')}
       </div>
     </div>`
   }
@@ -573,9 +629,13 @@ function renderRegistry() {
 }
 
 function updatePackActionVisibility() {
-  const isAdmin = AUTH.isAdmin()
-  document.querySelectorAll('[id^="packActions-"] button').forEach(btn => {
+  const isAdmin  = AUTH.isAdmin()
+  const isOfficer = AUTH.isLoggedIn()
+  document.querySelectorAll('[id^="packActions-"] button.admin-only').forEach(btn => {
     btn.classList.toggle('hidden', !isAdmin)
+  })
+  document.querySelectorAll('[id^="packActions-"] button.officer-only').forEach(btn => {
+    btn.classList.toggle('hidden', !isOfficer)
   })
 }
 
@@ -666,16 +726,18 @@ const CHECK_ITEMS = [
 const APPARATUS_LABELS = {E1:'Engine 1',E5:'Engine 5',T1:'Tower 1',R1:'Rescue 1',R2:'Rescue 2',C1:'C1',C2:'C2',C4:'C4',C5:'C5',C6:'C6',M1:'M1/C8'}
 
 let inspCurrentIdx = 0
-let inspData = {}           // packId -> { psi, checks:{key:null/'pass'/'fail'}, notes }
+let inspData = {}           // packId -> { pressure_full:null/true/false, checks:{key:null/'pass'/'fail'}, notes }
 let inspBottleList = []
-let inspBottleUpdates = {}  // bottleId -> psi string
+let inspBottleUpdates = {}  // bottleId -> true/false/null (is_full)
 let inspBatteryCache = []
 let inspApparatus = ''
+let flowTestData = {}       // packId -> most recent flow test
+let flowTestModalPackId = null
 
 function initInspData() {
   inspData = {}
   for (const p of inspPacks) {
-    inspData[p.id] = { psi:'', checks: Object.fromEntries(CHECK_ITEMS.map(ci=>[ci.key,null])), notes:'' }
+    inspData[p.id] = { pressure_full: null, checks: Object.fromEntries(CHECK_ITEMS.map(ci=>[ci.key,null])), notes:'' }
   }
 }
 
@@ -754,9 +816,7 @@ function saveCurrentCardState() {
   if (!inspPacks.length) return
   const p = inspPacks[inspCurrentIdx]
   if (!p || !inspData[p.id]) return
-  const psiEl   = document.getElementById(`mob-psi-${p.id}`)
   const notesEl = document.getElementById(`mob-notes-${p.id}`)
-  if (psiEl)   inspData[p.id].psi   = psiEl.value
   if (notesEl) inspData[p.id].notes = notesEl.value
 }
 
@@ -767,6 +827,13 @@ function packStatus(packId) {
   if (vals.some(v=>v==='fail')) return 'fail'
   if (vals.some(v=>v===null))  return 'pending'
   return 'pass'
+}
+
+// A pack is "complete" for counter purposes when pressure_full has been set
+function packComplete(packId) {
+  const d = inspData[packId]
+  if (!d) return false
+  return d.pressure_full !== null
 }
 
 function renderMobileCard(idx) {
@@ -792,6 +859,12 @@ function renderMobileCard(idx) {
     </div>`
   }).join('')
 
+  const pfFull    = d.pressure_full === true
+  const pfNotFull = d.pressure_full === false
+  const pfBtnFull    = pfFull    ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+  const pfBtnNotFull = pfNotFull ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'
+  const showNotesWrap = anyFail || pfNotFull
+
   document.getElementById('inspPackCard').innerHTML = `
     <div class="px-4 py-3 flex items-center justify-between text-white rounded-t-2xl" style="background:${headerBg};">
       <div>
@@ -800,16 +873,17 @@ function renderMobileCard(idx) {
       </div>
       <span class="text-sm font-bold px-3 py-1 rounded-full" style="background:rgba(255,255,255,0.2);">${statusLbl}</span>
     </div>
-    <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
-      <label class="block text-xs font-semibold text-gray-500 mb-1.5">Bottle PSI</label>
-      <input id="mob-psi-${p.id}" type="number" inputmode="numeric" placeholder="e.g. 4500" min="0" max="5500"
-        value="${esc(d.psi)}"
-        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white" style="min-height:44px;">
+    <div class="px-4 py-4 border-b-2 border-gray-200 bg-gray-50">
+      <label class="block text-sm font-bold text-gray-700 mb-2">Bottle Pressure</label>
+      <div class="flex gap-3">
+        <button onclick="setInspPressure('${p.id}',true)" class="flex-1 font-black text-base rounded-xl py-4 transition ${pfBtnFull}" style="min-height:56px;">FULL</button>
+        <button onclick="setInspPressure('${p.id}',false)" class="flex-1 font-black text-base rounded-xl py-4 transition ${pfBtnNotFull}" style="min-height:56px;">NOT FULL</button>
+      </div>
     </div>
     ${checksHtml}
-    <div id="mob-notes-wrap-${p.id}" class="${anyFail?'':'hidden'} border-t-2 border-red-200 bg-red-50 px-4 py-3">
-      <label class="block text-xs font-semibold text-red-700 mb-1.5">Failure Notes <span class="font-normal">(required)</span></label>
-      <textarea id="mob-notes-${p.id}" rows="3" maxlength="500" placeholder="Describe the failed items…"
+    <div id="mob-notes-wrap-${p.id}" class="${showNotesWrap?'':'hidden'} border-t-2 border-red-200 bg-red-50 px-4 py-3">
+      <label class="block text-xs font-semibold text-red-700 mb-1.5">${pfNotFull && !anyFail ? 'Reason / Action taken' : 'Failure Notes'} <span class="font-normal">(required)</span></label>
+      <textarea id="mob-notes-${p.id}" rows="3" maxlength="500" placeholder="${pfNotFull && !anyFail ? 'Reason / Action taken (required)' : 'Describe the failed items…'}"
         class="w-full border border-red-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none bg-white" style="min-height:0;">${esc(d.notes)}</textarea>
     </div>`
 
@@ -837,6 +911,14 @@ function setInspCheck(packId, key, val) {
   inspData[packId].checks[key] = val
   if (inspPacks[inspCurrentIdx]?.id === packId) renderMobileCard(inspCurrentIdx)
   updateDesktopCell(packId, key)
+  updateCounter()
+}
+
+function setInspPressure(packId, isFull) {
+  saveCurrentCardState()
+  inspData[packId].pressure_full = isFull
+  if (inspPacks[inspCurrentIdx]?.id === packId) renderMobileCard(inspCurrentIdx)
+  updateDesktopPressureCell(packId)
   updateCounter()
 }
 
@@ -885,7 +967,7 @@ function renderDesktopTable() {
   let html = `<table class="w-full text-sm min-w-max">
   <thead><tr style="background:#1e3a5f;">
     <th class="text-xs font-semibold text-white px-4 py-2.5 text-left" style="min-width:130px;">Pack ID</th>
-    <th class="${thBase}" style="min-width:90px;">PSI</th>
+    <th class="${thBase}" style="min-width:130px;">Pressure</th>
     ${CHECK_ITEMS.map(ci=>`<th class="${thBase}" style="min-width:110px;">${esc(ci.label)}</th>`).join('')}
     <th class="${thBase}" style="min-width:160px;">Notes</th>
   </tr></thead><tbody>`
@@ -894,15 +976,19 @@ function renderDesktopTable() {
     const d = inspData[p.id]
     const status = packStatus(p.id)
     const rowBg = status==='pass'?'bg-green-50':status==='fail'?'bg-red-50':''
+    const pfFull    = d.pressure_full === true
+    const pfNotFull = d.pressure_full === false
+    const pfBtnFull    = pfFull    ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+    const pfBtnNotFull = pfNotFull ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
     html += `<tr class="border-b border-gray-100 ${rowBg}" id="drow-${p.id}">
       <td id="dsticky-${p.id}" class="px-4 py-2.5 font-bold text-gray-900 border-r border-gray-200" style="background:${status==='pass'?'#f0fdf4':status==='fail'?'#fef2f2':'#fff'};">
         ${esc(p.pack_id)}<br><span class="text-xs font-normal text-gray-400">${esc(p.assigned_apparatus||inspApparatus)}</span>
       </td>
-      <td class="px-3 py-2 text-center">
-        <input type="number" inputmode="numeric" placeholder="PSI" min="0" max="5500"
-          value="${esc(d.psi)}"
-          oninput="inspData['${p.id}'].psi=this.value"
-          class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:0;">
+      <td class="px-2 py-2 text-center" id="dpresscell-${p.id}">
+        <div class="flex gap-1 justify-center">
+          <button onclick="setInspPressure('${p.id}',true)" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pfBtnFull}" style="min-height:0;min-width:50px;">FULL</button>
+          <button onclick="setInspPressure('${p.id}',false)" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pfBtnNotFull}" style="min-height:0;min-width:50px;">NOT</button>
+        </div>
       </td>
       ${CHECK_ITEMS.map(ci=>{
         const val=d.checks[ci.key]
@@ -943,6 +1029,20 @@ function updateDesktopCell(packId, key) {
   if (sticky) sticky.style.background = status==='pass'?'#f0fdf4':status==='fail'?'#fef2f2':'#fff'
 }
 
+function updateDesktopPressureCell(packId) {
+  const cell = document.getElementById(`dpresscell-${packId}`)
+  if (!cell) return
+  const d = inspData[packId]
+  const pfFull    = d?.pressure_full === true
+  const pfNotFull = d?.pressure_full === false
+  const pfBtnFull    = pfFull    ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+  const pfBtnNotFull = pfNotFull ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+  cell.innerHTML = `<div class="flex gap-1 justify-center">
+    <button onclick="setInspPressure('${packId}',true)" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pfBtnFull}" style="min-height:0;min-width:50px;">FULL</button>
+    <button onclick="setInspPressure('${packId}',false)" class="text-xs font-bold px-2 py-1.5 rounded-lg transition ${pfBtnNotFull}" style="min-height:0;min-width:50px;">NOT</button>
+  </div>`
+}
+
 function renderInspBottleGrid() {
   const c = document.getElementById('inspBottleGrid')
   if (!c) return
@@ -950,26 +1050,34 @@ function renderInspBottleGrid() {
   if (!bottles.length) { c.innerHTML='<p class="text-gray-400 text-xs text-center py-2">No spare bottles on record.</p>'; return }
   c.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
     ${bottles.map(b=>{
-      const cur = b.current_psi
-      const bc = !cur?'#d1d5db':cur<2000?'#fca5a5':cur<4000?'#fde68a':'#86efac'
+      const curFull = b.is_full
+      const bc = curFull===true?'#86efac':curFull===false?'#fca5a5':'#d1d5db'
+      const sel = inspBottleUpdates[b.id]  // true/false/null
+      const btnFull    = sel===true  ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'
+      const btnNotFull = sel===false ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'
       return `<div class="border-2 rounded-xl p-3 bg-gray-50" id="ibcard-${b.id}" style="border-color:${bc};">
         <div class="text-xs font-bold text-gray-700 mb-0.5 truncate">${esc(b.bottle_number)}</div>
         ${b.apparatus_assigned?`<div class="text-xs text-gray-400 mb-1">${esc(b.apparatus_assigned)}</div>`:''}
-        <div class="text-xs text-gray-400 mb-2">Now: <strong>${cur?cur+' PSI':'—'}</strong></div>
-        <input type="number" inputmode="numeric" placeholder="New PSI" min="0" max="5500"
-          value="${inspBottleUpdates[b.id]||''}"
-          oninput="updateInspBottle('${b.id}',this.value,'ibcard-${b.id}')"
-          class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600 bg-white" style="min-height:0;">
+        <div class="text-xs text-gray-400 mb-2">Last: <strong>${curFull===true?'FULL ✓':curFull===false?'NOT FULL ⚠':'—'}</strong></div>
+        <div class="flex gap-1.5">
+          <button onclick="updateInspBottle('${b.id}',true,'ibcard-${b.id}')" class="flex-1 text-xs font-bold rounded-lg py-2 transition ${btnFull}" style="min-height:0;">FULL</button>
+          <button onclick="updateInspBottle('${b.id}',false,'ibcard-${b.id}')" class="flex-1 text-xs font-bold rounded-lg py-2 transition ${btnNotFull}" style="min-height:0;">NOT</button>
+        </div>
       </div>`
     }).join('')}
   </div>`
 }
 
-function updateInspBottle(bottleId, val, cardId) {
-  inspBottleUpdates[bottleId] = val
-  const psi = parseInt(val)
+function updateInspBottle(bottleId, isFull, cardId) {
+  inspBottleUpdates[bottleId] = isFull
   const card = document.getElementById(cardId)
-  if (card) card.style.borderColor = !val?'#d1d5db':psi<2000?'#fca5a5':psi<4000?'#fde68a':'#86efac'
+  if (card) {
+    card.style.borderColor = isFull ? '#86efac' : '#fca5a5'
+    // Update button states
+    const btns = card.querySelectorAll('button')
+    if (btns[0]) btns[0].className = `flex-1 text-xs font-bold rounded-lg py-2 transition ${isFull?'bg-green-600 text-white':'bg-gray-100 text-gray-700 hover:bg-green-100'}`
+    if (btns[1]) btns[1].className = `flex-1 text-xs font-bold rounded-lg py-2 transition ${!isFull?'bg-red-600 text-white':'bg-gray-100 text-gray-700 hover:bg-red-100'}`
+  }
 }
 
 function renderInspBatteryStatus() {
@@ -1006,24 +1114,30 @@ function submitInspection() {
 
   for (const p of inspPacks) {
     const d = inspData[p.id]
+    if (d.pressure_full === null) {
+      err.textContent=`Select FULL or NOT FULL for ${p.pack_id}.`; err.classList.remove('hidden'); return
+    }
     for (const ci of CHECK_ITEMS) {
       if (!d.checks[ci.key]) {
         err.textContent=`Complete all checks for ${p.pack_id}.`; err.classList.remove('hidden'); return
       }
     }
     const hasFail = Object.values(d.checks).some(v=>v==='fail')
-    if (hasFail && !d.notes.trim()) {
-      err.textContent=`Failure notes required for ${p.pack_id}.`; err.classList.remove('hidden'); return
+    const isNotFull = d.pressure_full === false
+    if ((hasFail || isNotFull) && !d.notes.trim()) {
+      err.textContent=`Notes are required for ${p.pack_id} (failure or not-full pressure).`; err.classList.remove('hidden'); return
     }
   }
 
   const passed = inspPacks.filter(p=>packStatus(p.id)==='pass').length
   const failed = inspPacks.filter(p=>packStatus(p.id)==='fail').length
-  const bottleCount = Object.keys(inspBottleUpdates).filter(id=>inspBottleUpdates[id]).length
+  const notFull = inspPacks.filter(p=>inspData[p.id]?.pressure_full===false).length
+  const bottleCount = Object.keys(inspBottleUpdates).filter(id=>inspBottleUpdates[id]!==undefined && inspBottleUpdates[id]!==null).length
   const lines = [
     `<strong>${passed} pack${passed!==1?'s':''} pass</strong>, <strong class="text-red-700">${failed} fail</strong>.`,
-    failed>0 ? 'Failures will be logged and DCs notified.' : '',
-    bottleCount ? `${bottleCount} spare bottle PSI value${bottleCount!==1?'s':''} will be updated.` : '',
+    notFull>0 ? `<strong class="text-orange-700">${notFull} pack${notFull!==1?'s':''} NOT at full pressure</strong> — will be marked Out of Service, DCs notified.` : '',
+    failed>0 && notFull===0 ? 'Failures will be logged and DCs notified.' : '',
+    bottleCount ? `${bottleCount} spare bottle status${bottleCount!==1?'es':''} will be updated.` : '',
   ].filter(Boolean).join('<br>')
 
   document.getElementById('inspConfirmSummary').innerHTML = lines
@@ -1046,7 +1160,7 @@ async function doSubmitInspection() {
     return {
       pack_id: p.id, pack_label: p.pack_id,
       apparatus_assigned: AP_LABELS[inspApparatus]||inspApparatus,
-      psi: d.psi ? parseInt(d.psi) : null,
+      pressure_full: d.pressure_full,
       notes: d.notes || overallNotes || null,
       ...d.checks
     }
@@ -1057,21 +1171,22 @@ async function doSubmitInspection() {
     const d = await r.json()
     if (!r.ok) { err.textContent=d.error||'Failed'; err.classList.remove('hidden'); return }
 
-    // Log any bottle PSI updates
-    const bottleEntries = Object.entries(inspBottleUpdates).filter(([,v])=>v)
-    await Promise.allSettled(bottleEntries.map(([bid, psi]) =>
-      postAuth('log_psi', { bottle_id: bid, psi: parseInt(psi), logged_by: inspectedBy })
+    // Log any bottle status updates
+    const bottleEntries = Object.entries(inspBottleUpdates).filter(([,v])=>v!==undefined && v!==null)
+    await Promise.allSettled(bottleEntries.map(([bid, isFull]) =>
+      postAuth('log_psi', { bottle_id: bid, is_full: isFull, logged_by: inspectedBy })
     ))
 
-    const bottleMsg = bottleEntries.length ? ` ${bottleEntries.length} bottle PSI updated.` : ''
-    const msg = d.failed>0
-      ? `${d.failed} pack${d.failed!==1?'s':''} failed — findings created, DCs notified.${bottleMsg}`
+    const bottleMsg = bottleEntries.length ? ` ${bottleEntries.length} bottle status updated.` : ''
+    const notFullCount = d.notFull || 0
+    const msg = d.failed>0 || notFullCount>0
+      ? `${d.failed>0 ? d.failed+' pack'+(d.failed!==1?'s':'')+' failed — findings created, DCs notified. ' : ''}${notFullCount>0 ? notFullCount+' pack'+(notFullCount!==1?'s':'')+' not at full pressure — marked OOS, DCs notified.' : ''}${bottleMsg}`
       : `All ${d.saved} pack${d.saved!==1?'s':''} passed.${bottleMsg}`
 
     document.getElementById('inspFormWrap').innerHTML = `
       <div class="bg-white rounded-2xl shadow px-6 py-10 text-center">
-        <div class="text-4xl mb-3">${d.failed>0?'⚠️':'✅'}</div>
-        <p class="font-bold text-gray-800 text-lg mb-2">Inspection Complete${d.failed>0?' — Issues Found':''}</p>
+        <div class="text-4xl mb-3">${d.failed>0||(d.notFull>0)?'⚠️':'✅'}</div>
+        <p class="font-bold text-gray-800 text-lg mb-2">Inspection Complete${(d.failed>0||(d.notFull>0))?' — Issues Found':''}</p>
         <p class="text-sm text-gray-500 mb-6">${msg}</p>
         <button onclick="resetAndSetupInspection()" class="bg-green-700 hover:bg-green-800 text-white font-bold rounded-xl px-6 py-3 transition text-sm">Run Another Inspection</button>
       </div>`
@@ -1106,9 +1221,9 @@ function renderBottles() {
   let html = `<table class="w-full text-sm">
     <thead><tr class="border-b border-gray-200 bg-gray-50">
       <th class="text-left px-5 py-2.5 text-xs font-semibold text-gray-500">Bottle</th>
-      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Current PSI</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500">Status</th>
       <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden sm:table-cell">Apparatus</th>
-      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden md:table-cell">4-Week Log</th>
+      <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden md:table-cell">Recent Log</th>
       <th class="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 hidden sm:table-cell">Last Checked</th>
       <th class="px-3 py-2.5"></th>
     </tr></thead>
@@ -1116,28 +1231,33 @@ function renderBottles() {
 
   for (const b of bottles) {
     const bLogs = (logs[b.id]||[]).slice(0,4)
-    const psi = b.current_psi
-    let psiClass = 'badge-pass', warn = ''
-    if (psi && psi < 2000) { psiClass = 'badge-fail'; warn = ' 🔴 CRITICAL' }
-    else if (psi && psi < 4000) { psiClass = 'badge-warn'; warn = ' ⚠️ Low' }
 
     const logDots = bLogs.map(l => {
-      const cl = l.psi < 2000 ? 'bg-red-500' : l.psi < 4000 ? 'bg-yellow-400' : 'bg-green-500'
-      return `<span class="${cl} inline-block w-2 h-2 rounded-full" title="${l.psi} PSI — ${l.logged_date}"></span>`
+      const cl = l.is_full === false ? 'bg-red-500' : l.is_full === true ? 'bg-green-500' : 'bg-gray-300'
+      const title = l.is_full === false ? 'NOT FULL' : l.is_full === true ? 'FULL' : '—'
+      return `<span class="${cl} inline-block w-2 h-2 rounded-full" title="${title} — ${l.logged_date}"></span>`
     }).join(' ')
 
     const loggedBy = AUTH.isLoggedIn()
+
+    let statusBadgeHtml
+    if (b.is_full === true) {
+      statusBadgeHtml = '<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-pass">FULL ✓</span>'
+    } else if (b.is_full === false) {
+      statusBadgeHtml = '<span class="text-xs font-bold px-2 py-0.5 rounded-full badge-fail">NOT FULL ⚠</span>'
+    } else {
+      statusBadgeHtml = '<span class="text-xs text-gray-400">—</span>'
+    }
+
     html += `<tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
       <td class="px-5 py-3 font-bold text-gray-800">${esc(b.bottle_number)}</td>
-      <td class="px-3 py-3">
-        ${psi ? `<span class="text-xs font-bold px-2 py-0.5 rounded-full ${psiClass}">${psi} PSI${warn}</span>` : '<span class="text-xs text-gray-400">—</span>'}
-      </td>
+      <td class="px-3 py-3">${statusBadgeHtml}</td>
       <td class="px-3 py-3 text-gray-500 text-xs hidden sm:table-cell">${esc(b.apparatus_assigned||'—')}</td>
       <td class="px-3 py-3 hidden md:table-cell"><div class="flex items-center gap-1">${logDots||'<span class="text-gray-300 text-xs">no logs</span>'}</div></td>
       <td class="px-3 py-3 text-gray-400 text-xs hidden sm:table-cell">${b.last_checked ? fmtDate(b.last_checked) : '—'}</td>
       <td class="px-3 py-3 text-right">
         <div class="flex items-center justify-end gap-2">
-          ${loggedBy ? `<button onclick="openPsiModal('${b.id}','${esc(b.bottle_number)}')" class="text-xs font-bold text-green-700 hover:text-green-900 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-50" style="min-height:0;">Log PSI</button>` : ''}
+          ${loggedBy ? `<button onclick="openPsiModal('${b.id}','${esc(b.bottle_number)}')" class="text-xs font-bold text-green-700 hover:text-green-900 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-50" style="min-height:0;">Log Status</button>` : ''}
           ${loggedBy ? `<button onclick="openEditBottleModal('${b.id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50" style="min-height:0;">Edit</button>` : ''}
           ${loggedBy ? `<button onclick="deleteBottle('${b.id}','${esc(b.bottle_number)}')" class="text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" style="min-height:0;">Delete</button>` : ''}
         </div>
@@ -1199,24 +1319,38 @@ async function deleteBottle(id, label) {
   } catch(e) { alert(e.message) }
 }
 
+let psiToggleValue = null  // true = FULL, false = NOT FULL
+
+function setPsiToggle(isFull) {
+  psiToggleValue = isFull
+  const fullBtn    = document.getElementById('psiFullBtn')
+  const notFullBtn = document.getElementById('psiNotFullBtn')
+  if (fullBtn)    fullBtn.className    = `flex-1 font-black text-base rounded-xl py-4 transition ${isFull  ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'}`
+  if (notFullBtn) notFullBtn.className = `flex-1 font-black text-base rounded-xl py-4 transition ${!isFull ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'}`
+}
+
 function openPsiModal(id, label) {
   if (!AUTH.isLoggedIn()) { alert('Login required.'); return }
   psiBottleId = id
+  psiToggleValue = null
   document.getElementById('psiModalLabel').textContent = `Bottle: ${label}`
-  document.getElementById('psiInput').value = ''
   document.getElementById('psiLoggedBy').value = AUTH.getSession()?.display_name || ''
   document.getElementById('psiModalErr').classList.add('hidden')
+  // Reset toggle buttons
+  const fullBtn    = document.getElementById('psiFullBtn')
+  const notFullBtn = document.getElementById('psiNotFullBtn')
+  if (fullBtn)    fullBtn.className    = 'flex-1 font-black text-base rounded-xl py-4 transition bg-gray-100 text-gray-700 hover:bg-green-100'
+  if (notFullBtn) notFullBtn.className = 'flex-1 font-black text-base rounded-xl py-4 transition bg-gray-100 text-gray-700 hover:bg-red-100'
   document.getElementById('psiModal').classList.remove('hidden')
 }
 function closePsiModal() { document.getElementById('psiModal').classList.add('hidden') }
 async function savePsi() {
   const err = document.getElementById('psiModalErr')
   err.classList.add('hidden')
-  const psi = document.getElementById('psiInput').value
   const logged_by = document.getElementById('psiLoggedBy').value.trim()
-  if (!psi) { err.textContent = 'Enter PSI reading'; err.classList.remove('hidden'); return }
+  if (psiToggleValue === null) { err.textContent = 'Select FULL or NOT FULL'; err.classList.remove('hidden'); return }
   try {
-    const r = await postAuth('log_psi', { bottle_id: psiBottleId, psi: parseInt(psi), logged_by })
+    const r = await postAuth('log_psi', { bottle_id: psiBottleId, is_full: psiToggleValue, logged_by })
     const d = await r.json()
     if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
     closePsiModal()
@@ -1329,8 +1463,60 @@ async function saveBattery() {
   } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
 }
 
+// ── FLOW TESTS ─────────────────────────────────────────────────────────────
+let flowTestResult = null
+
+function setFlowTestResult(val) {
+  flowTestResult = val
+  const passBtn = document.getElementById('ftPassBtn')
+  const failBtn = document.getElementById('ftFailBtn')
+  if (passBtn) passBtn.className = `flex-1 font-black text-base rounded-xl py-3.5 transition ${val==='passed' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100'}`
+  if (failBtn) failBtn.className = `flex-1 font-black text-base rounded-xl py-3.5 transition ${val==='failed' ? 'bg-red-600 text-white'   : 'bg-gray-100 text-gray-700 hover:bg-red-100'}`
+}
+
+function openFlowTestModal(packId, packLabel) {
+  if (!AUTH.isLoggedIn()) { alert('Officer login required.'); return }
+  flowTestModalPackId = packId
+  flowTestResult = null
+  const today = new Date().toISOString().split('T')[0]
+  document.getElementById('flowTestModalLabel').textContent = `Pack: ${packLabel}`
+  document.getElementById('flowTestDate').value = today
+  document.getElementById('flowTestTestedBy').value = AUTH.getSession()?.display_name || ''
+  document.getElementById('flowTestNotes').value = ''
+  document.getElementById('flowTestModalErr').classList.add('hidden')
+  // Reset toggle buttons
+  const passBtn = document.getElementById('ftPassBtn')
+  const failBtn = document.getElementById('ftFailBtn')
+  if (passBtn) passBtn.className = 'flex-1 font-black text-base rounded-xl py-3.5 transition bg-gray-100 text-gray-700 hover:bg-green-100'
+  if (failBtn) failBtn.className = 'flex-1 font-black text-base rounded-xl py-3.5 transition bg-gray-100 text-gray-700 hover:bg-red-100'
+  document.getElementById('flowTestModal').classList.remove('hidden')
+}
+
+function closeFlowTestModal() { document.getElementById('flowTestModal').classList.add('hidden') }
+
+async function saveFlowTest() {
+  const err = document.getElementById('flowTestModalErr')
+  err.classList.add('hidden')
+  const test_date = document.getElementById('flowTestDate').value
+  const tested_by = document.getElementById('flowTestTestedBy').value.trim()
+  const notes     = document.getElementById('flowTestNotes').value.trim()
+  if (!test_date)         { err.textContent = 'Enter test date'; err.classList.remove('hidden'); return }
+  if (!flowTestResult)    { err.textContent = 'Select PASSED or FAILED'; err.classList.remove('hidden'); return }
+  if (!tested_by)         { err.textContent = 'Enter who performed the test'; err.classList.remove('hidden'); return }
+  try {
+    const r = await postAuth('log_flow_test', {
+      pack_id: flowTestModalPackId,
+      test_date, result: flowTestResult, tested_by, notes: notes || null
+    })
+    const d = await r.json()
+    if (!r.ok) { err.textContent = d.error||'Failed'; err.classList.remove('hidden'); return }
+    closeFlowTestModal()
+    loadRegistry()
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden') }
+}
+
 // Close modals on backdrop click
-['loginModal','packModal','bottleModal','psiModal','batteryModal'].forEach(id => {
+['loginModal','packModal','bottleModal','psiModal','batteryModal','flowTestModal'].forEach(id => {
   document.getElementById(id)?.addEventListener('click', function(e) {
     if (e.target === this) document.getElementById(id).classList.add('hidden')
   })

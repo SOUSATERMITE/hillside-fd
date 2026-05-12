@@ -50,7 +50,7 @@ exports.handler = async (event) => {
         if (packIds.length) {
           const { data: insp } = await supabase
             .from('scba_inspections')
-            .select('pack_id, inspection_date, inspected_by, psi, overall_pass')
+            .select('pack_id, inspection_date, inspected_by, psi, pressure_full, overall_pass')
             .in('pack_id', packIds)
             .order('inspection_date', { ascending: false })
           for (const i of (insp || [])) {
@@ -95,6 +95,16 @@ exports.handler = async (event) => {
       if (section === 'batteries') {
         // Latest battery log per apparatus
         const { data, error } = await supabase.from('scba_batteries').select('*').order('changed_date', { ascending: false })
+        if (error) throw error
+        return { statusCode: 200, headers, body: JSON.stringify(data || []) }
+      }
+
+      if (section === 'flow_tests') {
+        // All flow tests joined with pack info, ordered by test_date desc
+        const { data, error } = await supabase
+          .from('scba_flow_tests')
+          .select('*, scba_packs(pack_id, apparatus_id, assigned_apparatus)')
+          .order('test_date', { ascending: false })
         if (error) throw error
         return { statusCode: 200, headers, body: JSON.stringify(data || []) }
       }
@@ -164,6 +174,7 @@ exports.handler = async (event) => {
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
       const saved = []
       const failed = []
+      const notFull = []
 
       for (const insp of inspections) {
         const overall_pass = CHECK_FIELDS.every(f => insp[f] === 'pass')
@@ -173,7 +184,8 @@ exports.handler = async (event) => {
           inspected_by: inspected_by || officer.display_name,
           officer_id: officer.officer_id,
           apparatus_assigned: insp.apparatus_assigned || null,
-          psi: insp.psi ? parseInt(insp.psi) : null,
+          psi: null,
+          pressure_full: insp.pressure_full !== undefined ? insp.pressure_full : null,
           harness_frame:    insp.harness_frame    || null,
           straps_buckles:   insp.straps_buckles   || null,
           air_gauge:        insp.air_gauge        || null,
@@ -189,11 +201,11 @@ exports.handler = async (event) => {
         if (error) throw error
         saved.push(data)
         if (!overall_pass) failed.push({ ...data, pack_label: insp.pack_label })
+        if (insp.pressure_full === false) notFull.push({ ...data, pack_label: insp.pack_label })
       }
 
-      // Create findings + send email for failed packs
+      // Create findings + send email for failed packs (check failures)
       for (const f of failed) {
-        // Create high priority finding
         const { data: pack } = await supabase.from('scba_packs').select('pack_id, apparatus_id, assigned_apparatus').eq('id', f.pack_id).single()
         if (pack) {
           const { data: apparatus } = await supabase.from('apparatus').select('id').eq('unit_name', pack.apparatus_id).maybeSingle()
@@ -202,7 +214,7 @@ exports.handler = async (event) => {
               apparatus_id: apparatus.id,
               finding_type: 'inspection',
               title: `SCBA Inspection FAILED — Pack ${pack.pack_id}`,
-              description: `Pack ${pack.pack_id} failed weekly SCBA inspection on ${f.inspection_date}. Inspected by: ${f.inspected_by}. PSI: ${f.psi || 'N/A'}. Notes: ${f.notes || 'None'}`,
+              description: `Pack ${pack.pack_id} failed weekly SCBA inspection on ${f.inspection_date}. Inspected by: ${f.inspected_by}. Notes: ${f.notes || 'None'}`,
               priority: 'high',
               status: 'open',
               reported_by: f.inspected_by,
@@ -231,17 +243,67 @@ exports.handler = async (event) => {
       <tr style="background:#fee2e2;"><td style="padding:8px 12px;font-weight:600;">Apparatus</td><td style="padding:8px 12px;">${f.apparatus_assigned || ''}</td></tr>
       <tr><td style="padding:8px 12px;font-weight:600;">Inspected By</td><td style="padding:8px 12px;">${f.inspected_by}</td></tr>
       <tr style="background:#fee2e2;"><td style="padding:8px 12px;font-weight:600;">Date</td><td style="padding:8px 12px;">${f.inspection_date}</td></tr>
-      <tr><td style="padding:8px 12px;font-weight:600;">PSI</td><td style="padding:8px 12px;">${f.psi || 'N/A'}</td></tr>
-      ${f.notes ? `<tr style="background:#fee2e2;"><td style="padding:8px 12px;font-weight:600;">Notes</td><td style="padding:8px 12px;">${f.notes}</td></tr>` : ''}
+      ${f.notes ? `<tr><td style="padding:8px 12px;font-weight:600;">Notes</td><td style="padding:8px 12px;">${f.notes}</td></tr>` : ''}
     </table>
     <p style="margin:0;color:#dc2626;font-weight:600;">This pack has been flagged as a high-priority finding. Immediate follow-up required.</p>
   </div>
 </div>`
-          await sendEmail({ to: emails.join(', '), subject, html, text: `SCBA INSPECTION FAILED\nPack: ${packLabel}\nApparatus: ${f.apparatus_assigned}\nInspected By: ${f.inspected_by}\nDate: ${f.inspection_date}\nPSI: ${f.psi || 'N/A'}\n${f.notes || ''}` })
+          await sendEmail({ to: emails.join(', '), subject, html, text: `SCBA INSPECTION FAILED\nPack: ${packLabel}\nApparatus: ${f.apparatus_assigned}\nInspected By: ${f.inspected_by}\nDate: ${f.inspection_date}\n${f.notes || ''}` })
         }
       }
 
-      return { statusCode: 200, headers, body: JSON.stringify({ saved: saved.length, failed: failed.length }) }
+      // Handle NOT FULL packs — set OOS + create finding + email
+      for (const f of notFull) {
+        // Set pack status to out_of_service
+        await supabase.from('scba_packs').update({ status: 'out_of_service' }).eq('id', f.pack_id).catch(() => {})
+
+        const { data: pack } = await supabase.from('scba_packs').select('pack_id, apparatus_id, assigned_apparatus').eq('id', f.pack_id).single()
+        if (pack) {
+          const { data: apparatus } = await supabase.from('apparatus').select('id').eq('unit_name', pack.apparatus_id).maybeSingle()
+          if (apparatus) {
+            await supabase.from('apparatus_findings').insert({
+              apparatus_id: apparatus.id,
+              finding_type: 'inspection',
+              title: `SCBA Pack ${pack.pack_id} not at full pressure — needs air fill`,
+              description: f.notes || `Pack ${pack.pack_id} was found NOT at full pressure during inspection on ${f.inspection_date} by ${f.inspected_by}.`,
+              priority: 'high',
+              status: 'open',
+              reported_by: f.inspected_by,
+              officer_id: f.officer_id
+            }).catch(() => {})
+          }
+
+          // Email DCs + Chief about not-full pack
+          const { data: recipients } = await supabase
+            .from('firefighters')
+            .select('name, email')
+            .in('rank', ['DC','D/C','D/C 1','D/C 2','D/C 3','D/C 4','Chief'])
+            .eq('active', true)
+          const emails = (recipients || []).filter(r => r.email).map(r => r.email)
+          if (emails.length) {
+            const packLabel = f.pack_label || pack.pack_id
+            const subject = `⚠️ SCBA PACK NOT AT FULL PRESSURE — Pack ${packLabel} — ${today}`
+            const html = `<div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;">
+  <div style="background:#d97706;padding:20px 28px;border-radius:10px 10px 0 0;">
+    <h2 style="color:#fff;margin:0;">⚠️ SCBA Pack Not at Full Pressure</h2>
+  </div>
+  <div style="background:#fff;padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;">
+    <table style="width:100%;border-collapse:collapse;background:#fffbeb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+      <tr><td style="padding:8px 12px;font-weight:600;width:140px;">Pack</td><td style="padding:8px 12px;font-weight:700;">${packLabel}</td></tr>
+      <tr style="background:#fef3c7;"><td style="padding:8px 12px;font-weight:600;">Apparatus</td><td style="padding:8px 12px;">${pack.assigned_apparatus || pack.apparatus_id}</td></tr>
+      <tr><td style="padding:8px 12px;font-weight:600;">Inspected By</td><td style="padding:8px 12px;">${f.inspected_by}</td></tr>
+      <tr style="background:#fef3c7;"><td style="padding:8px 12px;font-weight:600;">Date</td><td style="padding:8px 12px;">${f.inspection_date}</td></tr>
+      ${f.notes ? `<tr><td style="padding:8px 12px;font-weight:600;">Notes</td><td style="padding:8px 12px;">${f.notes}</td></tr>` : ''}
+    </table>
+    <p style="margin:0;color:#d97706;font-weight:600;">Pack has been marked Out of Service. Air fill required before returning to service.</p>
+  </div>
+</div>`
+            await sendEmail({ to: emails.join(', '), subject, html, text: `SCBA PACK NOT AT FULL PRESSURE\nPack: ${packLabel}\nApparatus: ${pack.assigned_apparatus || pack.apparatus_id}\nInspected By: ${f.inspected_by}\nDate: ${f.inspection_date}\n${f.notes || ''}` })
+          }
+        }
+      }
+
+      return { statusCode: 200, headers, body: JSON.stringify({ saved: saved.length, failed: failed.length, notFull: notFull.length }) }
     }
 
     // ── SPARE BOTTLES ──────────────────────────────────────────────────────────
@@ -279,26 +341,25 @@ exports.handler = async (event) => {
     }
 
     if (action === 'log_psi') {
-      const { bottle_id, psi, logged_by } = body
-      if (!bottle_id || psi === undefined) return { statusCode: 400, headers, body: JSON.stringify({ error: 'bottle_id and psi required' }) }
+      const { bottle_id, is_full, logged_by } = body
+      if (!bottle_id || is_full === undefined) return { statusCode: 400, headers, body: JSON.stringify({ error: 'bottle_id and is_full required' }) }
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
       const d = new Date()
       const week = Math.ceil((d - new Date(d.getFullYear(), 0, 1)) / 604800000)
-      const psiInt = parseInt(psi)
 
-      // Update current_psi on bottle
+      // Update is_full on bottle (keep current_psi as-is for existing records)
       await supabase.from('spare_bottles').update({
-        current_psi: psiInt, last_checked: today, checked_by: logged_by || officer.display_name
+        is_full, last_checked: today, checked_by: logged_by || officer.display_name
       }).eq('id', bottle_id)
 
       const { data, error } = await supabase.from('bottle_psi_log').insert({
-        bottle_id, psi: psiInt, logged_date: today,
+        bottle_id, psi: null, is_full, logged_date: today,
         logged_by: logged_by || officer.display_name, week_number: week
       }).select().single()
       if (error) throw error
 
-      // Auto-create finding if critical PSI
-      if (psiInt < 2000) {
+      // Auto-create finding if NOT full
+      if (is_full === false) {
         const { data: bottle } = await supabase.from('spare_bottles').select('bottle_number, apparatus_assigned').eq('id', bottle_id).single()
         if (bottle) {
           const { data: apparatus } = await supabase.from('apparatus').select('id').eq('unit_name', bottle.apparatus_assigned).maybeSingle()
@@ -306,8 +367,8 @@ exports.handler = async (event) => {
             await supabase.from('apparatus_findings').insert({
               apparatus_id: apparatus.id,
               finding_type: 'inspection',
-              title: `CRITICAL: Spare Bottle ${bottle.bottle_number} PSI below 2000`,
-              description: `Spare bottle ${bottle.bottle_number} logged at ${psiInt} PSI on ${today} by ${logged_by || officer.display_name}.`,
+              title: `CRITICAL: Spare Bottle ${bottle.bottle_number} not at full pressure`,
+              description: `Spare bottle ${bottle.bottle_number} was found NOT at full pressure on ${today} by ${logged_by || officer.display_name}.`,
               priority: 'critical',
               status: 'open',
               reported_by: logged_by || officer.display_name,
@@ -333,6 +394,32 @@ exports.handler = async (event) => {
         apparatus: apparatus.trim(),
         changed_date: today,
         changed_by: changed_by || officer.display_name,
+        next_due,
+        notes: notes?.trim() || null
+      }).select().single()
+      if (error) throw error
+      return { statusCode: 200, headers, body: JSON.stringify(data) }
+    }
+
+    // ── FLOW TESTS ────────────────────────────────────────────────────────────
+    if (action === 'log_flow_test') {
+      const { pack_id, test_date, result, tested_by, notes } = body
+      if (!pack_id || !test_date || !result || !tested_by) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'pack_id, test_date, result, and tested_by are required' }) }
+      }
+      if (!['passed','failed'].includes(result)) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'result must be passed or failed' }) }
+      }
+      // Auto-calculate next_due = test_date + 365 days
+      const testDateObj = new Date(test_date + 'T12:00:00')
+      const nextDueObj  = new Date(testDateObj.getTime() + 365 * 86400000)
+      const next_due    = nextDueObj.toISOString().split('T')[0]
+
+      const { data, error } = await supabase.from('scba_flow_tests').insert({
+        pack_id,
+        test_date,
+        result,
+        tested_by: tested_by.trim(),
         next_due,
         notes: notes?.trim() || null
       }).select().single()

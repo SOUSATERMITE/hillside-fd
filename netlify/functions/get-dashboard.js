@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes, stationIssuesRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes, stationIssuesRes, scbaPacksRes, scbaFlowRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -136,7 +136,17 @@ exports.handler = async (event) => {
         .not('status', 'in', '("completed","cancelled")')
         .in('priority', ['urgent', 'high'])
         .order('priority', { ascending: true })
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }),
+
+      supabase
+        .from('scba_packs')
+        .select('id, status')
+        .eq('active', true),
+
+      supabase
+        .from('scba_flow_tests')
+        .select('pack_id, next_due')
+        .order('test_date', { ascending: false })
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -175,6 +185,27 @@ exports.handler = async (event) => {
     const apparatusFindings = allFindings.filter(f => f.apparatus_id != null && f.finding_type !== 'manual_report')
     const manualIssues      = allFindings.filter(f => f.finding_type === 'manual_report')
 
+    // Build SCBA summary
+    const scbaPacks = scbaPacksRes.data || []
+    const scbaFlowTests = scbaFlowRes.data || []
+    const in60days = new Date(now + 60 * 86400000).toISOString().split('T')[0]
+    // Most recent flow test per pack
+    const latestFlowByPack = {}
+    for (const ft of scbaFlowTests) {
+      if (!latestFlowByPack[ft.pack_id]) latestFlowByPack[ft.pack_id] = ft
+    }
+    const scba_summary = {
+      oos_count: scbaPacks.filter(p => p.status === 'out_of_service').length,
+      overdue_flow_tests: scbaPacks.filter(p => {
+        const ft = latestFlowByPack[p.id]
+        return ft && ft.next_due < todayStr
+      }).length,
+      flow_tests_due_soon: scbaPacks.filter(p => {
+        const ft = latestFlowByPack[p.id]
+        return ft && ft.next_due >= todayStr && ft.next_due <= in60days
+      }).length
+    }
+
     return {
       statusCode: 200, headers,
       body: JSON.stringify({
@@ -190,6 +221,7 @@ exports.handler = async (event) => {
         manual_issues:       manualIssues,
         recently_resolved:   resolvedRes.data  || [],
         station_issues:      stationIssuesRes.data || [],
+        scba_summary,
         schedule
       })
     }

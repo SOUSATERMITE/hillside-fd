@@ -448,6 +448,8 @@
       <a href="/apparatus" class="text-xs font-bold text-white border border-white border-opacity-60 rounded-lg px-3 py-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;">View All →</a>
     </div>
     <div id="apparatusOOSBanner" class="hidden px-4 py-2 bg-red-50 border-b border-red-200 text-sm font-bold text-red-700"></div>
+    <div id="scbaSummaryStrip" class="hidden px-4 py-2 border-b border-gray-100 flex flex-wrap gap-2">
+    </div>
     <div id="apparatusGrid" class="px-3 py-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
       <div class="text-center py-4 text-gray-400 text-sm col-span-full">Loading...</div>
     </div>
@@ -1760,6 +1762,26 @@ function renderApparatus() {
   const grid   = document.getElementById('apparatusGrid')
   const banner = document.getElementById('apparatusOOSBanner')
   const units = dashData.apparatus || []
+
+  // SCBA summary strip
+  const scbaStrip = document.getElementById('scbaSummaryStrip')
+  if (scbaStrip) {
+    const s = dashData.scba_summary
+    if (s) {
+      const chips = []
+      chips.push(`<a href="/scba" class="text-xs font-bold px-2.5 py-1 rounded-full transition ${s.oos_count > 0 ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}" style="min-height:0;">${s.oos_count} SCBA OOS</a>`)
+      if (s.overdue_flow_tests > 0) {
+        chips.push(`<a href="/scba" class="text-xs font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition" style="min-height:0;">${s.overdue_flow_tests} flow test${s.overdue_flow_tests !== 1 ? 's' : ''} overdue</a>`)
+      }
+      if (s.flow_tests_due_soon > 0) {
+        chips.push(`<a href="/scba" class="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition" style="min-height:0;">${s.flow_tests_due_soon} flow test${s.flow_tests_due_soon !== 1 ? 's' : ''} due soon</a>`)
+      }
+      scbaStrip.innerHTML = chips.join('')
+      scbaStrip.classList.remove('hidden')
+    } else {
+      scbaStrip.classList.add('hidden')
+    }
+  }
 
   if (!units.length) {
     grid.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm col-span-full">No apparatus found.</div>'
