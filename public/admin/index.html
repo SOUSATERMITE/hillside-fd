@@ -97,8 +97,14 @@
     <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm mx-4 text-center">
       <div class="text-4xl mb-3">🔒</div>
       <h2 class="text-xl font-extrabold text-gray-800 mb-2">Admin Access Required</h2>
-      <p class="text-gray-500 text-sm mb-5" id="accessDeniedMsg">You must be logged in as an admin (DC) to view this page.</p>
-      <button onclick="AUTH.showLoginModal(checkAccess)" class="w-full bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition">Log In</button>
+      <p class="text-gray-500 text-sm mb-4" id="accessDeniedMsg">Enter the admin password or log in as an admin officer.</p>
+      <input id="adminPwInput" type="password" placeholder="Admin password"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+        style="min-height:44px"
+        onkeydown="if(event.key==='Enter') doAdminPwLogin()">
+      <div id="adminPwError" class="text-red-600 text-sm text-center mb-2 hidden"></div>
+      <button onclick="doAdminPwLogin()" class="w-full bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-3 transition mb-3">Enter Admin Panel</button>
+      <button onclick="AUTH.showLoginModal(checkAccess)" class="w-full text-gray-500 hover:text-gray-700 text-sm py-2 border border-gray-200 rounded-xl">Officer PIN Login</button>
     </div>
   </div>
 
@@ -544,11 +550,27 @@
       }
     }
 
+    async function doAdminPwLogin() {
+      const pw = document.getElementById('adminPwInput').value.trim()
+      const errEl = document.getElementById('adminPwError')
+      errEl.classList.add('hidden')
+      if (!pw) { errEl.textContent = 'Enter the admin password.'; errEl.classList.remove('hidden'); return }
+      try {
+        await AUTH.adminPasswordLogin(pw)
+        checkAccess()
+      } catch (e) {
+        errEl.textContent = e.message || 'Incorrect password.'
+        errEl.classList.remove('hidden')
+      }
+    }
+
     // Run on page load and after login
     document.addEventListener('DOMContentLoaded', () => {
       // Wait for AUTH to init (it runs on DOMContentLoaded too — add a tiny delay)
       setTimeout(checkAccess, 50)
     })
+
+    window.addEventListener('hfd:login', checkAccess)
 
     // ── Admin Tabs ────────────────────────────────────────────────────────────────
 

@@ -23,12 +23,15 @@ const AUTH = (() => {
   function isLoggedIn() { return !!getSession() }
   function isMember()  { return !!getSession() }   // any role: officer, admin, firefighter
   function isOfficer() { const s = getSession(); return !!(s && (s.role === 'officer' || s.role === 'admin')) }
-  function isAdmin()   { const s = getSession(); return !!(s && s.role === 'admin') }
+  function isAdmin()   { const s = getSession(); if (s && s.role === 'admin') return true; return !!sessionStorage.getItem('hfd_admin_pass') }
   function isFF()      { const s = getSession(); return !!(s && s.role === 'firefighter') }
   function getDisplayName() { return getSession()?.display_name || null }
   function getHeaders() {
     const s = getSession()
-    return s ? { 'x-session-token': s.token } : {}
+    const h = s ? { 'x-session-token': s.token } : {}
+    const ap = sessionStorage.getItem('hfd_admin_pass')
+    if (ap) h['x-admin-password'] = ap
+    return h
   }
 
   // ── Nav slot ─────────────────────────────────────────────────────────────────
@@ -154,6 +157,7 @@ const AUTH = (() => {
       }
 
       hideModal()
+      window.dispatchEvent(new CustomEvent('hfd:login', { detail: data }))
       const cb = _loginCallback
       _loginCallback = null
       if (cb) cb(data)
@@ -213,6 +217,7 @@ const AUTH = (() => {
       if (s) { s.must_change_pin = false; localStorage.setItem(KEY, JSON.stringify(s)) }
 
       hideModal()
+      window.dispatchEvent(new CustomEvent('hfd:login', { detail: getSession() }))
       const cb = _loginCallback
       _loginCallback = null
       if (cb) cb(getSession())
@@ -220,6 +225,22 @@ const AUTH = (() => {
       errEl.textContent = 'Network error: ' + e.message
       errEl.classList.remove('hidden')
     }
+  }
+
+  // ── Admin password login ──────────────────────────────────────────────────────
+
+  async function adminPasswordLogin(password) {
+    const res = await fetch(`${API}/admin-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': password }
+    })
+    if (!res.ok) {
+      const d = await res.json()
+      throw new Error(d.error || 'Incorrect password')
+    }
+    sessionStorage.setItem('hfd_admin_pass', password)
+    updateNav()
+    window.dispatchEvent(new CustomEvent('hfd:login', { detail: { role: 'admin' } }))
   }
 
   // ── Logout ────────────────────────────────────────────────────────────────────
@@ -235,6 +256,7 @@ const AUTH = (() => {
       } catch {}
     }
     localStorage.removeItem(KEY)
+    sessionStorage.removeItem('hfd_admin_pass')
     updateNav()
     location.reload()
   }
@@ -251,7 +273,7 @@ const AUTH = (() => {
   return {
     getSession, isLoggedIn, isMember, isOfficer, isAdmin, isFF, getDisplayName, getHeaders,
     showLoginModal, hideModal, showChangePinModal,
-    logout, updateNav, loadOfficers, getActingOfficers,
+    logout, updateNav, loadOfficers, getActingOfficers, adminPasswordLogin,
     _doLogin, _doChangePin
   }
 })()

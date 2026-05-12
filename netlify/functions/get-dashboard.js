@@ -100,7 +100,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('contacts')
-        .select('id, name, title, phone, email, category, notes')
+        .select('id, name, title, phone, email, category, notes, key_code')
         .eq('active', true)
         .order('category')
         .order('name'),

@@ -2640,6 +2640,17 @@ function showOfficerButtons() {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('hfd:login', () => {
+  showOfficerButtons()
+  if (typeof dashData !== 'undefined' && dashData) {
+    renderBulletins()
+    renderEvents()
+    renderWorkOrders()
+    renderApparatus()
+    renderContacts()
+  }
+})
+
 document.addEventListener('DOMContentLoaded', async () => {
   await AUTH.init
   AUTH.updateNav()
