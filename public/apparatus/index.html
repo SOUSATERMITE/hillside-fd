@@ -836,11 +836,20 @@ function getDailyItems(unitType, unitName) {
   return items
 }
 
-function renderCheckItems(items) {
+function getApparatusColor(name) {
+  const n = (name || '').toUpperCase()
+  if (n.startsWith('E')) return '#8b0000'
+  if (n.startsWith('T')) return '#1e3a5f'
+  if (n.startsWith('R')) return '#1a5c2a'
+  return '#8b4513'
+}
+
+function renderCheckItems(items, borderColor) {
+  const leftBorder = borderColor ? `border-left:4px solid ${borderColor};` : ''
   return items.map(item => `
-    <div id="ck-row-${item.key}" class="border-b border-gray-100 last:border-b-0">
+    <div id="ck-row-${item.key}" class="border-b border-gray-100 last:border-b-0" style="${leftBorder}">
       <div class="flex items-center justify-between gap-3 px-3 py-2.5">
-        <label class="text-sm font-medium text-gray-700 flex-1">${esc(item.label)}</label>
+        <label class="flex-1" style="font-size:0.875rem;font-weight:700;color:#222;">${esc(item.label)}</label>
         <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
           onchange="onCheckItemChange(this)"
           class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
@@ -857,7 +866,8 @@ function renderCheckItems(items) {
     </div>`).join('')
 }
 
-function renderCheckItemsGrouped(dbItems) {
+function renderCheckItemsGrouped(dbItems, apparatusName) {
+  const color = getApparatusColor(apparatusName)
   const groups = new Map()
   for (const item of dbItems) {
     const cat = item.category || 'Other'
@@ -866,8 +876,8 @@ function renderCheckItemsGrouped(dbItems) {
   }
   let html = ''
   for (const [cat, items] of groups) {
-    html += `<div class="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200">${esc(cat)}</div>`
-    html += renderCheckItems(items)
+    html += `<div style="background:${color};padding:6px 14px;"><span style="color:#fff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${esc(cat)}</span></div>`
+    html += renderCheckItems(items, color)
   }
   return html
 }
@@ -897,7 +907,7 @@ function openCheckModal(id, name, unitType, checkType) {
         container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6">No weekly check items found for this apparatus.</div>'
         return
       }
-      container.innerHTML = renderCheckItemsGrouped(data)
+      container.innerHTML = renderCheckItemsGrouped(data, name)
     })
     .catch(() => {
       container.innerHTML = '<div class="text-red-500 text-sm text-center py-6">Failed to load checklist items.</div>'
