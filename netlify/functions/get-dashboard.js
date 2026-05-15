@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   const in14days = new Date(now + 14 * 86400000).toISOString().split('T')[0]
 
   try {
-    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes, stationIssuesRes, scbaPacksRes, scbaFlowRes] = await Promise.all([
+    const [sickRes, recallRes, vacRes, bulletinRes, eventRes, workOrderRes, contactRes, apparatusRes, findingsRes, attachRes, resolvedRes, stationIssuesRes, scbaPacksRes, scbaFlowRes, hazardRes, hazardResolvedRes] = await Promise.all([
       supabase
         .from('sick_log')
         .select('id, marked_sick_date, firefighters(id, name, rank, group_number)')
@@ -146,7 +146,21 @@ exports.handler = async (event) => {
       supabase
         .from('scba_flow_tests')
         .select('pack_id, next_due')
-        .order('test_date', { ascending: false })
+        .order('test_date', { ascending: false }),
+
+      supabase
+        .from('field_hazard_reports')
+        .select('id, address, cross_street, district, hazard_type, severity, description, observed_date, reported_by, reported_tour, status, created_at')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(50),
+
+      supabase
+        .from('field_hazard_reports')
+        .select('id, address, cross_street, hazard_type, severity, description, reported_by, reported_tour, resolution_note, resolved_by, resolved_at, created_at')
+        .eq('status', 'resolved')
+        .order('resolved_at', { ascending: false })
+        .limit(20)
     ])
 
     const currentGroup  = getGroupForMs(now)
@@ -222,7 +236,9 @@ exports.handler = async (event) => {
         recently_resolved:   resolvedRes.data  || [],
         station_issues:      stationIssuesRes.data || [],
         scba_summary,
-        schedule
+        schedule,
+        field_hazards:          hazardRes.data         || [],
+        field_hazards_resolved: hazardResolvedRes.data || []
       })
     }
   } catch (e) {
