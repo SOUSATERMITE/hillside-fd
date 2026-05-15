@@ -846,15 +846,18 @@ function getApparatusColor(name) {
 
 function renderCheckItems(items, borderColor) {
   const leftBorder = borderColor ? `border-left:4px solid ${borderColor};` : ''
-  return items.map(item => `
+  return items.map(item => {
+    const opts = item.options
+      ? item.options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('')
+      : '<option value="Good">Good</option><option value="Issue">Issue</option>'
+    return `
     <div id="ck-row-${item.key}" class="border-b border-gray-100 last:border-b-0" style="${leftBorder}">
       <div class="flex items-center justify-between gap-3 px-3 py-2.5">
         <label class="flex-1" style="font-size:0.875rem;font-weight:700;color:#222;">${esc(item.label)}</label>
         <select id="ck_${item.key}" data-key="${item.key}" data-label="${esc(item.label)}" data-pass='${JSON.stringify(item.pass)}'
           onchange="onCheckItemChange(this)"
           class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 min-w-[120px]" style="min-height:36px;">
-          <option value="Good">Good</option>
-          <option value="Issue">Issue</option>
+          ${opts}
         </select>
       </div>
       <div id="ck-issue-${item.key}" style="max-height:0;overflow:hidden;transition:max-height 0.28s ease;">
@@ -863,7 +866,8 @@ function renderCheckItems(items, borderColor) {
             class="w-full border border-red-300 bg-red-50 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" style="min-height:0;"></textarea>
         </div>
       </div>
-    </div>`).join('')
+    </div>`
+  }).join('')
 }
 
 function renderCheckItemsGrouped(dbItems, apparatusName) {
