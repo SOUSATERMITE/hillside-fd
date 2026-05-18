@@ -19,11 +19,11 @@ exports.handler = async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   const body = JSON.parse(event.body || '{}')
   const { action } = body
-  const cats = ['officer', 'firefighter', 'staff', 'external', 'vendor', 'emergency', 'utility', 'other', 'key_codes']
+  const cats = ['officer', 'firefighter', 'staff', 'external', 'vendor', 'emergency', 'utility', 'other', 'key_codes', 'alarm_codes']
 
   if (action === 'add') {
     const { name, title, phone, email, category, notes, key_code } = body
-    if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Name required' }) }
+    if (!name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: category === 'alarm_codes' ? 'Address required' : 'Name required' }) }
 
     const { data, error } = await supabase.from('contacts').insert({
       name:     name.trim().slice(0, 100),
@@ -36,13 +36,13 @@ exports.handler = async (event) => {
       active:   true
     }).select().single()
 
-    if (error) return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
+    if (error) { console.error('[manage-contacts] add:', error.message); return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) } }
     return { statusCode: 200, headers, body: JSON.stringify(data) }
   }
 
   if (action === 'edit') {
     const { id, name, title, phone, email, category, notes, key_code } = body
-    if (!id || !name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id and name required' }) }
+    if (!id || !name?.trim()) return { statusCode: 400, headers, body: JSON.stringify({ error: category === 'alarm_codes' ? 'id and address required' : 'id and name required' }) }
 
     const { error } = await supabase.from('contacts').update({
       name:     name.trim().slice(0, 100),
@@ -54,7 +54,7 @@ exports.handler = async (event) => {
       key_code: key_code?.trim().slice(0, 100) || null
     }).eq('id', id)
 
-    if (error) return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
+    if (error) { console.error('[manage-contacts] edit:', error.message); return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) } }
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
   }
 
