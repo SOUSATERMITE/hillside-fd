@@ -66,14 +66,72 @@ exports.handler = async (event) => {
     if (event.httpMethod === 'PUT') {
       const { id, name, rank, group_number, active, email } = JSON.parse(event.body || '{}')
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id is required' }) }
+
+      // Fetch current state before update so we can detect changes
+      const { data: current, error: fetchErr } = await supabase
+        .from('firefighters').select('name, rank, group_number').eq('id', id).single()
+      if (fetchErr) throw fetchErr
+
       const updates = {}
-      if (name !== undefined) updates.name = name
-      if (rank !== undefined) updates.rank = rank
+      if (name         !== undefined) updates.name         = name
+      if (rank         !== undefined) updates.rank         = rank
       if (group_number !== undefined) updates.group_number = group_number
-      if (active !== undefined) updates.active = active
-      if (email !== undefined) updates.email = email || null
-      const { data: updated, error } = await supabase.from('firefighters').update(updates).eq('id', id).select().single()
+      if (active       !== undefined) updates.active       = active
+      if (email        !== undefined) updates.email        = email || null
+
+      const { data: updated, error } = await supabase
+        .from('firefighters').update(updates).eq('id', id).select().single()
       if (error) throw error
+
+      // ── Sync recall_list if group or rank changed ──────────────────────────
+      const RECALL_RANKS = ['FF', 'Captain']
+      const oldRank  = current.rank
+      const newRank  = updated.rank
+      const oldGroup = current.group_number
+      const newGroup = updated.group_number
+
+      const wasOnRecall = RECALL_RANKS.includes(oldRank)
+      const isOnRecall  = RECALL_RANKS.includes(newRank)
+      const groupChanged = group_number !== undefined && newGroup !== oldGroup
+      const rankChanged  = rank !== undefined && newRank !== oldRank
+
+      const getBottomPos = async (grp, rankType, excludeId) => {
+        const q = supabase.from('recall_list').select('list_position')
+          .eq('group_number', grp).eq('rank_type', rankType)
+          .order('list_position', { ascending: false }).limit(1)
+        if (excludeId) q.neq('firefighter_id', excludeId)
+        const { data } = await q
+        return (data?.[0]?.list_position || 0) + 1
+      }
+
+      if (wasOnRecall && !isOnRecall) {
+        // Promoted to DC/Chief — remove from recall list
+        await supabase.from('recall_list').delete().eq('firefighter_id', id)
+        console.log(`[recall-sync] ${updated.name} promoted to ${newRank} — removed from recall list by ${admin.display_name}`)
+      } else if (!wasOnRecall && isOnRecall) {
+        // Moved from non-recall rank (DC/Chief) to recall rank — insert new record
+        const newRankType = newRank === 'Captain' ? 'Captain' : 'FF'
+        const pos = await getBottomPos(newGroup, newRankType, null)
+        await supabase.from('recall_list').insert({
+          firefighter_id: id, group_number: newGroup, rank_type: newRankType,
+          list_position: pos, short_min_count: 0
+        })
+        console.log(`[recall-sync] ${updated.name} added to recall list: Group ${newGroup} ${newRankType} pos ${pos} by ${admin.display_name}`)
+      } else if (wasOnRecall && isOnRecall && (groupChanged || rankChanged)) {
+        // Still on recall but group and/or rank changed — move to bottom of new slot
+        const newRankType = newRank === 'Captain' ? 'Captain' : 'FF'
+        const targetGroup = newGroup
+        const pos = await getBottomPos(targetGroup, newRankType, id)
+        await supabase.from('recall_list').update({
+          group_number: targetGroup, rank_type: newRankType,
+          list_position: pos, short_min_count: 0
+        }).eq('firefighter_id', id)
+        const changes = []
+        if (groupChanged) changes.push(`Group ${oldGroup} → ${newGroup}`)
+        if (rankChanged)  changes.push(`${oldRank} → ${newRank}`)
+        console.log(`[recall-sync] ${updated.name}: ${changes.join(', ')} → pos ${pos} in Group ${targetGroup} ${newRankType} list by ${admin.display_name}`)
+      }
+
       return { statusCode: 200, headers, body: JSON.stringify(updated) }
     }
 
