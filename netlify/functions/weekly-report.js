@@ -1,15 +1,15 @@
 const { createClient } = require('@supabase/supabase-js')
 const nodemailer = require('nodemailer')
 
-// ── Email transport (Gmail SMTP) ───────────────────────────────────────────────
+// ── Email transport (Zoho SMTP) ────────────────────────────────────────────────
 function makeTransport() {
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    host: 'smtp.zoho.com',
+    port: 465,
+    secure: true,
     auth: {
-      user: process.env.ZOHO_SMTP_USER || process.env.SMTP_USER,
-      pass: process.env.ZOHO_SMTP_PASS || process.env.SMTP_PASS
+      user: process.env.ZOHO_SMTP_USER,
+      pass: process.env.ZOHO_SMTP_PASS
     }
   })
 }
@@ -110,40 +110,37 @@ async function fetchWeeklyData(supabase, weekStart, weekEnd) {
       .select('id, firefighter_id, marked_sick_date, cleared_date, notes, firefighters!sick_log_firefighter_id_fkey(name, rank, group_number)')
       .gte('marked_sick_date', weekStart + 'T00:00:00.000Z')
       .lte('marked_sick_date', weekEnd   + 'T23:59:59.999Z')
-      .eq('deleted', false)
       .order('marked_sick_date', { ascending: false }),
 
     supabase.from('recall_log')
       .select('id, firefighter_id, shift_date, recall_type, hours_worked, tour_worked, recorded_by, firefighters!recall_log_firefighter_id_fkey(name, rank)')
       .gte('shift_date', weekStart)
       .lte('shift_date', weekEnd)
-      .eq('deleted', false)
       .order('shift_date', { ascending: false }),
 
     supabase.from('apparatus')
-      .select('id, unit_number, unit_type, status, last_updated, notes')
+      .select('id, unit_name, unit_type, status, last_updated, notes')
       .neq('status', 'in_service')
-      .order('unit_number'),
+      .order('unit_name'),
 
-    supabase.from('bulletins')
+    supabase.from('bulletin_posts')
       .select('id, title, content, category, posted_by, created_at')
       .gte('created_at', weekStart + 'T00:00:00.000Z')
       .lte('created_at', weekEnd   + 'T23:59:59.999Z')
-      .eq('deleted', false)
+      .eq('active', true)
       .order('created_at', { ascending: false }),
 
     supabase.from('vacation_requests')
-      .select('id, firefighter_id, start_date, end_date, status, firefighters!vacation_requests_firefighter_id_fkey(name, rank)')
-      .gte('start_date', weekStart)
-      .lte('start_date', weekEnd)
-      .order('start_date'),
+      .select('id, firefighter_id, ff_name, request_date, new_dates, cancelled_dates, status, firefighters!vacation_requests_firefighter_id_fkey(name, rank)')
+      .gte('request_date', weekStart)
+      .lte('request_date', weekEnd)
+      .order('request_date'),
 
-    supabase.from('events')
-      .select('id, title, description, start_date, end_date, event_type, created_by')
-      .gte('start_date', weekStart)
-      .lte('start_date', weekEnd)
-      .eq('deleted', false)
-      .order('start_date')
+    supabase.from('scheduled_events')
+      .select('id, title, description, event_date, event_time, category, created_by')
+      .gte('event_date', weekStart)
+      .lte('event_date', weekEnd)
+      .order('event_date')
   ])
 
   return {
@@ -218,7 +215,7 @@ function buildReportHtml(data, weekStart, weekEnd) {
         ? '<span class="badge badge-red">Out of Service</span>'
         : `<span class="badge badge-orange">${a.status?.replace(/_/g,' ') || a.status}</span>`
       apparatusRows += `<tr>
-        <td>${a.unit_number} – ${a.unit_type}</td>
+        <td>${a.unit_name} – ${a.unit_type}</td>
         <td>${statusBadge}</td>
         <td>${a.notes || '—'}</td>
       </tr>`
@@ -247,7 +244,7 @@ function buildReportHtml(data, weekStart, weekEnd) {
     for (const e of events) {
       eventRows += `<div style="margin-bottom:10px;padding:10px 12px;background:#f8fafc;border-radius:6px;border-left:3px solid #1e3a5f;">
         <div style="font-weight:700;font-size:13px;color:#1e3a5f;">${e.title}</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${fmtDate(e.start_date)}${e.end_date && e.end_date !== e.start_date ? ' – ' + fmtDate(e.end_date) : ''} · ${e.event_type || ''}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${fmtDate(e.event_date)} · ${e.category || ''}</div>
         ${e.description ? `<div style="font-size:12px;color:#374151;margin-top:4px;">${e.description.slice(0,200)}</div>` : ''}
       </div>`
     }
@@ -266,8 +263,8 @@ function buildReportHtml(data, weekStart, weekEnd) {
           : '<span class="badge badge-blue">Pending</span>'
       const ff = v.firefighters
       vacRows += `<tr>
-        <td>${ff?.name || '—'}</td>
-        <td>${fmtDate(v.start_date)}${v.end_date ? ' – ' + fmtDate(v.end_date) : ''}</td>
+        <td>${ff?.name || v.ff_name || '—'}</td>
+        <td>${fmtDate(v.request_date)}${v.new_dates?.length ? ' → ' + v.new_dates.map(fmtDate).join(', ') : ''}</td>
         <td>${statusBadge}</td>
       </tr>`
     }
@@ -338,7 +335,6 @@ async function buildPatternHtml(supabase, weekStart, weekEnd) {
     .from('sick_log')
     .select('firefighter_id, marked_sick_date, cleared_date, firefighters!sick_log_firefighter_id_fkey(name, rank, group_number)')
     .gte('marked_sick_date', yearStart + 'T00:00:00.000Z')
-    .eq('deleted', false)
     .order('marked_sick_date', { ascending: false })
 
   const { data: weekRefused } = await supabase
@@ -347,7 +343,6 @@ async function buildPatternHtml(supabase, weekStart, weekEnd) {
     .gte('shift_date', weekStart)
     .lte('shift_date', weekEnd)
     .eq('recall_type', 'refused')
-    .eq('deleted', false)
 
   // Group sick by firefighter and compute pattern scores
   const ffMap = {}
@@ -494,13 +489,13 @@ exports.handler = async (event) => {
   try {
     const transport = makeTransport()
     await transport.sendMail({
-      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
+      from: '"Hillside Fire Department" <sousa@sousapest.com>',
       to:   RECIPIENTS.join(', '),
       subject,
       html: reportHtml
     })
     await transport.sendMail({
-      from: '"Hillside Fire Department" <hillsidefireapp@gmail.com>',
+      from: '"Hillside Fire Department" <sousa@sousapest.com>',
       to:   'fsousa@hillsidefire.org',
       subject: patternSubject,
       html: patternHtml
