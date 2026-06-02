@@ -24,7 +24,7 @@ Web app for Hillside Fire Department to manage daily operations: sick tracking, 
 - **Frontend**: Vanilla HTML/JS, Tailwind CSS via CDN, no build step
 - **Backend**: Netlify Functions (Node.js CommonJS) in `/netlify/functions/`
 - **Database**: Supabase (PostgreSQL), project ref `oyyxbfguzmpsidcsgsyf`
-- **Hosting**: Netlify, site ID `6f61044e-fc21-4db6-99dc-a1e084da5e42`, URL `hillside-fd.netlify.app`
+- **Hosting**: Netlify, site ID `350e74fc-326c-4313-b510-67efb40fddbe`, URL `hillside-fd-624.netlify.app`
 - **Netlify account**: sousatermite@gmail.com (NOT sousatermite@aol.com — that's a different account)
 - **GitHub repo**: `SOUSATERMITE/hillside-fd`, branch `main`
 - **Deploy**: `git push origin main` → Netlify auto-deploys. Manual deploy: `netlify deploy --prod --dir=public` (must be logged into gmail account)
@@ -281,6 +281,7 @@ SUPABASE_SERVICE_ROLE_KEY=     # secret — all functions use this
 ADMIN_PASSWORD=                # Phil's admin panel password
 ZOHO_SMTP_USER=                # sousa@sousapest.com
 ZOHO_SMTP_PASS=                # Zoho SMTP password
+GMAIL_APP_PASSWORD=            # hillsidefireapp@gmail.com app password (for recall report emails)
 ```
 
 ---
