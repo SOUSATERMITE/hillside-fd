@@ -17,6 +17,11 @@
   status = 200
 
 [[redirects]]
+  from = "/recall/report"
+  to = "/recall/report/index.html"
+  status = 200
+
+[[redirects]]
   from = "/admin"
   to = "/admin/index.html"
   status = 200
@@ -61,3 +66,6 @@
 
 [functions."duty-cron"]
   schedule = "30 11 * * *"
+
+[functions."send-recall-report-background"]
+  schedule = "0 10 * * 1"

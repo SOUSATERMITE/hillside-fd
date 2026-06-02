@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recall Report — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 14px; }
+
+    /* Screen controls */
+    .no-print { }
+
+    /* Print styles */
+    @media print {
+      .no-print { display: none !important; }
+      body { font-size: 12pt; color: #000; background: #fff; margin: 0; padding: 0; }
+      .print-page { max-width: 100%; margin: 0; padding: 0.5in; }
+      .section { page-break-inside: avoid; margin-bottom: 24pt; }
+      table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+      th { border-bottom: 2pt solid #000; padding: 4pt 6pt; text-align: left; font-weight: bold; background: none; }
+      td { border-bottom: 0.5pt solid #ccc; padding: 3pt 6pt; }
+      .hdr-block { text-align: center; margin-bottom: 20pt; border-bottom: 2pt solid #000; padding-bottom: 10pt; }
+      .hdr-block h1 { font-size: 18pt; font-weight: bold; margin: 0 0 4pt; }
+      .hdr-block h2 { font-size: 13pt; margin: 0 0 3pt; }
+      .hdr-block p { font-size: 10pt; margin: 0; }
+      .section h3 { font-size: 13pt; font-weight: bold; margin: 0 0 6pt; padding-bottom: 3pt; border-bottom: 1pt solid #000; }
+      .badge-sick { font-weight: bold; }
+      .badge-recalled { font-style: italic; }
+      tr.sick-row td { font-weight: bold; }
+    }
+
+    /* Screen preview of print layout */
+    @media screen {
+      .print-page { max-width: 850px; margin: 0 auto; padding: 20px; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+      .hdr-block { text-align: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #000; }
+      .hdr-block h1 { font-size: 22px; font-weight: bold; margin: 0 0 4px; }
+      .hdr-block h2 { font-size: 15px; margin: 0 0 3px; }
+      .hdr-block p { font-size: 12px; color: #555; }
+      .section { margin-bottom: 28px; }
+      .section h3 { font-size: 15px; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th { background: #f0f0f0; border-bottom: 2px solid #000; padding: 6px 8px; text-align: left; font-weight: bold; }
+      td { border-bottom: 1px solid #ddd; padding: 5px 8px; }
+      tr.sick-row td { background: #fff3cd; font-weight: bold; }
+      tr.recalled-row td { background: #d4edda; }
+    }
+
+    .badge-sick::after { content: " ★ SICK"; font-size: 0.85em; }
+    .badge-recalled::after { content: " ✓"; font-size: 0.85em; }
+    #loading { text-align: center; padding: 40px; color: #666; }
+    #error-msg { display: none; color: #c00; padding: 10px; background: #fff0f0; border: 1px solid #c00; border-radius: 4px; margin: 10px 0; }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+  <!-- Controls (no-print) -->
+  <div class="no-print bg-red-800 text-white px-4 py-3 shadow-md">
+    <div class="max-w-850px mx-auto flex flex-wrap items-center gap-3" style="max-width:850px;margin:0 auto;">
+      <a href="/recall" class="text-white text-sm hover:underline opacity-80">← Recall List</a>
+      <span class="opacity-40">|</span>
+      <label class="text-sm font-semibold">Tour:</label>
+      <select id="groupSel" onchange="loadReport()" class="text-black rounded px-2 py-1 text-sm">
+        <option value="1">Tour 1</option>
+        <option value="2">Tour 2</option>
+        <option value="3">Tour 3</option>
+        <option value="4">Tour 4</option>
+      </select>
+      <label class="text-sm font-semibold ml-2">History:</label>
+      <select id="daysSel" onchange="loadReport()" class="text-black rounded px-2 py-1 text-sm">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+      <button onclick="window.print()" class="ml-auto bg-white text-red-800 font-bold px-4 py-1.5 rounded text-sm hover:bg-gray-100">
+        🖨 Print Report
+      </button>
+    </div>
+  </div>
+
+  <!-- Report content -->
+  <div class="py-6 px-4 bg-gray-100 min-h-screen no-print-wrapper">
+    <div class="print-page">
+      <div id="loading">Loading report…</div>
+      <div id="error-msg"></div>
+      <div id="report" style="display:none;"></div>
+    </div>
+  </div>
+
+<script>
+const SHIFT_ANCHOR = new Date('2026-04-30T11:30:00Z')
+
+function currentGroup() {
+  const shifts = Math.floor((Date.now() - SHIFT_ANCHOR.getTime()) / 86400000)
+  return [3,4,1,2][shifts % 4]
+}
+
+function fmtDateLong(iso) {
+  const d = new Date(iso + 'T12:00:00')
+  return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return ''
+  const d = new Date(iso + 'T12:00:00')
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+}
+
+function fmtDatetime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US', { timeZone:'America/New_York', month:'short', day:'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-US', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true })
+}
+
+function recallTypeLabel(t) {
+  const map = {
+    full_shift: 'Full Shift', short_min: 'Short Min', refused: 'Refused',
+    vacation_skip: 'Vac. Skip', substitution: 'Substitution', refused_no_penalty: 'Refused (no penalty)'
+  }
+  return map[t] || t
+}
+
+async function loadReport() {
+  const group = document.getElementById('groupSel').value
+  const days  = document.getElementById('daysSel').value
+
+  document.getElementById('loading').style.display = 'block'
+  document.getElementById('report').style.display  = 'none'
+  document.getElementById('error-msg').style.display = 'none'
+
+  try {
+    const resp = await fetch(`/.netlify/functions/get-recall-report?group=${group}&days=${days}`)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const data = await resp.json()
+    renderReport(data)
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none'
+    const em = document.getElementById('error-msg')
+    em.textContent = 'Failed to load report: ' + e.message
+    em.style.display = 'block'
+  }
+}
+
+function renderReport(d) {
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('en-US', { timeZone:'America/New_York', weekday:'long', year:'numeric', month:'long', day:'numeric' })
+  const timeStr = today.toLocaleTimeString('en-US', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true })
+
+  let html = `
+    <div class="hdr-block">
+      <h1>HILLSIDE FIRE DEPARTMENT</h1>
+      <h2>Weekly Recall Report — Tour ${d.group}</h2>
+      <p>${dateStr} &nbsp;|&nbsp; Generated at ${timeStr}</p>
+    </div>
+  `
+
+  // Section 1 — Recall Order
+  html += `<div class="section">
+    <h3>SECTION 1 &mdash; CURRENT RECALL ORDER (Tour ${d.group})</h3>`
+
+  const renderList = (rows, label) => {
+    if (!rows.length) return `<p style="color:#888;font-style:italic">No ${label.toLowerCase()} on recall list.</p>`
+    let t = `<h4 style="font-size:13px;font-weight:bold;margin:10px 0 4px;">${label}</h4>
+    <table>
+      <thead><tr>
+        <th style="width:40px">#</th>
+        <th>Name</th>
+        <th>Rank</th>
+        <th>Badge</th>
+        <th>Phone</th>
+        <th>Status</th>
+      </tr></thead><tbody>`
+    for (const r of rows) {
+      const rowClass = r.currently_sick ? 'sick-row' : (r.recalled_today ? 'recalled-row' : '')
+      const nameClass = r.currently_sick ? 'badge-sick' : (r.recalled_today ? 'badge-recalled' : '')
+      let statusParts = []
+      if (r.currently_sick) {
+        const since = r.sick_since ? ` since ${fmtDateShort(r.sick_since.split('T')[0])}` : ''
+        statusParts.push(`SICK${since}`)
+      }
+      if (r.recalled_today) {
+        const label = recallTypeLabel(r.recalled_today_type)
+        const time = r.recalled_today_time ? ` @ ${r.recalled_today_time}` : ''
+        statusParts.push(`Recalled${time} (${label})`)
+      }
+      t += `<tr class="${rowClass}">
+        <td>${r.list_position}</td>
+        <td><span class="${nameClass}">${esc(r.name)}</span></td>
+        <td>${esc(r.rank)}</td>
+        <td>${esc(r.badge_number || '—')}</td>
+        <td>${esc(r.phone || '—')}</td>
+        <td>${statusParts.join(' / ') || '—'}</td>
+      </tr>`
+    }
+    t += `</tbody></table>`
+    return t
+  }
+
+  html += renderList(d.section1.captains, 'Captains')
+  html += renderList(d.section1.ff, 'Firefighters')
+  html += `
+    <p style="font-size:11px;margin-top:8px;color:#555;">
+      <strong>★ SICK</strong> = currently out sick &nbsp;|&nbsp; <strong>✓</strong> = recalled this shift (${fmtDateShort(d.shift_date)})
+    </p>
+  </div>`
+
+  // Section 2 — Recall History
+  html += `<div class="section">
+    <h3>SECTION 2 &mdash; RECALL HISTORY (Last ${d.history_days} Days)</h3>`
+  if (!d.section2.length) {
+    html += `<p style="color:#888;font-style:italic">No recalls recorded in this period.</p>`
+  } else {
+    html += `<table>
+      <thead><tr>
+        <th>Date</th>
+        <th>Member Recalled</th>
+        <th>Type</th>
+        <th>Covered For</th>
+        <th>Notified</th>
+        <th>Officer</th>
+      </tr></thead><tbody>`
+    for (const r of d.section2) {
+      html += `<tr>
+        <td>${fmtDateShort(r.shift_date)}</td>
+        <td>${esc(r.name)} <span style="font-size:11px;color:#666;">(${esc(r.rank)})</span></td>
+        <td>${esc(recallTypeLabel(r.recall_type))}</td>
+        <td>${r.covered_name ? esc(r.covered_name) : '—'}</td>
+        <td>${r.recall_start_time ? esc(r.recall_start_time) : '—'}</td>
+        <td>${esc(r.recorded_by || '—')}</td>
+      </tr>`
+    }
+    html += `</tbody></table>`
+  }
+  html += `</div>`
+
+  // Section 3 — Sick List
+  html += `<div class="section">
+    <h3>SECTION 3 &mdash; CURRENT SICK LIST (Tour ${d.group})</h3>`
+  if (!d.section3.length) {
+    html += `<p style="color:#888;font-style:italic">No members currently on sick leave.</p>`
+  } else {
+    html += `<table>
+      <thead><tr>
+        <th>Name</th>
+        <th>Rank</th>
+        <th>Date Sick Started</th>
+        <th>Days Out</th>
+        <th>Notes</th>
+      </tr></thead><tbody>`
+    for (const s of d.section3) {
+      html += `<tr>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${esc(s.rank)}</td>
+        <td>${fmtDateShort(s.marked_sick_date ? s.marked_sick_date.split('T')[0] : '')}</td>
+        <td>${s.days_out} day${s.days_out === 1 ? '' : 's'}</td>
+        <td>${esc(s.notes || '—')}</td>
+      </tr>`
+    }
+    html += `</tbody></table>`
+  }
+  html += `</div>`
+
+  html += `<p style="font-size:10px;color:#888;margin-top:20px;text-align:right;">
+    Report generated ${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})} ET
+  </p>`
+
+  document.getElementById('loading').style.display = 'none'
+  document.getElementById('report').innerHTML = html
+  document.getElementById('report').style.display = 'block'
+}
+
+function esc(s) {
+  if (s == null) return ''
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+// Init — set group to current on-duty tour by default
+window.addEventListener('DOMContentLoaded', () => {
+  const g = currentGroup()
+  document.getElementById('groupSel').value = g
+  loadReport()
+})
+</script>
+</body>
+</html>
