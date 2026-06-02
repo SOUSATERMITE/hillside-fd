@@ -1,0 +1,31 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Deploy to Netlify
+        run: npx netlify-cli deploy --prod --dir=public --functions=netlify/functions
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Verify deploy
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "https://hillside-fd-624.netlify.app/recall/")
+          echo "Recall page HTTP $STATUS"
+          if [ "$STATUS" != "200" ]; then echo "FAIL: site returned $STATUS"; exit 1; fi
+          echo "PASS: site is live"

@@ -1,5 +1,27 @@
 # Hillside Fire Department — Project Brain
 
+## DEPLOYMENT — CRITICAL
+
+hillside-fd-624.netlify.app has **NO GitHub auto-deploy connection** (repo: null in Netlify).
+
+**Auto-deploy is now handled by GitHub Actions** (`.github/workflows/deploy.yml`).
+Every push to `main` triggers the workflow which runs `netlify deploy --prod` automatically.
+
+If you need to deploy manually (e.g. emergency fix without a push):
+```
+cd "C:/Users/sousa/hillside-fd"
+NETLIFY_AUTH_TOKEN=nfp_UzuAXo6VghoT48BdsWVn8nBH2mDeUGWNc61c netlify deploy --prod --dir=public --functions=netlify/functions --site=350e74fc-326c-4313-b510-67efb40fddbe
+```
+
+**Never assume a git push deployed to Netlify** — always wait for the GitHub Actions workflow to complete, or run the manual command above and verify with:
+```
+curl -s -o /dev/null -w "%{http_code}" https://hillside-fd-624.netlify.app/recall/
+```
+
+GitHub Actions secrets set: `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`
+
+---
+
 ## Project Purpose
 Web app for Hillside Fire Department to manage daily operations: sick tracking, recall list, officer vacation requests, documents, policy search, and an operational dashboard. Phil Sousa is the DC and the admin.
 
