@@ -185,7 +185,7 @@ exports.handler = async (event) => {
 
   const histData = histRes.data || []
   if (!histData.length) {
-    doc.font('Helvetica').fontSize(9).fillColor('#666666').text('No recalls recorded in the last 7 days.', M, doc.y)
+    doc.font('Helvetica').fontSize(9).fillColor('#666666').text('No recalls recorded in the last 30 days.', M, doc.y)
     doc.moveDown(0.5)
   } else {
     const cols2 = [68, 90, 72, 90, 62, 76]  // Date, Member, Type, Covered For, Notified, Officer

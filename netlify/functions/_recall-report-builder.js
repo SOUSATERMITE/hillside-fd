@@ -162,4 +162,4 @@ function buildEmailHtml(group, todayShift, historyDays, { rlData, sickData, sick
   return html
 }
 
-module.exports = { buildGroupReport, buildEmailHtml, makeTransport, fromAddr, currentShiftDate, HISTORY_DAYS: 7 }
+module.exports = { buildGroupReport, buildEmailHtml, makeTransport, fromAddr, currentShiftDate, HISTORY_DAYS: 30 }

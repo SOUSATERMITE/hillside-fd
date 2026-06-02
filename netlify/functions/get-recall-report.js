@@ -35,7 +35,7 @@ exports.handler = async (event) => {
   if (!group || group < 1 || group > 4) {
     return { statusCode: 400, headers, body: JSON.stringify({ error: 'group param must be 1–4' }) }
   }
-  const days = Math.min(parseInt(params.days, 10) || 7, 90)
+  const days = Math.min(parseInt(params.days, 10) || 30, 90)
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
