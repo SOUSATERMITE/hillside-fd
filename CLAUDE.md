@@ -2,23 +2,26 @@
 
 ## DEPLOYMENT — CRITICAL
 
-hillside-fd-624.netlify.app has **NO GitHub auto-deploy connection** (repo: null in Netlify).
+**Production URL**: `https://hillside-fd.netlify.app` (site ID `6f61044e-fc21-4db6-99dc-a1e084da5e42`)
+**Netlify account**: `sousatermite@gmail.com` — CLI token in `%APPDATA%\netlify\Config\config.json`
 
-**Auto-deploy is now handled by GitHub Actions** (`.github/workflows/deploy.yml`).
-Every push to `main` triggers the workflow which runs `netlify deploy --prod` automatically.
+The site has **NO GitHub auto-deploy connection** (repo: null in Netlify).
+**Auto-deploy is handled by GitHub Actions** (`.github/workflows/deploy.yml`) — every push to `main` runs `netlify deploy --prod` automatically.
 
-If you need to deploy manually (e.g. emergency fix without a push):
+Manual deploy command (uses Gmail account token):
 ```
 cd "C:/Users/sousa/hillside-fd"
-NETLIFY_AUTH_TOKEN=nfp_UzuAXo6VghoT48BdsWVn8nBH2mDeUGWNc61c netlify deploy --prod --dir=public --functions=netlify/functions --site=350e74fc-326c-4313-b510-67efb40fddbe
+NETLIFY_AUTH_TOKEN=nfc_4Qjo4D8aCy2qZ9gGU5pnJ2qsQmjBPGmud5c4 netlify deploy --prod --dir=public --functions=netlify/functions --site=6f61044e-fc21-4db6-99dc-a1e084da5e42
 ```
 
-**Never assume a git push deployed to Netlify** — always wait for the GitHub Actions workflow to complete, or run the manual command above and verify with:
+**WRONG site to avoid**: `hillside-fd-624.netlify.app` (site ID `350e74fc`) is under the AOL account — officers do NOT use this URL. Always deploy to `6f61044e`.
+
+Verify after deploy:
 ```
-curl -s -o /dev/null -w "%{http_code}" https://hillside-fd-624.netlify.app/recall/
+curl -s -o /dev/null -w "%{http_code}" https://hillside-fd.netlify.app/recall/
 ```
 
-GitHub Actions secrets set: `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`
+GitHub Actions secrets: `NETLIFY_AUTH_TOKEN` (Gmail CLI token), `NETLIFY_SITE_ID` (`6f61044e-fc21-4db6-99dc-a1e084da5e42`)
 
 ---
 
@@ -46,7 +49,7 @@ Web app for Hillside Fire Department to manage daily operations: sick tracking, 
 - **Frontend**: Vanilla HTML/JS, Tailwind CSS via CDN, no build step
 - **Backend**: Netlify Functions (Node.js CommonJS) in `/netlify/functions/`
 - **Database**: Supabase (PostgreSQL), project ref `oyyxbfguzmpsidcsgsyf`
-- **Hosting**: Netlify, site ID `350e74fc-326c-4313-b510-67efb40fddbe`, URL `hillside-fd-624.netlify.app`
+- **Hosting**: Netlify, site ID `6f61044e-fc21-4db6-99dc-a1e084da5e42`, URL `hillside-fd.netlify.app` (Gmail account)
 - **Netlify account**: sousatermite@gmail.com (NOT sousatermite@aol.com — that's a different account)
 - **GitHub repo**: `SOUSATERMITE/hillside-fd`, branch `main`
 - **Deploy**: `git push origin main` → Netlify auto-deploys. Manual deploy: `netlify deploy --prod --dir=public` (must be logged into gmail account)

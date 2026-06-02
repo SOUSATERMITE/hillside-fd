@@ -25,7 +25,7 @@ jobs:
 
       - name: Verify deploy
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "https://hillside-fd-624.netlify.app/recall/")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "https://hillside-fd.netlify.app/recall/")
           echo "Recall page HTTP $STATUS"
           if [ "$STATUS" != "200" ]; then echo "FAIL: site returned $STATUS"; exit 1; fi
           echo "PASS: site is live"
