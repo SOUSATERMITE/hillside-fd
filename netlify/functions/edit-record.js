@@ -7,7 +7,7 @@ const RECALL_FIELDS    = new Set(['shift_date', 'recall_start_time', 'recall_end
 const APPARATUS_FIELDS = new Set(['description', 'priority', 'finding_type', 'status', 'scheduled_date', 'completed_date', 'completed_by', 'assigned_to', 'resolution_notes', 'photos_notes'])
 const VACATION_FIELDS  = new Set(['request_date', 'cancelled_dates', 'new_dates', 'status', 'captain_action_date', 'dc_action_date', 'chief_action_date', 'denial_reason', 'staffing_impact', 'impact_explanation'])
 
-const VALID_RECALL_TYPES     = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution'])
+const VALID_RECALL_TYPES     = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution', 'manual_ot'])
 const VALID_FINDING_STATUSES = new Set(['open', 'in_progress', 'completed', 'cancelled'])
 const VALID_VACATION_STATUSES = new Set(['pending', 'captain_approved', 'dc_approved', 'approved', 'denied'])
 

@@ -124,5 +124,48 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ success: true }) }
   }
 
+  // ── Manual sick entry (backfill a missed sick occurrence) ─────────────────
+  if (action === 'add_manual_sick') {
+    const { firefighter_id, marked_sick_date, cleared_date, notes } = body
+    if (!firefighter_id || !marked_sick_date) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'firefighter_id and marked_sick_date required' }) }
+    }
+    const insert = {
+      firefighter_id,
+      marked_sick_date: new Date(marked_sick_date + 'T12:00:00').toISOString(),
+      marked_sick_by:   officer.display_name,
+      officer_id:       officer.officer_id,
+      notes:            notes?.trim().slice(0, 2000) || null
+    }
+    if (cleared_date) {
+      insert.cleared_date  = new Date(cleared_date + 'T12:00:00').toISOString()
+      insert.cleared_by    = officer.display_name
+      insert.confirmed_24hr = true // historical backfill — already resolved, doesn't block active recall eligibility
+    }
+    const { data, error } = await supabase.from('sick_log').insert(insert).select().single()
+    if (error) return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
+    return { statusCode: 200, headers, body: JSON.stringify(data) }
+  }
+
+  // ── Manual OT / recall entry (backfill a missed overtime occurrence) ──────
+  if (action === 'add_manual_ot') {
+    const { firefighter_id, shift_date, hours_worked, tour_worked, notes } = body
+    if (!firefighter_id || !shift_date || !hours_worked) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'firefighter_id, shift_date, and hours_worked required' }) }
+    }
+    const { data, error } = await supabase.from('recall_log').insert({
+      firefighter_id,
+      shift_date,
+      recall_type:  'manual_ot',
+      hours_worked: parseFloat(hours_worked),
+      tour_worked:  tour_worked?.trim() || null,
+      recorded_by:  officer.display_name,
+      officer_id:   officer.officer_id,
+      notes:        notes?.trim().slice(0, 2000) || null
+    }).select().single()
+    if (error) return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) }
+    return { statusCode: 200, headers, body: JSON.stringify(data) }
+  }
+
   return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid action' }) }
 }

@@ -133,7 +133,10 @@
         <div class="section-card">
           <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Sick History</h3>
-            <div id="sickTotals" class="text-xs text-gray-500"></div>
+            <div class="flex items-center gap-3">
+              <div id="sickTotals" class="text-xs text-gray-500"></div>
+              <button id="addSickBtn" class="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hidden" onclick="showManualSickModal()">+ Add Manual Entry</button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <table class="data-table">
@@ -150,7 +153,10 @@
         <div class="section-card">
           <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 class="font-bold text-gray-700 text-sm uppercase tracking-wide">Recall / OT History</h3>
-            <div id="recallTotals" class="text-xs text-gray-500"></div>
+            <div class="flex items-center gap-3">
+              <div id="recallTotals" class="text-xs text-gray-500"></div>
+              <button id="addOtBtn" class="btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 hidden" onclick="showManualOtModal()">+ Add Manual Entry</button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <table class="data-table">
@@ -242,6 +248,68 @@
   </div>
 </div>
 
+<!-- ── Manual Sick Entry Modal ──────────────────────────────────────────────── -->
+<div id="manualSickModal" class="hidden">
+  <div class="modal-overlay" onclick="if(event.target===this)closeManualSickModal()">
+    <div class="modal-box p-6">
+      <h3 class="text-lg font-extrabold text-gray-800 mb-1">Add Manual Sick Entry</h3>
+      <p class="text-xs text-gray-400 mb-4">For sick time the system missed — e.g. a historical occurrence that was never entered.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Sick Date *</label>
+          <input id="msSickDate" type="date">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Return Date (leave blank if still out)</label>
+          <input id="msClearedDate" type="date">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Notes</label>
+          <textarea id="msNotes" rows="2" placeholder="Optional"></textarea>
+        </div>
+        <div id="msError" class="hidden text-red-600 text-sm"></div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn-primary flex-1" onclick="submitManualSick()">Save</button>
+        <button class="btn-sm bg-gray-100 text-gray-600 flex-1 py-2" onclick="closeManualSickModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Manual OT Entry Modal ────────────────────────────────────────────────── -->
+<div id="manualOtModal" class="hidden">
+  <div class="modal-overlay" onclick="if(event.target===this)closeManualOtModal()">
+    <div class="modal-box p-6">
+      <h3 class="text-lg font-extrabold text-gray-800 mb-1">Add Manual OT Entry</h3>
+      <p class="text-xs text-gray-400 mb-4">For overtime the system missed — e.g. worked outside the normal recall rotation.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Shift Date *</label>
+          <input id="moShiftDate" type="date">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Hours Worked *</label>
+          <input id="moHours" type="number" step="0.5" min="0" max="24" placeholder="e.g. 10">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Tour</label>
+          <input id="moTour" type="text" maxlength="1" placeholder="1-4, optional">
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Notes</label>
+          <textarea id="moNotes" rows="2" placeholder="Optional"></textarea>
+        </div>
+        <div id="moError" class="hidden text-red-600 text-sm"></div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn-primary flex-1" onclick="submitManualOt()">Save</button>
+        <button class="btn-sm bg-gray-100 text-gray-600 flex-1 py-2" onclick="closeManualOtModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="authModal"></div>
 <script src="/auth.js"></script>
 <script>
@@ -260,9 +328,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/'
     return
   }
-  // Show upload/note controls for admins
+  // Show upload/note/manual-entry controls for admins
   document.getElementById('uploadBtn').classList.remove('hidden')
   document.getElementById('addNoteBtn').classList.remove('hidden')
+  document.getElementById('addSickBtn').classList.remove('hidden')
+  document.getElementById('addOtBtn').classList.remove('hidden')
   loadPersonnel()
 })
 
@@ -413,12 +483,12 @@ function renderSickHistory(history, stats) {
 
 function renderRecallHistory(history, stats) {
   const tbody = document.getElementById('recallTbody')
-  const worked  = history.filter(r => ['full_shift','short_min','substitution'].includes(r.recall_type))
+  const worked  = history.filter(r => ['full_shift','short_min','substitution','manual_ot'].includes(r.recall_type))
   const refused = history.filter(r => r.recall_type === 'refused')
   document.getElementById('recallTotals').textContent = `${worked.length} worked · ${refused.length} refused · ${stats.ytd_ot_hours}h OT`
   if (!history.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-gray-400 italic text-center py-4">No recall history on record</td></tr>'; return }
 
-  const typeLabel = { full_shift:'Full Shift', short_min:'Short Min', substitution:'Substitution', refused:'Refused' }
+  const typeLabel = { full_shift:'Full Shift', short_min:'Short Min', substitution:'Substitution', refused:'Refused', manual_ot:'Manual OT' }
   tbody.innerHTML = history.map(r => {
     const isRefused = r.recall_type === 'refused'
     const badge = isRefused
@@ -622,6 +692,70 @@ async function deleteNote(noteId) {
     body: JSON.stringify({ action:'delete_note', note_id: noteId })
   })
   await openFile(currentFF.id); switchTab('notes')
+}
+
+// ── Manual sick entry ─────────────────────────────────────────────────────────
+function showManualSickModal() {
+  document.getElementById('msSickDate').value = ''
+  document.getElementById('msClearedDate').value = ''
+  document.getElementById('msNotes').value = ''
+  document.getElementById('msError').classList.add('hidden')
+  document.getElementById('manualSickModal').classList.remove('hidden')
+}
+function closeManualSickModal() {
+  document.getElementById('manualSickModal').classList.add('hidden')
+}
+async function submitManualSick() {
+  const marked_sick_date = document.getElementById('msSickDate').value
+  const cleared_date     = document.getElementById('msClearedDate').value
+  const notes            = document.getElementById('msNotes').value.trim()
+  const errEl = document.getElementById('msError')
+  errEl.classList.add('hidden')
+
+  if (!marked_sick_date) { errEl.textContent = 'Sick date is required'; errEl.classList.remove('hidden'); return }
+  if (cleared_date && cleared_date < marked_sick_date) { errEl.textContent = 'Return date cannot be before sick date'; errEl.classList.remove('hidden'); return }
+
+  const res = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'add_manual_sick', firefighter_id: currentFF.id, marked_sick_date, cleared_date: cleared_date || null, notes })
+  })
+  if (!res.ok) { const e = await res.json(); errEl.textContent = e.error || 'Failed to save'; errEl.classList.remove('hidden'); return }
+  closeManualSickModal()
+  await openFile(currentFF.id); switchTab('sick')
+}
+
+// ── Manual OT entry ───────────────────────────────────────────────────────────
+function showManualOtModal() {
+  document.getElementById('moShiftDate').value = ''
+  document.getElementById('moHours').value = ''
+  document.getElementById('moTour').value = ''
+  document.getElementById('moNotes').value = ''
+  document.getElementById('moError').classList.add('hidden')
+  document.getElementById('manualOtModal').classList.remove('hidden')
+}
+function closeManualOtModal() {
+  document.getElementById('manualOtModal').classList.add('hidden')
+}
+async function submitManualOt() {
+  const shift_date   = document.getElementById('moShiftDate').value
+  const hours_worked = document.getElementById('moHours').value
+  const tour_worked  = document.getElementById('moTour').value.trim()
+  const notes        = document.getElementById('moNotes').value.trim()
+  const errEl = document.getElementById('moError')
+  errEl.classList.add('hidden')
+
+  if (!shift_date) { errEl.textContent = 'Shift date is required'; errEl.classList.remove('hidden'); return }
+  if (!hours_worked || parseFloat(hours_worked) <= 0) { errEl.textContent = 'Hours worked is required'; errEl.classList.remove('hidden'); return }
+
+  const res = await fetch(`${API}/manage-personnel-docs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+    body: JSON.stringify({ action:'add_manual_ot', firefighter_id: currentFF.id, shift_date, hours_worked, tour_worked, notes })
+  })
+  if (!res.ok) { const e = await res.json(); errEl.textContent = e.error || 'Failed to save'; errEl.classList.remove('hidden'); return }
+  closeManualOtModal()
+  await openFile(currentFF.id); switchTab('recall')
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

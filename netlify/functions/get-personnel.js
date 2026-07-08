@@ -42,7 +42,7 @@ exports.handler = async (event) => {
     .from('recall_log')
     .select('firefighter_id, hours_worked')
     .gte('shift_date', yearStart)
-    .in('recall_type', ['full_shift', 'short_min', 'substitution'])
+    .in('recall_type', ['full_shift', 'short_min', 'substitution', 'manual_ot'])
     .eq('deleted', false)
 
   // Build per-FF maps

@@ -320,7 +320,8 @@
       refused:             'Refused',
       refused_no_penalty:  'No Penalty',
       vacation_skip:       'Vac Skip',
-      substitution:        'Sub'
+      substitution:        'Sub',
+      manual_ot:           'Manual OT'
     }
 
     function renderLog(entries) {
@@ -347,7 +348,8 @@
           refused:            'bg-red-100 text-red-700',
           refused_no_penalty: 'bg-orange-100 text-orange-700',
           vacation_skip:      'bg-gray-100 text-gray-600',
-          substitution:       'bg-blue-100 text-blue-700'
+          substitution:       'bg-blue-100 text-blue-700',
+          manual_ot:          'bg-purple-100 text-purple-700'
         }[e.recall_type] || 'bg-gray-100 text-gray-600'
         const timeStr = (e.recall_start_time || e.recall_end_time)
           ? `${e.recall_start_time || '?'}–${e.recall_end_time || '?'}` : '—'

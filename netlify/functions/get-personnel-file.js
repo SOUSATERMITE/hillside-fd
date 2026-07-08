@@ -119,7 +119,7 @@ exports.handler = async (event) => {
   // YTD stats
   const sickYTD   = sickHistory.filter(s => s.out_date >= yearStart)
   const ytdSickDays = sickYTD.reduce((n, s) => n + s.days_out, 0)
-  const recallYTD = (recallRes.data || []).filter(r => r.shift_date >= yearStart && ['full_shift','short_min','substitution'].includes(r.recall_type))
+  const recallYTD = (recallRes.data || []).filter(r => r.shift_date >= yearStart && ['full_shift','short_min','substitution','manual_ot'].includes(r.recall_type))
   const ytdOTHours = recallYTD.reduce((n, r) => n + (r.hours_worked || 0), 0)
   const lastSick   = sickHistory[0]?.out_date || null
   const lastRecall = (recallRes.data || []).filter(r => r.recall_type !== 'refused')[0]?.shift_date || null
