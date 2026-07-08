@@ -5,6 +5,11 @@
 
 [functions]
   node_bundler = "esbuild"
+  # pdfkit reads its font data files (data/*.afm) via __dirname-relative paths at
+  # runtime. esbuild's single-file bundle breaks that (__dirname no longer points
+  # at pdfkit's own directory), so pdfkit must ship unbundled as a real
+  # node_modules dependency instead.
+  external_node_modules = ["pdfkit"]
 
 [[redirects]]
   from = "/sick"
