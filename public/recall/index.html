@@ -222,26 +222,30 @@
       }
       document.getElementById('recallPerson').innerHTML = personHtml
 
-      // Substitute dropdown: full tour roster (FF + Captains), grouped by rank, sorted by name —
-      // not rotation order — since this is a manual override for when the normal recall order breaks down.
-      const byName = (a, b) => ((a.firefighters || {}).name || '').localeCompare((b.firefighters || {}).name || '')
+      // Substitute dropdown: full roster (FF + Captains) across ALL tours, grouped by
+      // tour — a bad recall may require pulling someone from a different tour to cover.
+      const rankOrder = { Captain: 0, FF: 1 }
+      const byRankThenName = (a, b) => {
+        const ra = rankOrder[(a.firefighters || {}).rank] ?? 2
+        const rb = rankOrder[(b.firefighters || {}).rank] ?? 2
+        if (ra !== rb) return ra - rb
+        return ((a.firefighters || {}).name || '').localeCompare((b.firefighters || {}).name || '')
+      }
       const subOption = e => {
         const ff = e.firefighters || {}
         const sl = getSickLabel(e)
         const badge = ff.badge_number ? `Badge ${ff.badge_number}` : 'No badge on file'
         const phone = ff.phone || 'No phone on file'
-        const label = `${ff.rank || '?'} — ${ff.name || '—'} — ${badge} — ${phone}${sl ? ` (${sl})` : ''}`
+        const label = `${ff.rank || '?'} — ${ff.name || '—'} — ${badge} — ${phone} — Tour ${ff.group_number || '?'}${sl ? ` (${sl})` : ''}`
         return `<option value="${e.id}">${label}</option>`
       }
+      const allTours = data.all_tours || []
       let subHtml = '<option value="">Who substituted?...</option>'
-      if (capEntries.length) {
-        subHtml += '<optgroup label="Captains">'
-        for (const e of [...capEntries].sort(byName)) subHtml += subOption(e)
-        subHtml += '</optgroup>'
-      }
-      if (ffEntries.length) {
-        subHtml += '<optgroup label="Firefighters">'
-        for (const e of [...ffEntries].sort(byName)) subHtml += subOption(e)
+      for (const tourNum of [1, 2, 3, 4]) {
+        const tourEntries = allTours.filter(e => (e.firefighters || {}).group_number === tourNum)
+        if (!tourEntries.length) continue
+        subHtml += `<optgroup label="Tour ${tourNum}">`
+        for (const e of tourEntries.sort(byRankThenName)) subHtml += subOption(e)
         subHtml += '</optgroup>'
       }
       document.getElementById('subPerson').innerHTML = subHtml

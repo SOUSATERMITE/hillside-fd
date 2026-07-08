@@ -34,8 +34,8 @@ exports.handler = async (event) => {
 
     if (sickError) throw sickError
 
-    // Recently cleared: cleared_date within last 96 hours
-    const cutoffISO = new Date(Date.now() - 96 * 3600 * 1000).toISOString()
+    // Returned to duty: cleared_date this calendar year (Jan 1 through today)
+    const cutoffISO = new Date(`${new Date().getFullYear()}-01-01T00:00:00.000Z`).toISOString()
 
     const { data: recentlyCleared, error: clearedError } = await supabase
       .from('sick_log')

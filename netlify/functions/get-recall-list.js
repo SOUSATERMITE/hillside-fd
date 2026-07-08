@@ -43,7 +43,7 @@ exports.handler = async (event) => {
     const firefighterIds = recallEntries.map(e => e.firefighter_id)
     const safeIds = firefighterIds.length > 0 ? firefighterIds : ['00000000-0000-0000-0000-000000000000']
 
-    const [sickResult, pendingResult, logResult] = await Promise.all([
+    const [sickResult, pendingResult, logResult, allToursResult] = await Promise.all([
       // Currently sick (not yet cleared)
       supabase.from('sick_log')
         .select('firefighter_id, marked_sick_date')
@@ -62,12 +62,19 @@ exports.handler = async (event) => {
         .eq('deleted', false)
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(50),
+      // Full FF+Captain roster across ALL tours — for the "someone else took this
+      // shift" substitute picker, since a DC may need to pull anyone from any tour.
+      supabase.from('recall_list')
+        .select('*, firefighters(id, name, rank, group_number, badge_number, phone)')
+        .order('group_number', { ascending: true })
+        .order('rank_type', { ascending: true })
     ])
 
     if (sickResult.error) throw sickResult.error
     if (pendingResult.error) throw pendingResult.error
     if (logResult.error) throw logResult.error
+    if (allToursResult.error) throw allToursResult.error
 
     const sickMap = {}
     for (const s of sickResult.data) {
@@ -88,11 +95,12 @@ exports.handler = async (event) => {
     const ff = annotated.filter(e => e.rank_type === 'FF')
     const captains = annotated.filter(e => e.rank_type === 'Captain')
     const logEntries = logResult.data
+    const allTours = (allToursResult.data || []).filter(e => e.rank_type === 'FF' || e.rank_type === 'Captain')
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ff, captains, log: logEntries || [] })
+      body: JSON.stringify({ ff, captains, log: logEntries || [], all_tours: allTours })
     }
   } catch (e) {
     console.error('[get-recall-list] error:', e.message)

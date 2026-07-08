@@ -142,7 +142,7 @@ exports.handler = async (event) => {
     const groupFFIds = allEntries.map(e => e.firefighter_id)
     const safeIds = groupFFIds.length > 0 ? groupFFIds : ['00000000-0000-0000-0000-000000000000']
 
-    const [logInsert, listResult, sickResult, logResult] = await Promise.all([
+    const [logInsert, listResult, sickResult, logResult, allToursResult] = await Promise.all([
       supabase.from('recall_log').insert({
         firefighter_id,
         shift_date: today,
@@ -169,13 +169,19 @@ exports.handler = async (event) => {
         .eq('deleted', false)
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })
-        .limit(50)
+        .limit(50),
+      // Full FF+Captain roster across ALL tours — for the substitute picker
+      supabase.from('recall_list')
+        .select('*, firefighters(id, name, rank, group_number, badge_number, phone)')
+        .order('group_number', { ascending: true })
+        .order('rank_type', { ascending: true })
     ])
 
     if (logInsert.error) throw logInsert.error
     if (listResult.error) throw listResult.error
     if (sickResult.error) throw sickResult.error
     if (logResult.error) throw logResult.error
+    if (allToursResult.error) throw allToursResult.error
 
     const sickMap = {}
     for (const s of sickResult.data) {
@@ -193,7 +199,8 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         ff: annotated.filter(e => e.rank_type === 'FF'),
         captains: annotated.filter(e => e.rank_type === 'Captain'),
-        log: logResult.data || []
+        log: logResult.data || [],
+        all_tours: (allToursResult.data || []).filter(e => e.rank_type === 'FF' || e.rank_type === 'Captain')
       })
     }
   } catch (e) {

@@ -92,11 +92,11 @@
         </div>
       </div>
 
-      <!-- Returned to Duty (last 96 hours) -->
+      <!-- Returned to Duty (year to date) -->
       <div>
         <h2 class="font-bold text-gray-700 uppercase tracking-wide text-sm mb-3">
           Returned to Duty <span id="rtdCount" class="ml-1 bg-green-600 text-white text-xs rounded-full px-2 py-0.5">0</span>
-          <span class="normal-case font-normal text-gray-400 tracking-normal">— last 96 hours</span>
+          <span class="normal-case font-normal text-gray-400 tracking-normal">— year to date</span>
         </h2>
         <div id="returnedToDutyList">
           <div class="text-gray-400 text-sm text-center py-8">Loading...</div>
@@ -209,7 +209,7 @@
       document.getElementById('rtdCount').textContent = entries.length
 
       if (entries.length === 0) {
-        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-xl border border-gray-200">No one returned to duty in the last 96 hours</div>'
+        container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 bg-white rounded-xl border border-gray-200">No one returned to duty so far this year</div>'
         return
       }
 
