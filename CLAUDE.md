@@ -41,6 +41,7 @@ Web app for Hillside Fire Department to manage daily operations: sick tracking, 
 | `/search` | `search/index.html` | Full-text search across policies and documents |
 | `/vacation` | `vacation/index.html` | FF submits vacation change request; officers approve via email link |
 | `/admin` | `admin/index.html` | Password-protected: manage firefighters, positions, logs, officer accounts |
+| `/contacts/business` | `contacts/business/index.html` | Property/business owner emergency contacts — viewable by anyone (no login required), editable by officers/chiefs |
 
 ---
 
@@ -223,6 +224,25 @@ Stores uploaded file metadata; actual files in Supabase Storage bucket.
 | active | bool | |
 | created_at | timestamptz | |
 
+### `business_contacts`
+Property/business owner emergency contacts, separate from the general `contacts` directory. No RLS-bypassing concerns — all access goes through Netlify functions.
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid pk | |
+| business_name | text | |
+| address | text | nullable |
+| premises_phone | text | nullable |
+| owner_name | text | nullable |
+| owner_phone | text | nullable |
+| emergency_contact_1_name | text | nullable |
+| emergency_contact_1_phone | text | nullable |
+| emergency_contact_2_name | text | nullable |
+| emergency_contact_2_phone | text | nullable |
+| emergency_contact_3_name | text | nullable |
+| emergency_contact_3_phone | text | nullable |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
 ---
 
 ## Netlify Functions
@@ -290,6 +310,12 @@ All in `/netlify/functions/`. CommonJS. All include CORS headers.
 | `manage-events.js` | POST | Officer | Add scheduled events |
 | `manage-work-orders.js` | POST | Officer | Submit/update work orders |
 | `manage-contacts.js` | POST | Officer | Add/edit/delete contacts |
+
+### Business Contacts
+| Function | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `get-business-contacts.js` | GET | None | List all business contacts — deliberately open, no login, so FFs can pull it up at a scene |
+| `manage-business-contacts.js` | POST | Officer or Admin | Add/edit/delete a business contact |
 
 ### Utilities
 | Function | Method | Auth | Purpose |
@@ -401,4 +427,5 @@ Do NOT delete from `sick_log`, `recall_log`, or `recall_list` as part of cleanin
 - **Netlify accounts**: There are TWO Netlify accounts. `hillside-fd.netlify.app` is under `sousatermite@gmail.com`. The AOL account has other sites (sousa-referral, sousapest.com). Always deploy hillside-fd from the gmail account.
 - **Database migrations**: DDL requires a Supabase Personal Access Token (`SUPABASE_ACCESS_TOKEN` Netlify env var, token name "Claude"). Use the Management API: `POST https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query`. The service role key cannot run DDL.
 - **Magic tokens table**: `supabase/magic_tokens.sql` must also be run in Supabase if not already done.
+- **Business contacts table**: `supabase/migration_business_contacts.sql` must be run in the Supabase SQL editor before `get-business-contacts.js`/`manage-business-contacts.js` will work — the `SUPABASE_ACCESS_TOKEN` Management API PAT has been invalid/unauthorized every time it's been tested this project, so DDL has to be run manually.
 - **Captains in firefighters table**: Captains and DCs appear in BOTH the `officers` table (for login) AND the `firefighters` table (for sick tracking and recall list). Do not remove officers from `firefighters` — it breaks operational tracking.

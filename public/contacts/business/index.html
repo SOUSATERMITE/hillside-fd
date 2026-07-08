@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#b71c1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hillside FD">
+  <link rel="manifest" href="/manifest.json">
+  <title>Business Contacts — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    select, button, input, textarea { min-height: 44px; }
+    nav { padding-top: max(12px, env(safe-area-inset-top)); background: #1a5c2a; }
+    nav button, nav a { min-height: 0 !important; }
+    #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); background: #1a5c2a; }
+    .nav-active { font-weight:700; border-bottom:2px solid rgba(255,255,255,0.85); }
+    .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
+    .biz-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; }
+    .tel-link { color:#1a5c2a; font-weight:600; text-decoration:none; }
+    .tel-link:hover { text-decoration:underline; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px; }
+    .modal-box { background:#fff; border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:100%; max-width:520px; max-height:90vh; overflow-y:auto; }
+    input, textarea { border:1px solid #d1d5db; border-radius:10px; padding:9px 12px; font-size:14px; width:100%; outline:none; }
+    input:focus, textarea:focus { border-color:#1a5c2a; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="authModal"></div>
+
+  <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+    <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
+    <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
+      <a href="/"        class="hover:text-green-200 pb-0.5">Dashboard</a>
+      <a href="/sick"     class="hover:text-green-200 pb-0.5">Sick Tracking</a>
+      <a href="/recall"   class="hover:text-green-200 pb-0.5">Recall List</a>
+      <a href="/docs"     class="hover:text-green-200 pb-0.5">Documents</a>
+      <a href="/vacation" class="hover:text-green-200 pb-0.5">Vacation</a>
+      <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
+      <a href="/scba"      class="hover:text-green-200 pb-0.5">SCBA</a>
+      <a href="/personnel" data-admin-only class="hidden hover:text-green-200 pb-0.5">Personnel</a>
+      <a href="/contacts/business" class="nav-active pb-0.5">Business Contacts</a>
+      <a href="/admin"    class="hover:text-green-200 pb-0.5">Admin</a>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="authSlot" class="flex items-center gap-2"></span>
+      <button onclick="toggleMobileMenu()" class="sm:hidden text-white rounded px-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;font-size:22px;line-height:1;background:none;border:none;cursor:pointer;" aria-label="Menu">&#9776;</button>
+    </div>
+  </nav>
+  <div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
+  <div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 80px);">
+    <a href="/"        onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+    <a href="/sick"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Sick Tracking</a>
+    <a href="/recall"   onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Recall List</a>
+    <a href="/docs"     onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Documents</a>
+    <a href="/vacation" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Vacation Requests</a>
+    <a href="/apparatus" onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Apparatus</a>
+    <a href="/scba"      onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">SCBA Management</a>
+    <a href="/personnel" data-admin-only onclick="closeMobileMenu()" class="hidden flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Personnel</a>
+    <a href="/contacts/business" onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold border-b border-green-900" style="min-height:52px;">Business Contacts</a>
+    <a href="/admin"    onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Admin</a>
+  </div>
+
+  <div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+  <div class="max-w-3xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <h1 class="text-2xl font-extrabold text-gray-800">Business Contacts</h1>
+      <button id="addBtn" onclick="showAddModal()" class="hidden bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 py-2.5 text-sm transition">+ Add Business</button>
+    </div>
+    <p class="text-sm text-gray-500 mb-4">Property/business owner emergency contacts. Tap a business to see owner and emergency contact info.</p>
+
+    <input id="searchInput" type="search" placeholder="Search by business name or address..." oninput="filterList()"
+      class="w-full mb-4" style="border:1px solid #d1d5db; border-radius:12px; padding:10px 14px; font-size:14px;">
+
+    <div id="bizList" class="space-y-2">
+      <div class="text-gray-400 text-sm text-center py-10">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div id="bizModal" class="hidden">
+    <div class="modal-overlay" onclick="if(event.target===this)closeBizModal()">
+      <div class="modal-box p-6">
+        <h3 id="bizModalTitle" class="text-lg font-extrabold text-gray-800 mb-4">Add Business</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Business Name *</label>
+            <input id="bzName" type="text" maxlength="200" placeholder="e.g. Hillside Diner">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Address</label>
+            <input id="bzAddress" type="text" maxlength="300" placeholder="Street address">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Premises Phone</label>
+            <input id="bzPremisesPhone" type="tel" maxlength="30" placeholder="On-site phone number">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Owner Name</label>
+              <input id="bzOwnerName" type="text" maxlength="150">
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-gray-500 uppercase mb-1 block">Owner Phone</label>
+              <input id="bzOwnerPhone" type="tel" maxlength="30">
+            </div>
+          </div>
+          <div class="border-t border-gray-200 pt-3">
+            <div class="text-xs font-bold text-gray-500 uppercase mb-2">Emergency Contact 1</div>
+            <div class="grid grid-cols-2 gap-2">
+              <input id="bzEc1Name" type="text" placeholder="Name" maxlength="150">
+              <input id="bzEc1Phone" type="tel" placeholder="Phone" maxlength="30">
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-gray-500 uppercase mb-2">Emergency Contact 2</div>
+            <div class="grid grid-cols-2 gap-2">
+              <input id="bzEc2Name" type="text" placeholder="Name" maxlength="150">
+              <input id="bzEc2Phone" type="tel" placeholder="Phone" maxlength="30">
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-gray-500 uppercase mb-2">Emergency Contact 3</div>
+            <div class="grid grid-cols-2 gap-2">
+              <input id="bzEc3Name" type="text" placeholder="Name" maxlength="150">
+              <input id="bzEc3Phone" type="tel" placeholder="Phone" maxlength="30">
+            </div>
+          </div>
+          <div id="bzError" class="hidden text-red-600 text-sm"></div>
+        </div>
+        <div class="flex gap-2 mt-5">
+          <button class="flex-1 bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl py-2.5 text-sm transition" onclick="submitBiz()">Save</button>
+          <button class="flex-1 bg-gray-100 text-gray-600 font-bold rounded-xl py-2.5 text-sm" onclick="closeBizModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const API = '/.netlify/functions'
+    let allBiz = []
+    let expandedId = null
+    let editingId = null
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+    }
+
+    function showError(msg) {
+      const b = document.getElementById('errorBanner')
+      b.textContent = msg
+      b.classList.remove('hidden')
+      setTimeout(() => b.classList.add('hidden'), 5000)
+    }
+
+    async function loadBiz() {
+      try {
+        const res = await fetch(`${API}/get-business-contacts`)
+        if (!res.ok) throw new Error('Failed to load business contacts')
+        allBiz = await res.json()
+        renderList(allBiz)
+      } catch (e) {
+        document.getElementById('bizList').innerHTML = `<div class="text-red-500 text-sm text-center py-8">${e.message}</div>`
+      }
+    }
+
+    function filterList() {
+      const q = document.getElementById('searchInput').value.trim().toLowerCase()
+      if (!q) { renderList(allBiz); return }
+      renderList(allBiz.filter(b =>
+        (b.business_name || '').toLowerCase().includes(q) ||
+        (b.address || '').toLowerCase().includes(q)
+      ))
+    }
+
+    function telLink(phone) {
+      if (!phone) return '<span class="text-gray-400">—</span>'
+      return `<a href="tel:${phone.replace(/[^0-9+]/g, '')}" class="tel-link">${esc(phone)}</a>`
+    }
+
+    function renderList(list) {
+      const el = document.getElementById('bizList')
+      if (!list.length) { el.innerHTML = '<div class="text-gray-400 text-sm text-center py-10 bg-white rounded-xl border border-gray-200">No businesses found</div>'; return }
+
+      const isOff = AUTH.isOfficer()
+
+      el.innerHTML = list.map(b => {
+        const isExp = expandedId === b.id
+        const emergencyContacts = [
+          [b.emergency_contact_1_name, b.emergency_contact_1_phone],
+          [b.emergency_contact_2_name, b.emergency_contact_2_phone],
+          [b.emergency_contact_3_name, b.emergency_contact_3_phone]
+        ].filter(([name, phone]) => name || phone)
+
+        const expanded = isExp ? `
+          <div class="border-t border-gray-100 px-4 py-3 bg-gray-50">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-2">
+              <div>
+                <div class="text-xs text-gray-400 uppercase font-semibold">Owner</div>
+                <div class="font-semibold text-gray-800">${b.owner_name ? esc(b.owner_name) : '—'}</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-400 uppercase font-semibold">Owner Phone</div>
+                <div>${telLink(b.owner_phone)}</div>
+              </div>
+            </div>
+            ${emergencyContacts.length ? `
+              <div class="text-xs text-gray-400 uppercase font-semibold mt-3 mb-1">Emergency Contacts</div>
+              <div class="space-y-1.5">
+                ${emergencyContacts.map(([name, phone]) => `
+                  <div class="flex items-center justify-between bg-white rounded-lg border border-gray-100 px-3 py-2">
+                    <span class="font-medium text-gray-700 text-sm">${name ? esc(name) : 'Unnamed contact'}</span>
+                    <span class="text-sm">${telLink(phone)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<div class="text-xs text-gray-400 italic mt-2">No emergency contacts on file</div>'}
+            ${isOff ? `
+              <div class="flex gap-2 mt-3">
+                <button onclick="event.stopPropagation(); showEditModal('${b.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2 rounded-xl">Edit</button>
+                <button onclick="event.stopPropagation(); deleteBiz('${b.id}', '${esc(b.business_name).replace(/'/g, "\\'")}')" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-3 py-2 rounded-xl">Delete</button>
+              </div>
+            ` : ''}
+          </div>` : ''
+
+        return `
+          <div class="biz-card">
+            <button onclick="toggleExpand('${b.id}')" class="w-full text-left px-4 py-3 flex items-center justify-between gap-2 hover:bg-gray-50 transition" style="min-height:0;">
+              <div class="min-w-0">
+                <div class="font-bold text-gray-900">${esc(b.business_name)}</div>
+                ${b.address ? `<div class="text-sm text-gray-500">${esc(b.address)}</div>` : ''}
+                <div class="text-sm mt-0.5">${telLink(b.premises_phone)}</div>
+              </div>
+              <span class="text-gray-400 flex-shrink-0">${isExp ? '▲' : '▼'}</span>
+            </button>
+            ${expanded}
+          </div>`
+      }).join('')
+    }
+
+    function toggleExpand(id) {
+      expandedId = expandedId === id ? null : id
+      filterList()
+    }
+
+    // ── Add / Edit ────────────────────────────────────────────────────────────────
+    function showAddModal() {
+      editingId = null
+      document.getElementById('bizModalTitle').textContent = 'Add Business'
+      for (const f of ['bzName','bzAddress','bzPremisesPhone','bzOwnerName','bzOwnerPhone','bzEc1Name','bzEc1Phone','bzEc2Name','bzEc2Phone','bzEc3Name','bzEc3Phone']) {
+        document.getElementById(f).value = ''
+      }
+      document.getElementById('bzError').classList.add('hidden')
+      document.getElementById('bizModal').classList.remove('hidden')
+    }
+
+    function showEditModal(id) {
+      const b = allBiz.find(x => x.id === id)
+      if (!b) return
+      editingId = id
+      document.getElementById('bizModalTitle').textContent = 'Edit Business'
+      document.getElementById('bzName').value          = b.business_name || ''
+      document.getElementById('bzAddress').value        = b.address || ''
+      document.getElementById('bzPremisesPhone').value  = b.premises_phone || ''
+      document.getElementById('bzOwnerName').value      = b.owner_name || ''
+      document.getElementById('bzOwnerPhone').value     = b.owner_phone || ''
+      document.getElementById('bzEc1Name').value        = b.emergency_contact_1_name || ''
+      document.getElementById('bzEc1Phone').value       = b.emergency_contact_1_phone || ''
+      document.getElementById('bzEc2Name').value        = b.emergency_contact_2_name || ''
+      document.getElementById('bzEc2Phone').value       = b.emergency_contact_2_phone || ''
+      document.getElementById('bzEc3Name').value        = b.emergency_contact_3_name || ''
+      document.getElementById('bzEc3Phone').value       = b.emergency_contact_3_phone || ''
+      document.getElementById('bzError').classList.add('hidden')
+      document.getElementById('bizModal').classList.remove('hidden')
+    }
+
+    function closeBizModal() {
+      document.getElementById('bizModal').classList.add('hidden')
+      editingId = null
+    }
+
+    async function submitBiz() {
+      if (!AUTH.isOfficer()) { AUTH.showLoginModal(() => submitBiz()); return }
+      const errEl = document.getElementById('bzError')
+      errEl.classList.add('hidden')
+
+      const business_name = document.getElementById('bzName').value.trim()
+      if (!business_name) { errEl.textContent = 'Business name is required.'; errEl.classList.remove('hidden'); return }
+
+      const payload = {
+        action: editingId ? 'edit' : 'add',
+        id: editingId || undefined,
+        business_name,
+        address:                   document.getElementById('bzAddress').value.trim(),
+        premises_phone:            document.getElementById('bzPremisesPhone').value.trim(),
+        owner_name:                document.getElementById('bzOwnerName').value.trim(),
+        owner_phone:               document.getElementById('bzOwnerPhone').value.trim(),
+        emergency_contact_1_name:  document.getElementById('bzEc1Name').value.trim(),
+        emergency_contact_1_phone: document.getElementById('bzEc1Phone').value.trim(),
+        emergency_contact_2_name:  document.getElementById('bzEc2Name').value.trim(),
+        emergency_contact_2_phone: document.getElementById('bzEc2Phone').value.trim(),
+        emergency_contact_3_name:  document.getElementById('bzEc3Name').value.trim(),
+        emergency_contact_3_phone: document.getElementById('bzEc3Phone').value.trim()
+      }
+
+      try {
+        const res = await fetch(`${API}/manage-business-contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify(payload)
+        })
+        const data = await res.json()
+        if (!res.ok) { errEl.textContent = data.error || 'Error saving.'; errEl.classList.remove('hidden'); return }
+        closeBizModal()
+        await loadBiz()
+      } catch (e) {
+        errEl.textContent = 'Network error: ' + e.message
+        errEl.classList.remove('hidden')
+      }
+    }
+
+    async function deleteBiz(id, name) {
+      if (!AUTH.isOfficer()) { AUTH.showLoginModal(() => deleteBiz(id, name)); return }
+      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+      try {
+        const res = await fetch(`${API}/manage-business-contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+          body: JSON.stringify({ action: 'delete', id })
+        })
+        if (!res.ok) { const d = await res.json(); showError(d.error || 'Delete failed'); return }
+        expandedId = null
+        await loadBiz()
+      } catch (e) {
+        showError('Network error: ' + e.message)
+      }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────────
+    function updateAddButton() {
+      document.getElementById('addBtn').classList.toggle('hidden', !AUTH.isOfficer())
+    }
+
+    loadBiz()
+    window.addEventListener('hfd:login', () => { updateAddButton(); filterList() })
+    document.addEventListener('DOMContentLoaded', updateAddButton)
+    setTimeout(updateAddButton, 300)
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error))
+    }
+  </script>
+</body>
+</html>

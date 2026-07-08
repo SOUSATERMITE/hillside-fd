@@ -61,6 +61,11 @@
   to = "/search/index.html"
   status = 200
 
+[[redirects]]
+  from = "/contacts/business"
+  to = "/contacts/business/index.html"
+  status = 200
+
 [functions."weekly-report"]
   schedule = "0 10 * * 0"
 
