@@ -39,6 +39,21 @@ async function checkAdmin(event) {
   return null
 }
 
+// Check session with role Captain (officer) or Chief/DC (admin), OR legacy admin password.
+// Used for admin-panel sections Captains are allowed into (everything except
+// Officer Logins/user management, which stays checkAdmin-only).
+async function checkOfficerOrAdmin(event) {
+  const officer = await verifySession(event)
+  if (officer && (officer.role === 'officer' || officer.role === 'admin')) return officer
+
+  const provided = (event.headers && event.headers['x-admin-password']) || ''
+  const expected = process.env.ADMIN_PASSWORD || ''
+  if (provided && expected && provided === expected) {
+    return { officer_id: null, display_name: 'Admin', role: 'admin', name: 'Admin' }
+  }
+  return null
+}
+
 // Find an officer's firefighter record by name, trying progressively looser matches.
 // Returns { rank, group_number, name } or null.
 async function findOfficerInFirefighters(supabase, officer) {
@@ -67,4 +82,4 @@ async function findOfficerInFirefighters(supabase, officer) {
   return ff
 }
 
-module.exports = { verifySession, checkAdmin, findOfficerInFirefighters }
+module.exports = { verifySession, checkAdmin, checkOfficerOrAdmin, findOfficerInFirefighters }

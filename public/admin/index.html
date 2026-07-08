@@ -535,13 +535,17 @@
     // ── Access check ─────────────────────────────────────────────────────────────
 
     function checkAccess() {
-      if (AUTH.isAdmin()) {
+      // Captains (officer role) get the admin panel too, minus Officer Logins
+      // (login/user management) — that stays Chief/DC (admin role) only.
+      if (AUTH.isOfficer()) {
         document.getElementById('accessDenied').classList.add('hidden')
         document.getElementById('adminPanel').classList.remove('hidden')
+        document.getElementById('adminTab-logins').classList.toggle('hidden', !AUTH.isAdmin())
+        if (!AUTH.isAdmin() && currentAdminTab === 'logins') switchAdminTab('ff')
         loadFirefighters()
         loadFFForActing()
       } else if (AUTH.isLoggedIn()) {
-        document.getElementById('accessDeniedMsg').textContent = `You are logged in as ${AUTH.getDisplayName()} but admin (DC) access is required.`
+        document.getElementById('accessDeniedMsg').textContent = `You are logged in as ${AUTH.getDisplayName()} but officer (Captain or DC+) access is required.`
         document.getElementById('accessDenied').classList.remove('hidden')
         document.getElementById('adminPanel').classList.add('hidden')
       } else {
@@ -575,6 +579,7 @@
     // ── Admin Tabs ────────────────────────────────────────────────────────────────
 
     function switchAdminTab(tab) {
+      if (tab === 'logins' && !AUTH.isAdmin()) return // Chief/DC only
       const tabs = ['ff', 'positions', 'acting', 'logins', 'sicklog', 'recalllog', 'duties', 'apparatus', 'checklists']
       for (const t of tabs) {
         document.getElementById(`adminTab-${t}`).className = t === tab
@@ -660,9 +665,10 @@
             </div>
             <div class="flex gap-2">
               <button onclick="startEditFF('${f.id}')" class="flex-1 bg-blue-600 text-white text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
+              ${(f.active && !AUTH.isAdmin()) ? '' : `
               <button onclick="${f.active?`deactivateFF('${f.id}')`:`activateFF('${f.id}')`}" class="flex-1 text-white text-sm font-bold px-3 py-2.5 rounded-xl ${f.active?'bg-gray-500':'bg-green-600'}">
                 ${f.active?'Deactivate':'Activate'}
-              </button>
+              </button>`}
             </div>
           </div>`
       }).join('')
@@ -974,10 +980,11 @@
               <span class="text-gray-700">${e.cleared_by || '—'}</span>
               ${e.notes ? `<span class="text-gray-400 uppercase tracking-wide">Notes</span><span class="text-gray-700">${e.notes}</span>` : ''}
             </div>
+            ${AUTH.isAdmin() ? `
             <div class="flex gap-2">
               <button onclick="editSickRecord('${e.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
               <button onclick="showDeleteModal('sick', '${e.id}', document.getElementById('sick-row-${e.id}'))" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-3 py-2.5 rounded-xl">Delete...</button>
-            </div>
+            </div>` : '<div class="text-xs text-gray-400 italic">Editing requires DC/Chief access</div>'}
           </div>`
       }).join('')
     }
@@ -1035,10 +1042,11 @@
               <span class="text-gray-400 uppercase tracking-wide">Created</span>
               <span class="text-gray-700">${formatEastern(e.created_at)}</span>
             </div>
+            ${AUTH.isAdmin() ? `
             <div class="flex gap-2">
               <button onclick="editRecallRecord('${e.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
               <button onclick="showDeleteModal('recall', '${e.id}', document.getElementById('recall-row-${e.id}'))" class="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-3 py-2.5 rounded-xl">Delete...</button>
-            </div>
+            </div>` : '<div class="text-xs text-gray-400 italic">Editing requires DC/Chief access</div>'}
           </div>`
       }).join('')
     }

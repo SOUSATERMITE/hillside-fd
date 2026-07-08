@@ -1,6 +1,9 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-const { checkAdmin } = require('./_auth')
+const { checkOfficerOrAdmin } = require('./_auth')
+
+// Removing (deactivating) a firefighter stays Chief/DC-only — Captains can
+// view, add, edit, and reactivate, but not remove someone from the system.
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
@@ -13,7 +16,7 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
 
-  const admin = await checkAdmin(event)
+  const admin = await checkOfficerOrAdmin(event)
   if (!admin) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -71,6 +74,10 @@ exports.handler = async (event) => {
       const { data: current, error: fetchErr } = await supabase
         .from('firefighters').select('name, rank, group_number').eq('id', id).single()
       if (fetchErr) throw fetchErr
+
+      if (active === false && admin.role !== 'admin') {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Only a Chief (DC or above) can remove a firefighter' }) }
+      }
 
       const updates = {}
       if (name         !== undefined) updates.name         = name
@@ -136,6 +143,9 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'DELETE') {
+      if (admin.role !== 'admin') {
+        return { statusCode: 403, headers, body: JSON.stringify({ error: 'Only a Chief (DC or above) can remove a firefighter' }) }
+      }
       const { id } = JSON.parse(event.body || '{}')
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id is required' }) }
       const { data: updated, error } = await supabase.from('firefighters').update({ active: false }).eq('id', id).select().single()

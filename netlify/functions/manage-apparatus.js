@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-const { verifySession, checkAdmin } = require('./_auth')
+const { verifySession, checkOfficerOrAdmin } = require('./_auth')
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
@@ -78,7 +78,7 @@ exports.handler = async (event) => {
     }
 
     // ── ADMIN ACTIONS ─────────────────────────────────────────────────────────
-    const admin = await checkAdmin(event)
+    const admin = await checkOfficerOrAdmin(event)
     if (!admin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Admin required' }) }
 
     if (action === 'add') {

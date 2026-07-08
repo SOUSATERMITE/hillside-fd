@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-const { checkAdmin } = require('./_auth')
+const { checkOfficerOrAdmin } = require('./_auth')
 const crypto = require('crypto')
 
 function hashPin(pin) {
@@ -41,7 +41,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) }
 
-  const admin = await checkAdmin(event)
+  const admin = await checkOfficerOrAdmin(event)
   if (!admin) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Admin login required' }) }
 
   try {

@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
-const { checkAdmin } = require('./_auth')
+const { checkOfficerOrAdmin } = require('./_auth')
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
@@ -13,7 +13,7 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' }
 
-  const admin = await checkAdmin(event)
+  const admin = await checkOfficerOrAdmin(event)
   if (!admin) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)

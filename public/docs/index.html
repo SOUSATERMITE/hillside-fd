@@ -190,7 +190,7 @@
 
     function renderDocs(docs) {
       const container = document.getElementById('docList')
-      const isAdmin = AUTH.isAdmin()
+      const canManage = AUTH.isOfficer() // Captains and Chiefs can both manage documents
 
       if (docs.length === 0) {
         container.innerHTML = '<div class="text-gray-400 text-sm text-center py-12 bg-white rounded-2xl border border-gray-200">No documents found.</div>'
@@ -225,7 +225,7 @@
                 class="inline-flex items-center bg-red-700 hover:bg-red-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition">
                 ↓ Download ${ext}
               </a>
-              ${isAdmin ? `<button onclick="deleteDocument('${d.id}', this)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg">Remove</button>` : ''}
+              ${canManage ? `<button onclick="deleteDocument('${d.id}', this)" class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold px-3 py-2 rounded-lg">Remove</button>` : ''}
             </div>
           </div>`
       }
