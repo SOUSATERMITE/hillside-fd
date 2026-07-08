@@ -156,7 +156,7 @@ exports.handler = async (event) => {
         tour_worked: tour_worked || null
       }),
       supabase.from('recall_list')
-        .select('*, firefighters(id, name, rank, group_number)')
+        .select('*, firefighters(id, name, rank, group_number, badge_number, phone)')
         .eq('group_number', group_number)
         .order('rank_type', { ascending: true })
         .order('list_position', { ascending: true }),

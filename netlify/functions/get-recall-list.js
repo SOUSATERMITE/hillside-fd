@@ -32,7 +32,7 @@ exports.handler = async (event) => {
     // Fetch recall list for this group
     const { data: recallEntries, error: recallError } = await supabase
       .from('recall_list')
-      .select('*, firefighters(id, name, rank, group_number)')
+      .select('*, firefighters(id, name, rank, group_number, badge_number, phone)')
       .eq('group_number', group)
       .order('rank_type', { ascending: true })
       .order('list_position', { ascending: true })
