@@ -552,6 +552,8 @@ function renderFindingsTab(u, openFindings, isOff, isMem, isAdm) {
   const list = openFindings.length
     ? openFindings.map(f => {
         const pri = PRI_CFG[f.priority] || PRI_CFG.medium
+        // Any logged-in officer can resolve/cancel a reported deficiency — who resolved it
+        // and when is captured automatically server-side (manage-findings.js).
         const statusBtns = isOff ? `
           <div class="flex gap-1 mt-1.5 flex-wrap">
             ${f.status === 'open' ? `<button onclick="updateFindingStatus('${f.id}','in_progress','${u.id}')" class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-semibold hover:bg-yellow-200" style="min-height:0;">Mark In Progress</button>` : ''}

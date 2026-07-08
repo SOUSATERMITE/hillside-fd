@@ -470,6 +470,17 @@ exports.handler = async (event) => {
       const VALID_STATUSES = ['open', 'in_progress', 'completed', 'cancelled']
       if (!VALID_STATUSES.includes(status)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid status' }) }
 
+      // Any logged-in officer may resolve a reported deficiency (damage, repair needed,
+      // inspection finding, or a manually reported missing/broken item). When they do,
+      // who resolved it and when is captured automatically — never from client input —
+      // both on the record itself and in the edit_log audit trail.
+      const DEFICIENCY_TYPES = ['damage', 'repair_needed', 'inspection', 'manual_report']
+      const { data: existing } = await supabase.from('apparatus_findings').select('*').eq('id', id).maybeSingle()
+      const isResolvingDeficiency = existing
+        && DEFICIENCY_TYPES.includes(existing.finding_type)
+        && ['completed', 'cancelled'].includes(status)
+        && !['completed', 'cancelled'].includes(existing.status)
+
       const update = { status }
       if (assigned_to        !== undefined) update.assigned_to       = assigned_to || null
       if (completed_by       !== undefined) update.completed_by      = completed_by || null
@@ -483,6 +494,12 @@ exports.handler = async (event) => {
       if (resolution_notes   !== undefined) update.resolution_notes  = resolution_notes?.trim().slice(0, 2000) || null
       if (body.photo_urls    !== undefined) update.photo_urls        = (Array.isArray(body.photo_urls) && body.photo_urls.length) ? body.photo_urls : null
 
+      const resolvedAt = new Date().toISOString()
+      if (isResolvingDeficiency) {
+        update.completed_by   = officer.display_name
+        update.completed_date = resolvedAt.split('T')[0]
+      }
+
       const { data, error } = await supabase
         .from('apparatus_findings')
         .update(update)
@@ -491,6 +508,17 @@ exports.handler = async (event) => {
         .single()
 
       if (error) throw error
+
+      if (isResolvingDeficiency) {
+        await supabase.from('edit_log').insert({
+          table_name: 'apparatus_findings',
+          record_id: id,
+          edited_by: officer.display_name,
+          officer_id: officer.officer_id,
+          original_values: { status: existing.status, completed_by: existing.completed_by, completed_date: existing.completed_date },
+          new_values: { status, resolved_by: officer.display_name, resolved_at: resolvedAt }
+        })
+      }
 
       // If this is an auto-generated check finding, check if all siblings are resolved
       // and if so, mark the parent weekly check finding as completed too
