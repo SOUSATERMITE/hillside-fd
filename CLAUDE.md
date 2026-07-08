@@ -42,6 +42,7 @@ Web app for Hillside Fire Department to manage daily operations: sick tracking, 
 | `/vacation` | `vacation/index.html` | FF submits vacation change request; officers approve via email link |
 | `/admin` | `admin/index.html` | Password-protected: manage firefighters, positions, logs, officer accounts |
 | `/contacts/business` | `contacts/business/index.html` | Property/business owner emergency contacts — viewable by anyone (no login required), editable by officers/chiefs |
+| `/apparatus/report?id=<uuid>` | `apparatus/report/index.html` | Per-unit history report: apparatus info, deficiencies, checklists, maintenance, OOS history, maintenance/repair log with cost & parts. Date range filter (default YTD), print button, PDF download. Linked from a "View Report" button on each unit's card on `/apparatus`. |
 
 ---
 
@@ -316,6 +317,14 @@ All in `/netlify/functions/`. CommonJS. All include CORS headers.
 |----------|--------|------|---------|
 | `get-business-contacts.js` | GET | None | List all business contacts — deliberately open, no login, so FFs can pull it up at a scene |
 | `manage-business-contacts.js` | POST | Officer or Admin | Add/edit/delete a business contact |
+
+### Apparatus Report
+| Function | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `get-apparatus-report.js` | GET | None | Per-unit report data: info, deficiencies, checklists, maintenance, OOS history, summary. Params: `id` (required), `start`/`end` (default YTD) |
+| `download-apparatus-report.js` | GET | None | Same report as a PDF (pdfkit), same params |
+
+Note: `apparatus` gained `year`/`make`/`model` columns (editable inline on `/apparatus`'s Status tab); `apparatus_findings` gained `maintenance_type`/`maintenance_category`('routine'/'emergency')/`cost`/`parts_replaced`, settable when logging a repair or scheduling maintenance, editable later via the Chief-only edit modal. `apparatus`/`apparatus_log`/`apparatus_findings` predate this doc and were never fully written up here — see `get-apparatus.js` for the authoritative column list.
 
 ### Utilities
 | Function | Method | Auth | Purpose |

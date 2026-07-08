@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#b71c1c">
+  <link rel="manifest" href="/manifest.json">
+  <title>Apparatus Report — Hillside FD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    nav { padding-top: max(12px, env(safe-area-inset-top)); background: #1a5c2a; }
+    nav button, nav a { min-height: 0 !important; }
+    #mobileMenu { top: calc(max(12px, env(safe-area-inset-top)) + 44px); background: #1a5c2a; }
+    .nav-mobile-active { background:rgba(255,255,255,0.15) !important; }
+    input, select { min-height: 40px; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-size:14px; }
+    .section-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; margin-bottom:16px; }
+    .section-title { font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:0.03em; color:#1e3a5f; border-bottom:2px solid #1e3a5f; padding-bottom:6px; margin-bottom:12px; }
+    .row-card { border:1px solid #e5e7eb; border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:13px; }
+    .row-card:last-child { margin-bottom:0; }
+    .stat-card { background:#f8fafc; border-radius:10px; padding:12px; text-align:center; }
+    .stat-num { font-size:20px; font-weight:800; color:#1a2e52; }
+    .stat-lbl { font-size:10px; color:#6b7280; margin-top:2px; text-transform:uppercase; letter-spacing:0.02em; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .badge-red { background:#fee2e2; color:#991b1b; }
+    .badge-orange { background:#fff3cd; color:#92400e; }
+    .badge-green { background:#dcfce7; color:#166534; }
+    .badge-gray { background:#f3f4f6; color:#374151; }
+    .badge-blue { background:#dbeafe; color:#1e40af; }
+    @media print {
+      nav, #mobileMenu, #menuBackdrop, #controls, #errorBanner { display:none !important; }
+      body { background:#fff !important; }
+      .section-card { border:1px solid #ccc; box-shadow:none; break-inside:avoid; }
+      a[href]:after { content:none !important; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
+  <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
+  <div class="hidden sm:flex items-center gap-3 text-sm font-medium">
+    <a href="/"        class="hover:text-green-200 pb-0.5">Dashboard</a>
+    <a href="/apparatus" class="hover:text-green-200 pb-0.5">Apparatus</a>
+  </div>
+  <div class="flex items-center gap-2">
+    <span id="authSlot" class="flex items-center gap-2"></span>
+    <button onclick="toggleMobileMenu()" class="sm:hidden text-white rounded px-1 hover:bg-white hover:bg-opacity-20 transition" style="min-height:0;font-size:22px;line-height:1;background:none;border:none;cursor:pointer;" aria-label="Menu">&#9776;</button>
+  </div>
+</nav>
+<div id="menuBackdrop" class="hidden fixed inset-0 z-40" onclick="closeMobileMenu()" style="background:rgba(0,0,0,0.4);"></div>
+<div id="mobileMenu" class="sm:hidden hidden fixed left-0 right-0 z-50 shadow-2xl" style="overflow-y:auto;max-height:calc(100vh - 80px);">
+  <a href="/"        onclick="closeMobileMenu()" class="flex items-center px-6 text-white font-semibold border-b border-green-900 hover:bg-white hover:bg-opacity-10" style="min-height:52px;">Dashboard</a>
+  <a href="/apparatus" onclick="closeMobileMenu()" class="nav-mobile-active flex items-center px-6 text-white font-semibold" style="min-height:52px;">Apparatus</a>
+</div>
+
+<div id="errorBanner" class="hidden bg-red-600 text-white text-sm px-4 py-3 text-center font-semibold"></div>
+
+<div class="max-w-4xl mx-auto px-4 py-6">
+
+  <!-- Controls (screen only) -->
+  <div id="controls" class="flex flex-wrap items-end gap-2 mb-4">
+    <div>
+      <label class="text-xs font-semibold text-gray-500 block mb-1">From</label>
+      <input id="startDate" type="date">
+    </div>
+    <div>
+      <label class="text-xs font-semibold text-gray-500 block mb-1">To</label>
+      <input id="endDate" type="date">
+    </div>
+    <button onclick="applyRange()" class="bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl px-4 h-10 text-sm">Apply</button>
+    <div class="flex-1"></div>
+    <button onclick="window.print()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-xl px-4 h-10 text-sm">🖨️ Print</button>
+    <a id="pdfLink" href="#" class="bg-red-700 hover:bg-red-800 text-white font-bold rounded-xl px-4 h-10 text-sm flex items-center">⬇ Download PDF</a>
+  </div>
+
+  <!-- HFD Header -->
+  <div class="text-center mb-5">
+    <div class="text-xl font-extrabold text-gray-900">HILLSIDE FIRE DEPARTMENT</div>
+    <div id="reportTitle" class="text-base font-bold text-gray-700 mt-0.5">Apparatus History Report</div>
+    <div id="reportRange" class="text-xs text-gray-500 mt-0.5"></div>
+  </div>
+
+  <div id="loadingMsg" class="text-gray-400 text-sm text-center py-12">Loading...</div>
+  <div id="reportBody" class="hidden">
+
+    <!-- Summary -->
+    <div class="section-card">
+      <div class="section-title">Summary</div>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3" id="summaryStats"></div>
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section-card">
+      <div class="section-title">Section 1 — Apparatus Info</div>
+      <div id="section1" class="grid grid-cols-2 gap-3 text-sm"></div>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section-card">
+      <div class="section-title">Section 2 — Deficiency History</div>
+      <div id="section2"></div>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section-card">
+      <div class="section-title">Section 3 — Checklist / Inspection History</div>
+      <div id="section3"></div>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section-card">
+      <div class="section-title">Section 4 — Maintenance History</div>
+      <div id="section4"></div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section-card">
+      <div class="section-title">Section 5 — Out of Service History</div>
+      <div id="section5"></div>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section-card">
+      <div class="section-title">Section 6 — Maintenance &amp; Repair Log</div>
+      <div id="section6"></div>
+      <div class="mt-4 pt-3 border-t border-gray-200">
+        <div class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Outstanding / Open Repairs (all-time)</div>
+        <div id="outstandingRepairs"></div>
+      </div>
+    </div>
+
+    <div class="text-center text-xs text-gray-400 mt-4" id="generatedAt"></div>
+  </div>
+</div>
+
+<script src="/auth.js"></script>
+<script>
+const API = '/.netlify/functions'
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+}
+function showError(msg) {
+  const b = document.getElementById('errorBanner')
+  b.textContent = msg
+  b.classList.remove('hidden')
+}
+function fmtDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' })
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+const FTYPE_LABEL = { damage: 'Damage', repair_needed: 'Repair Needed', inspection: 'Inspection', manual_report: 'Manual Report', scheduled_maintenance: 'Scheduled Maint.', repair_completed: 'Repair Completed', daily_check: 'Daily Check', weekly_check: 'Weekly Check' }
+const PRI_BADGE = { critical: 'badge-red', high: 'badge-orange', medium: 'badge-blue', low: 'badge-gray' }
+const STATUS_BADGE = { open: 'badge-red', in_progress: 'badge-orange', completed: 'badge-green', cancelled: 'badge-gray' }
+
+const qs = new URLSearchParams(window.location.search)
+const apparatusId = qs.get('id')
+
+if (!apparatusId) {
+  document.getElementById('loadingMsg').textContent = 'No apparatus specified.'
+} else {
+  const yearStart = `${new Date().getFullYear()}-01-01`
+  const today = new Date().toISOString().split('T')[0]
+  document.getElementById('startDate').value = qs.get('start') || yearStart
+  document.getElementById('endDate').value   = qs.get('end') || today
+  loadReport()
+}
+
+function applyRange() {
+  const start = document.getElementById('startDate').value
+  const end   = document.getElementById('endDate').value
+  const url = new URL(window.location)
+  url.searchParams.set('start', start)
+  url.searchParams.set('end', end)
+  window.history.replaceState({}, '', url)
+  loadReport()
+}
+
+async function loadReport() {
+  document.getElementById('loadingMsg').classList.remove('hidden')
+  document.getElementById('reportBody').classList.add('hidden')
+  const start = document.getElementById('startDate').value
+  const end   = document.getElementById('endDate').value
+  try {
+    const res = await fetch(`${API}/get-apparatus-report?id=${apparatusId}&start=${start}&end=${end}`)
+    if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to load report') }
+    const data = await res.json()
+    render(data)
+    document.getElementById('pdfLink').href = `${API}/download-apparatus-report?id=${apparatusId}&start=${start}&end=${end}`
+    document.getElementById('loadingMsg').classList.add('hidden')
+    document.getElementById('reportBody').classList.remove('hidden')
+  } catch (e) {
+    document.getElementById('loadingMsg').textContent = e.message
+    showError(e.message)
+  }
+}
+
+function render(data) {
+  const { apparatus: u, period, summary, deficiencies, checklists, maintenance, oos_history, outstanding_repairs } = data
+
+  document.getElementById('reportTitle').textContent = `Apparatus History Report — ${u.unit_name}`
+  document.getElementById('reportRange').textContent = `${fmtDate(period.start)} – ${fmtDate(period.end)}`
+  document.getElementById('generatedAt').textContent = `Generated ${fmtDateTime(new Date().toISOString())} ET`
+
+  // Summary
+  document.getElementById('summaryStats').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${summary.total_deficiencies_period.total}</div><div class="stat-lbl">Deficiencies (${summary.total_deficiencies_period.open} open)</div></div>
+    <div class="stat-card"><div class="stat-num">${summary.total_maintenance_period}</div><div class="stat-lbl">Maintenance Entries</div></div>
+    <div class="stat-card"><div class="stat-num">${summary.days_oos_period}</div><div class="stat-lbl">Days OOS</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:13px;margin-top:3px;">${summary.last_maintenance_date ? fmtDate(summary.last_maintenance_date) : '—'}</div><div class="stat-lbl">Last Maintenance</div></div>
+    <div class="stat-card"><div class="stat-num" style="font-size:13px;margin-top:3px;">${summary.last_inspection_date ? fmtDate(summary.last_inspection_date) : '—'}</div><div class="stat-lbl">Last Inspection</div></div>
+  `
+
+  // Section 1
+  document.getElementById('section1').innerHTML = `
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Unit Name</div><div class="font-semibold">${esc(u.unit_name)}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Type</div><div>${esc(u.unit_type)}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Year / Make / Model</div><div>${esc([u.year, u.make, u.model].filter(Boolean).join(' ')) || '—'}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Current Status</div><div>${esc((u.status || '').replace(/_/g, ' '))}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Location</div><div>${esc(u.location || '—')}</div></div>
+    <div><div class="text-xs text-gray-400 uppercase font-semibold">Last Inspection</div><div>${summary.last_inspection_date ? fmtDate(summary.last_inspection_date) : '—'}</div></div>
+  `
+
+  // Section 2 — Deficiency History
+  const s2 = document.getElementById('section2')
+  s2.innerHTML = !deficiencies.length ? emptyMsg('No deficiencies reported in this period.') : deficiencies.map(f => `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">${FTYPE_LABEL[f.finding_type] || f.finding_type}</span>
+        <div class="flex gap-1">
+          <span class="badge ${PRI_BADGE[f.priority] || 'badge-gray'}">${esc(f.priority)}</span>
+          <span class="badge ${STATUS_BADGE[f.status] || 'badge-gray'}">${esc(f.status.replace('_',' '))}</span>
+        </div>
+      </div>
+      <div class="text-gray-700 mb-1">${esc(f.description)}</div>
+      <div class="text-xs text-gray-400">Reported ${fmtDate(f.created_at)} by ${esc(f.reported_by || '—')}${f.completed_date ? ` · Resolved ${fmtDate(f.completed_date)} by ${esc(f.completed_by || '—')}` : ''}</div>
+    </div>`).join('')
+
+  // Section 3 — Checklists
+  const s3 = document.getElementById('section3')
+  s3.innerHTML = !checklists.length ? emptyMsg('No completed checklists in this period.') : checklists.map(f => {
+    const fd = f.findings_data || {}
+    const failed = (fd.failed_items || []).length
+    return `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">${FTYPE_LABEL[f.finding_type] || f.finding_type}</span>
+        <span class="badge ${failed ? 'badge-orange' : 'badge-green'}">${failed ? failed + ' failed' : 'All pass'}</span>
+      </div>
+      <div class="text-xs text-gray-500">${fmtDate(f.created_at)} · Completed by ${esc(fd.submitted_by || f.reported_by || '—')}</div>
+      ${fd.notes ? `<div class="text-xs text-gray-600 mt-1">${esc(fd.notes)}</div>` : ''}
+    </div>`
+  }).join('')
+
+  // Section 4 — Maintenance History (basic)
+  const s4 = document.getElementById('section4')
+  s4.innerHTML = !maintenance.length ? emptyMsg('No maintenance records in this period.') : maintenance.map(f => `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">${FTYPE_LABEL[f.finding_type] || f.finding_type}</span>
+        <span class="text-xs text-gray-400">${f.scheduled_date ? 'Scheduled ' + fmtDate(f.scheduled_date) : ''}${f.completed_date ? (f.scheduled_date ? ' · ' : '') + 'Completed ' + fmtDate(f.completed_date) : ''}</span>
+      </div>
+      <div class="text-gray-700 mb-1">${esc(f.description)}</div>
+      <div class="text-xs text-gray-400">By ${esc(f.completed_by || f.assigned_to || '—')}${f.photos_notes ? ` · ${esc(f.photos_notes)}` : ''}</div>
+    </div>`).join('')
+
+  // Section 5 — OOS History
+  const s5 = document.getElementById('section5')
+  s5.innerHTML = !oos_history.length ? emptyMsg('No out-of-service periods in this range.') : oos_history.map(p => `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">Out: ${fmtDate(p.date_out)}</span>
+        <span class="badge ${p.date_returned ? 'badge-green' : 'badge-red'}">${p.date_returned ? 'Returned ' + fmtDate(p.date_returned) : 'Still OOS'}</span>
+      </div>
+      ${p.reason ? `<div class="text-gray-700 mb-1">${esc(p.reason)}</div>` : ''}
+      <div class="text-xs text-gray-400">Taken out by ${esc(p.taken_out_by || '—')}${p.returned_by ? ` · Returned by ${esc(p.returned_by)}` : ''}</div>
+    </div>`).join('')
+
+  // Section 6 — Maintenance & Repair Log (detailed)
+  const s6 = document.getElementById('section6')
+  s6.innerHTML = !maintenance.length ? emptyMsg('No maintenance/repair log entries in this period.') : maintenance.map(f => `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">${esc(f.maintenance_type || FTYPE_LABEL[f.finding_type] || f.finding_type)}</span>
+        ${f.maintenance_category ? `<span class="badge ${f.maintenance_category === 'emergency' ? 'badge-red' : 'badge-blue'}">${esc(f.maintenance_category)}</span>` : ''}
+      </div>
+      <div class="text-gray-700 mb-1">${esc(f.description)}</div>
+      <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-500">
+        <span>Scheduled: ${f.scheduled_date ? fmtDate(f.scheduled_date) : '—'}</span>
+        <span>Completed: ${f.completed_date ? fmtDate(f.completed_date) : '—'}</span>
+        <span>By: ${esc(f.completed_by || f.assigned_to || '—')}</span>
+        <span>Cost: ${f.cost != null ? '$' + Number(f.cost).toFixed(2) : '—'}</span>
+        <span class="col-span-2">Parts Replaced: ${esc(f.parts_replaced || '—')}</span>
+      </div>
+    </div>`).join('')
+
+  const outEl = document.getElementById('outstandingRepairs')
+  outEl.innerHTML = !outstanding_repairs.length ? emptyMsg('None — no open deficiencies on record.') : outstanding_repairs.map(f => `
+    <div class="row-card">
+      <div class="flex items-center justify-between flex-wrap gap-1 mb-1">
+        <span class="font-semibold text-gray-800">${FTYPE_LABEL[f.finding_type] || f.finding_type}</span>
+        <div class="flex gap-1">
+          <span class="badge ${PRI_BADGE[f.priority] || 'badge-gray'}">${esc(f.priority)}</span>
+          <span class="badge ${STATUS_BADGE[f.status] || 'badge-gray'}">${esc(f.status.replace('_',' '))}</span>
+        </div>
+      </div>
+      <div class="text-gray-700">${esc(f.description)}</div>
+      <div class="text-xs text-gray-400 mt-1">Reported ${fmtDate(f.created_at)} by ${esc(f.reported_by || '—')}</div>
+    </div>`).join('')
+}
+
+function emptyMsg(text) {
+  return `<div class="text-gray-400 text-sm text-center py-6">${esc(text)}</div>`
+}
+
+function toggleMobileMenu() {
+  const m = document.getElementById('mobileMenu')
+  const b = document.getElementById('menuBackdrop')
+  if (!m) return
+  const opening = m.classList.contains('hidden')
+  m.classList.toggle('hidden')
+  if (b) { opening ? b.classList.remove('hidden') : b.classList.add('hidden') }
+}
+function closeMobileMenu() {
+  document.getElementById('mobileMenu')?.classList.add('hidden')
+  document.getElementById('menuBackdrop')?.classList.add('hidden')
+}
+</script>
+</body>
+</html>

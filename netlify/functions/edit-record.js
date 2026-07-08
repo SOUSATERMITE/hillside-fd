@@ -4,7 +4,7 @@ const { verifySession } = require('./_auth')
 
 const SICK_FIELDS      = new Set(['marked_sick_date', 'cleared_date', 'confirmed_at', 'confirmed_24hr', 'notes'])
 const RECALL_FIELDS    = new Set(['shift_date', 'recall_start_time', 'recall_end_time', 'tour_worked', 'recall_type', 'hours_worked', 'notes'])
-const APPARATUS_FIELDS = new Set(['description', 'priority', 'finding_type', 'status', 'scheduled_date', 'completed_date', 'completed_by', 'assigned_to', 'resolution_notes', 'photos_notes'])
+const APPARATUS_FIELDS = new Set(['description', 'priority', 'finding_type', 'status', 'scheduled_date', 'completed_date', 'completed_by', 'assigned_to', 'resolution_notes', 'photos_notes', 'maintenance_type', 'maintenance_category', 'cost', 'parts_replaced'])
 const VACATION_FIELDS  = new Set(['request_date', 'cancelled_dates', 'new_dates', 'status', 'captain_action_date', 'dc_action_date', 'chief_action_date', 'denial_reason', 'staffing_impact', 'impact_explanation'])
 
 const VALID_RECALL_TYPES     = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution', 'manual_ot'])
@@ -52,6 +52,7 @@ exports.handler = async (event) => {
       if (!allowedSet.has(k)) continue
       if (k === 'recall_type' && !VALID_RECALL_TYPES.has(v)) continue
       if (table === 'apparatus' && k === 'status' && !VALID_FINDING_STATUSES.has(v)) continue
+      if (table === 'apparatus' && k === 'maintenance_category' && v && !['routine', 'emergency'].includes(v)) continue
       if (table === 'vacation' && k === 'status' && !VALID_VACATION_STATUSES.has(v)) continue
       safeUpdates[k] = v === '' ? null : v
     }

@@ -126,9 +126,36 @@
         <input id="rm_date" type="date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
       </div>
     </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Maintenance Type</label>
+        <input id="rm_type" type="text" placeholder="Oil change, tire rotation..." maxlength="200"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Routine or Emergency</label>
+        <select id="rm_category" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="">— Not set —</option>
+          <option value="routine">Routine</option>
+          <option value="emergency">Emergency</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Cost ($)</label>
+        <input id="rm_cost" type="number" step="0.01" min="0" placeholder="Optional"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Parts Replaced</label>
+        <input id="rm_parts" type="text" placeholder="Optional" maxlength="1000"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+    </div>
     <div class="mb-3">
-      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Parts Used / Notes</label>
-      <textarea id="rm_notes" rows="2" maxlength="2000" placeholder="Part numbers, invoice #, additional notes..."
+      <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes</label>
+      <textarea id="rm_notes" rows="2" maxlength="2000" placeholder="Invoice #, additional notes..."
         class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:60px;resize:vertical;"></textarea>
     </div>
     <div id="rm_err" class="hidden text-red-600 text-xs mb-2"></div>
@@ -157,6 +184,21 @@
         <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Assign To</label>
         <input id="sm_assigned" type="text" placeholder="Shop / Vendor" maxlength="200"
           class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Maintenance Type</label>
+        <input id="sm_type" type="text" placeholder="Oil change, annual inspection..." maxlength="200"
+          class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Routine or Emergency</label>
+        <select id="sm_category" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" style="min-height:40px;">
+          <option value="">— Not set —</option>
+          <option value="routine">Routine</option>
+          <option value="emergency">Emergency</option>
+        </select>
       </div>
     </div>
     <div class="mb-3">
@@ -399,7 +441,11 @@ function openEditFinding(id) {
     { key: 'completed_by',    label: 'Completed By',    type: 'text', value: f.completed_by || '' },
     { key: 'assigned_to',     label: 'Assigned To',     type: 'text', value: f.assigned_to || '' },
     { key: 'resolution_notes',label: 'Resolution Notes',type: 'textarea', value: f.resolution_notes || '' },
-    { key: 'photos_notes',    label: 'Notes',           type: 'textarea', value: f.photos_notes || '' }
+    { key: 'photos_notes',    label: 'Notes',           type: 'textarea', value: f.photos_notes || '' },
+    { key: 'maintenance_type',     label: 'Maintenance Type',     type: 'text', value: f.maintenance_type || '' },
+    { key: 'maintenance_category', label: 'Routine or Emergency', type: 'select', value: f.maintenance_category || '', options: [{ value: '', label: '— Not set —' }, { value: 'routine', label: 'Routine' }, { value: 'emergency', label: 'Emergency' }] },
+    { key: 'cost',                 label: 'Cost ($)',             type: 'number', value: f.cost ?? '' },
+    { key: 'parts_replaced',       label: 'Parts Replaced',       type: 'text', value: f.parts_replaced || '' }
   ], () => loadApparatus())
 }
 
@@ -428,8 +474,8 @@ function renderCard(u, isOff, isMem, isAdm) {
 
   return `<div class="bg-white rounded-2xl border-2 ${st.border} shadow-sm overflow-hidden">
     <!-- Card Header (always visible) -->
-    <button onclick="toggleExpand('${u.id}')" class="w-full text-left ${headerBg} px-4 py-3 flex items-center justify-between gap-2 hover:bg-opacity-80 transition" style="min-height:0;">
-      <div class="flex items-center gap-3 min-w-0">
+    <div class="w-full ${headerBg} px-4 py-3 flex items-center justify-between gap-2" style="min-height:0;">
+      <button onclick="toggleExpand('${u.id}')" class="flex-1 min-w-0 text-left flex items-center gap-3 hover:opacity-80 transition" style="min-height:0;background:none;border:none;cursor:pointer;">
         <span class="w-3 h-3 rounded-full flex-shrink-0 ${st.dot}"></span>
         <div class="min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
@@ -440,9 +486,13 @@ function renderCard(u, isOff, isMem, isAdm) {
           </div>
           <div class="text-xs text-gray-500 mt-0.5">${esc(u.location || '—')} · Updated ${timeAgo(u.last_updated)}${u.updated_by ? ` by ${esc(u.updated_by)}` : ''}</div>
         </div>
+      </button>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a href="/apparatus/report?id=${u.id}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+          class="text-xs font-bold text-gray-500 border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition whitespace-nowrap" style="min-height:0;">📄 View Report</a>
+        <button onclick="toggleExpand('${u.id}')" class="text-gray-400 text-lg" style="min-height:0;background:none;border:none;cursor:pointer;">${isExp ? '▲' : '▼'}</button>
       </div>
-      <span class="text-gray-400 text-lg flex-shrink-0">${isExp ? '▲' : '▼'}</span>
-    </button>
+    </div>
 
     <!-- Expanded content -->
     ${isExp ? renderExpanded(u, tab, isOff, isMem, isAdm) : ''}
@@ -523,7 +573,30 @@ function renderStatusTab(u, isOff) {
       </div>
     </div>` : ''
 
+  const vehicleInfoView = `
+    <div id="vi-view-${u.id}" class="border border-gray-200 rounded-xl p-3 mb-3 bg-gray-50">
+      <div class="flex items-center justify-between mb-1">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Vehicle Info</div>
+        ${isOff ? `<button onclick="toggleVehicleInfoEdit('${u.id}', true)" class="text-xs text-blue-600 hover:underline font-semibold" style="min-height:0;">Edit</button>` : ''}
+      </div>
+      <div class="text-sm text-gray-700">${[u.year, esc(u.make || ''), esc(u.model || '')].filter(Boolean).join(' ') || 'Not set'}</div>
+    </div>
+    <div id="vi-edit-${u.id}" class="hidden border border-gray-200 rounded-xl p-3 mb-3 bg-gray-50">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Edit Vehicle Info</div>
+      <div class="grid grid-cols-3 gap-2 mb-2">
+        <input id="vi-year-${u.id}" type="number" placeholder="Year" value="${u.year || ''}" class="border border-gray-300 rounded-lg px-2 py-2 text-sm" style="min-height:40px;">
+        <input id="vi-make-${u.id}" type="text" placeholder="Make" value="${esc(u.make || '')}" class="border border-gray-300 rounded-lg px-2 py-2 text-sm" style="min-height:40px;">
+        <input id="vi-model-${u.id}" type="text" placeholder="Model" value="${esc(u.model || '')}" class="border border-gray-300 rounded-lg px-2 py-2 text-sm" style="min-height:40px;">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="saveVehicleInfo('${u.id}')" class="flex-1 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-lg py-2" style="min-height:0;">Save</button>
+        <button onclick="toggleVehicleInfoEdit('${u.id}', false)" class="flex-1 bg-gray-200 text-gray-700 text-xs font-bold rounded-lg py-2" style="min-height:0;">Cancel</button>
+      </div>
+      <div id="vi-err-${u.id}" class="hidden text-red-600 text-xs mt-1"></div>
+    </div>`
+
   return `<div>
+    ${vehicleInfoView}
     <div class="flex items-center gap-3 mb-3">
       <span class="font-bold px-3 py-1.5 rounded-full text-sm ${st.cls}">${st.label}</span>
       ${u.location ? `<span class="text-sm text-gray-600">📍 ${esc(u.location)}</span>` : ''}
@@ -533,6 +606,32 @@ function renderStatusTab(u, isOff) {
     ${updateForm}
     ${logHtml}
   </div>`
+}
+
+function toggleVehicleInfoEdit(id, show) {
+  document.getElementById(`vi-view-${id}`).classList.toggle('hidden', show)
+  document.getElementById(`vi-edit-${id}`).classList.toggle('hidden', !show)
+}
+
+async function saveVehicleInfo(id) {
+  const errEl = document.getElementById(`vi-err-${id}`)
+  errEl.classList.add('hidden')
+  try {
+    const res = await fetch(`${API}/manage-apparatus`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...AUTH.getHeaders() },
+      body: JSON.stringify({
+        action: 'edit',
+        id,
+        year:  document.getElementById(`vi-year-${id}`).value || null,
+        make:  document.getElementById(`vi-make-${id}`).value.trim(),
+        model: document.getElementById(`vi-model-${id}`).value.trim()
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) { errEl.textContent = data.error || 'Failed to save'; errEl.classList.remove('hidden'); return }
+    await loadApparatus()
+  } catch (e) { errEl.textContent = e.message; errEl.classList.remove('hidden') }
 }
 
 function renderFindingsTab(u, openFindings, isOff, isMem, isAdm) {
@@ -774,10 +873,14 @@ async function submitFinding() {
 function openRepairModal(id, name) {
   modalUnitId = id
   document.getElementById('repairModalTitle').textContent = `Log Repair — ${name}`
-  document.getElementById('rm_desc').value  = ''
-  document.getElementById('rm_by').value    = ''
-  document.getElementById('rm_date').value  = new Date().toISOString().split('T')[0]
-  document.getElementById('rm_notes').value = ''
+  document.getElementById('rm_desc').value     = ''
+  document.getElementById('rm_by').value       = ''
+  document.getElementById('rm_date').value     = new Date().toISOString().split('T')[0]
+  document.getElementById('rm_notes').value    = ''
+  document.getElementById('rm_type').value     = ''
+  document.getElementById('rm_category').value = ''
+  document.getElementById('rm_cost').value     = ''
+  document.getElementById('rm_parts').value    = ''
   document.getElementById('rm_err').classList.add('hidden')
   document.getElementById('repairModal').classList.remove('hidden')
   document.getElementById('rm_desc').focus()
@@ -798,7 +901,11 @@ async function submitRepair() {
         description:    desc,
         completed_by:   document.getElementById('rm_by').value.trim() || undefined,
         completed_date: document.getElementById('rm_date').value || undefined,
-        photos_notes:   document.getElementById('rm_notes').value.trim() || undefined
+        photos_notes:   document.getElementById('rm_notes').value.trim() || undefined,
+        maintenance_type:     document.getElementById('rm_type').value.trim() || undefined,
+        maintenance_category: document.getElementById('rm_category').value || undefined,
+        cost:                 document.getElementById('rm_cost').value || undefined,
+        parts_replaced:       document.getElementById('rm_parts').value.trim() || undefined
       })
     })
     const data = await res.json()
@@ -815,6 +922,8 @@ function openScheduleModal(id, name) {
   document.getElementById('sm_date').value     = ''
   document.getElementById('sm_assigned').value = ''
   document.getElementById('sm_notes').value    = ''
+  document.getElementById('sm_type').value     = ''
+  document.getElementById('sm_category').value = ''
   document.getElementById('sm_err').classList.add('hidden')
   document.getElementById('scheduleModal').classList.remove('hidden')
   document.getElementById('sm_desc').focus()
@@ -837,7 +946,9 @@ async function submitSchedule() {
         priority:       'low',
         scheduled_date: document.getElementById('sm_date').value || undefined,
         assigned_to:    document.getElementById('sm_assigned').value.trim() || undefined,
-        photos_notes:   document.getElementById('sm_notes').value.trim() || undefined
+        photos_notes:   document.getElementById('sm_notes').value.trim() || undefined,
+        maintenance_type:     document.getElementById('sm_type').value.trim() || undefined,
+        maintenance_category: document.getElementById('sm_category').value || undefined
       })
     })
     const data = await res.json()

@@ -18,7 +18,7 @@ exports.handler = async (event) => {
     const [apparatusRes, logRes, findingsRes] = await Promise.all([
       supabase
         .from('apparatus')
-        .select('id, unit_name, unit_type, status, location, notes, last_updated, updated_by, created_at, primary_officer_name, secondary_officer_name')
+        .select('id, unit_name, unit_type, status, location, notes, last_updated, updated_by, created_at, primary_officer_name, secondary_officer_name, year, make, model')
         .eq('active', true)
         .order('unit_name', { ascending: true }),
 
@@ -30,7 +30,7 @@ exports.handler = async (event) => {
 
       supabase
         .from('apparatus_findings')
-        .select('id, apparatus_id, finding_type, description, priority, reported_by, assigned_to, scheduled_date, completed_date, completed_by, status, photos_notes, findings_data, created_at')
+        .select('id, apparatus_id, finding_type, description, priority, reported_by, assigned_to, scheduled_date, completed_date, completed_by, status, photos_notes, findings_data, created_at, maintenance_type, maintenance_category, cost, parts_replaced')
         .order('created_at', { ascending: false })
         .limit(1000)
     ])

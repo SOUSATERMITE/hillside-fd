@@ -328,13 +328,15 @@ exports.handler = async (event) => {
 
     // ── REPORT FINDING (damage/repair_needed/inspection/scheduled_maintenance) ─
     if (action === 'report') {
-      const { apparatus_id, finding_type, description, priority, assigned_to, scheduled_date, photos_notes } = body
+      const { apparatus_id, finding_type, description, priority, assigned_to, scheduled_date, photos_notes,
+              maintenance_type, maintenance_category, cost, parts_replaced } = body
       if (!apparatus_id || !finding_type || !description?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'apparatus_id, finding_type, and description required' }) }
       }
 
       const VALID_TYPES = ['damage', 'repair_needed', 'inspection', 'scheduled_maintenance']
       const VALID_PRIS  = ['low', 'medium', 'high', 'critical']
+      const VALID_MAINT_CATS = ['routine', 'emergency']
       if (!VALID_TYPES.includes(finding_type)) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid finding_type' }) }
 
       const pri = VALID_PRIS.includes(priority) ? priority : 'medium'
@@ -359,7 +361,11 @@ exports.handler = async (event) => {
           assigned_to:   assigned_to?.trim() || null,
           scheduled_date: scheduled_date || null,
           photos_notes:  photos_notes?.trim().slice(0, 2000) || null,
-          status:        'open'
+          status:        'open',
+          maintenance_type:     maintenance_type?.trim().slice(0, 200) || null,
+          maintenance_category: VALID_MAINT_CATS.includes(maintenance_category) ? maintenance_category : null,
+          cost:            cost !== undefined && cost !== '' ? parseFloat(cost) : null,
+          parts_replaced:  parts_replaced?.trim().slice(0, 1000) || null
         })
         .select()
         .single()
@@ -385,10 +391,12 @@ exports.handler = async (event) => {
 
     // ── LOG REPAIR COMPLETED ──────────────────────────────────────────────────
     if (action === 'log_repair') {
-      const { apparatus_id, description, completed_by, completed_date, photos_notes } = body
+      const { apparatus_id, description, completed_by, completed_date, photos_notes,
+              maintenance_type, maintenance_category, cost, parts_replaced } = body
       if (!apparatus_id || !description?.trim()) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'apparatus_id and description required' }) }
       }
+      const VALID_MAINT_CATS = ['routine', 'emergency']
 
       const { data, error } = await supabase
         .from('apparatus_findings')
@@ -402,7 +410,11 @@ exports.handler = async (event) => {
           completed_by:   completed_by?.trim() || officer.display_name,
           completed_date: completed_date || new Date().toISOString().split('T')[0],
           photos_notes:   photos_notes?.trim().slice(0, 2000) || null,
-          status:         'completed'
+          status:         'completed',
+          maintenance_type:     maintenance_type?.trim().slice(0, 200) || null,
+          maintenance_category: VALID_MAINT_CATS.includes(maintenance_category) ? maintenance_category : null,
+          cost:            cost !== undefined && cost !== '' ? parseFloat(cost) : null,
+          parts_replaced:  parts_replaced?.trim().slice(0, 1000) || null
         })
         .select()
         .single()

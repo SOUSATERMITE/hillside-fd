@@ -82,7 +82,7 @@ exports.handler = async (event) => {
     if (!admin) return { statusCode: 403, headers, body: JSON.stringify({ error: 'Admin required' }) }
 
     if (action === 'add') {
-      const { unit_name, unit_type, status, location, notes,
+      const { unit_name, unit_type, status, location, notes, year, make, model,
               primary_officer_id, primary_officer_name, secondary_officer_id, secondary_officer_name } = body
       if (!unit_name || !unit_type) return { statusCode: 400, headers, body: JSON.stringify({ error: 'unit_name and unit_type required' }) }
 
@@ -92,6 +92,9 @@ exports.handler = async (event) => {
         status:    status || 'in_service',
         location:  location || 'Station 1',
         notes:     notes || null,
+        year:      year ? parseInt(year, 10) : null,
+        make:      make?.trim() || null,
+        model:     model?.trim() || null,
         primary_officer_id:     primary_officer_id   || null,
         primary_officer_name:   primary_officer_name?.trim() || null,
         secondary_officer_id:   secondary_officer_id   || null,
@@ -106,7 +109,7 @@ exports.handler = async (event) => {
     }
 
     if (action === 'edit') {
-      const { id, unit_name, unit_type, status, location, notes,
+      const { id, unit_name, unit_type, status, location, notes, year, make, model,
               primary_officer_id, primary_officer_name, secondary_officer_id, secondary_officer_name } = body
       if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) }
       const update = {}
@@ -115,6 +118,9 @@ exports.handler = async (event) => {
       if (status                 !== undefined) update.status                 = status
       if (location               !== undefined) update.location               = location || null
       if (notes                  !== undefined) update.notes                  = notes || null
+      if (year                   !== undefined) update.year                   = year ? parseInt(year, 10) : null
+      if (make                   !== undefined) update.make                   = make?.trim() || null
+      if (model                  !== undefined) update.model                  = model?.trim() || null
       if (primary_officer_id     !== undefined) update.primary_officer_id     = primary_officer_id || null
       if (primary_officer_name   !== undefined) update.primary_officer_name   = primary_officer_name?.trim() || null
       if (secondary_officer_id   !== undefined) update.secondary_officer_id   = secondary_officer_id || null
