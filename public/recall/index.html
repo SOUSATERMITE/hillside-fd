@@ -26,6 +26,7 @@
 
   <!-- Auth modal container -->
   <div id="authModal"></div>
+  <div id="editRecordModal"></div>
 
   <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
@@ -148,11 +149,13 @@
   </div>
 
   <script src="/auth.js"></script>
+  <script src="/edit-modal.js"></script>
   <script>
     const API = '/.netlify/functions'
     let currentGroup = 1
     let groupData = {}
     let allFirefighters = []
+    let recallLogEntriesById = {}
 
     function showError(msg) {
       const b = document.getElementById('errorBanner')
@@ -330,7 +333,9 @@
         return
       }
 
+      const isChief = AUTH.isAdmin()
       container.innerHTML = entries.map(e => {
+        recallLogEntriesById[e.id] = e
         const ff = e.firefighters || {}
         const date = e.shift_date
           ? new Date(e.shift_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -366,8 +371,23 @@
               <span class="text-xs text-gray-400 uppercase tracking-wide">Recorded by</span>
               <span class="font-medium text-gray-700">${e.recorded_by || '—'}</span>
             </div>
+            ${isChief ? `<div class="text-right mt-2"><button onclick="openEditRecall('${e.id}')" class="text-xs text-gray-400 hover:text-gray-600 font-semibold underline">Edit</button></div>` : ''}
           </div>`
       }).join('')
+    }
+
+    function openEditRecall(id) {
+      const e = recallLogEntriesById[id]
+      if (!e) return
+      EDIT_MODAL.open('recall', id, [
+        { key: 'shift_date',         label: 'Shift Date',         type: 'date', value: e.shift_date || '' },
+        { key: 'recall_type',        label: 'Recall Type',        type: 'select', value: e.recall_type, options: Object.entries(recallTypeLabels).map(([value, label]) => ({ value, label })) },
+        { key: 'recall_start_time',  label: 'Start Time (e.g. 0730)', type: 'text', value: e.recall_start_time || '' },
+        { key: 'recall_end_time',    label: 'End Time (e.g. 1730)',   type: 'text', value: e.recall_end_time || '' },
+        { key: 'hours_worked',       label: 'Hours Worked',       type: 'number', value: e.hours_worked ?? '' },
+        { key: 'tour_worked',        label: 'Tour Worked (1-4)',  type: 'text', value: e.tour_worked || '' },
+        { key: 'notes',              label: 'Notes',              type: 'textarea', value: e.notes || '' }
+      ], () => loadGroup(currentGroup))
     }
 
     async function submitConfirm24hr(btn) {

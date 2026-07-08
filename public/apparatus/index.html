@@ -29,6 +29,7 @@
 <body class="bg-gray-100 min-h-screen">
 
 <div id="authModal"></div>
+<div id="editRecordModal"></div>
 
 <!-- Status Update Modal -->
 <div id="statusModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-start justify-center pt-8 px-4 overflow-y-auto">
@@ -236,6 +237,7 @@
 </div>
 
 <script src="/auth.js"></script>
+<script src="/edit-modal.js"></script>
 <script>
 const API = '/.netlify/functions'
 
@@ -354,6 +356,7 @@ function renderAll() {
   const grid   = document.getElementById('apparatusGrid')
   const isOff  = AUTH.isOfficer()
   const isMem  = AUTH.isMember()
+  const isAdm  = AUTH.isAdmin()
 
   const oos  = apparatusData.filter(u => u.status === 'out_of_service')
   const rest = apparatusData.filter(u => u.status !== 'out_of_service')
@@ -366,10 +369,41 @@ function renderAll() {
     banner.classList.add('hidden')
   }
 
-  grid.innerHTML = sorted.map(u => renderCard(u, isOff, isMem)).join('')
+  grid.innerHTML = sorted.map(u => renderCard(u, isOff, isMem, isAdm)).join('')
 }
 
-function renderCard(u, isOff, isMem) {
+function findFindingById(id) {
+  for (const u of apparatusData) {
+    const f = (u.findings || []).find(f => f.id === id)
+    if (f) return f
+  }
+  return null
+}
+
+const FINDING_STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
+function openEditFinding(id) {
+  const f = findFindingById(id)
+  if (!f) return
+  EDIT_MODAL.open('apparatus', id, [
+    { key: 'description',     label: 'Description',     type: 'textarea', value: f.description || '' },
+    { key: 'priority',        label: 'Priority',        type: 'select', value: f.priority, options: [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }, { value: 'critical', label: 'Critical' }] },
+    { key: 'status',          label: 'Status',          type: 'select', value: f.status, options: FINDING_STATUS_OPTIONS },
+    { key: 'scheduled_date',  label: 'Scheduled Date',  type: 'date', value: f.scheduled_date || '' },
+    { key: 'completed_date',  label: 'Completed Date',  type: 'date', value: f.completed_date || '' },
+    { key: 'completed_by',    label: 'Completed By',    type: 'text', value: f.completed_by || '' },
+    { key: 'assigned_to',     label: 'Assigned To',     type: 'text', value: f.assigned_to || '' },
+    { key: 'resolution_notes',label: 'Resolution Notes',type: 'textarea', value: f.resolution_notes || '' },
+    { key: 'photos_notes',    label: 'Notes',           type: 'textarea', value: f.photos_notes || '' }
+  ], () => loadApparatus())
+}
+
+function renderCard(u, isOff, isMem, isAdm) {
   const st       = STATUS_CFG[u.status] || STATUS_CFG.in_service
   const isExp    = expandedId === u.id
   const tab      = activeTab[u.id] || 'status'
@@ -411,11 +445,11 @@ function renderCard(u, isOff, isMem) {
     </button>
 
     <!-- Expanded content -->
-    ${isExp ? renderExpanded(u, tab, isOff, isMem) : ''}
+    ${isExp ? renderExpanded(u, tab, isOff, isMem, isAdm) : ''}
   </div>`
 }
 
-function renderExpanded(u, tab, isOff, isMem) {
+function renderExpanded(u, tab, isOff, isMem, isAdm) {
   const findings = u.findings || []
 
   const tabBtn = (id, label, badge) => {
@@ -433,11 +467,11 @@ function renderExpanded(u, tab, isOff, isMem) {
   if (tab === 'status') {
     content = renderStatusTab(u, isOff)
   } else if (tab === 'findings') {
-    content = renderFindingsTab(u, openFindings, isOff, isMem)
+    content = renderFindingsTab(u, openFindings, isOff, isMem, isAdm)
   } else if (tab === 'repairs') {
-    content = renderRepairsTab(u, repairs, isOff)
+    content = renderRepairsTab(u, repairs, isOff, isAdm)
   } else if (tab === 'scheduled') {
-    content = renderScheduledTab(u, scheduled, isOff)
+    content = renderScheduledTab(u, scheduled, isOff, isAdm)
   } else if (tab === 'checks') {
     content = renderChecksTab(u, isOff, isMem)
   }
@@ -501,7 +535,7 @@ function renderStatusTab(u, isOff) {
   </div>`
 }
 
-function renderFindingsTab(u, openFindings, isOff, isMem) {
+function renderFindingsTab(u, openFindings, isOff, isMem, isAdm) {
   const addBtn = isMem ? `
     <div class="flex gap-2 mb-4">
       <button onclick="openFindingModal('${u.id}','${esc(u.unit_name)}','damage')" class="flex-1 bg-red-700 hover:bg-red-800 text-white text-xs font-bold rounded-xl py-2 transition" style="min-height:0;">+ Report Damage</button>
@@ -519,11 +553,12 @@ function renderFindingsTab(u, openFindings, isOff, isMem) {
     ? openFindings.map(f => {
         const pri = PRI_CFG[f.priority] || PRI_CFG.medium
         const statusBtns = isOff ? `
-          <div class="flex gap-1 mt-1.5">
+          <div class="flex gap-1 mt-1.5 flex-wrap">
             ${f.status === 'open' ? `<button onclick="updateFindingStatus('${f.id}','in_progress','${u.id}')" class="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-semibold hover:bg-yellow-200" style="min-height:0;">Mark In Progress</button>` : ''}
             <button onclick="updateFindingStatus('${f.id}','completed','${u.id}')" class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold hover:bg-green-200" style="min-height:0;">Mark Resolved</button>
             <button onclick="updateFindingStatus('${f.id}','cancelled','${u.id}')" class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded font-semibold hover:bg-gray-200" style="min-height:0;">Cancel</button>
-          </div>` : ''
+            ${isAdm ? `<button onclick="openEditFinding('${f.id}')" class="text-xs px-2 py-1 text-gray-400 hover:text-gray-600 font-semibold underline" style="min-height:0;">Edit</button>` : ''}
+          </div>` : (isAdm ? `<div class="mt-1.5"><button onclick="openEditFinding('${f.id}')" class="text-xs px-2 py-1 text-gray-400 hover:text-gray-600 font-semibold underline" style="min-height:0;">Edit</button></div>` : '')
         return `<div class="border rounded-xl px-3 py-2.5 mb-2 ${f.priority === 'critical' ? 'border-red-300 bg-red-50' : 'border-gray-200'}">
           <div class="flex items-start justify-between gap-2">
             <div class="flex-1 min-w-0">
@@ -546,7 +581,7 @@ function renderFindingsTab(u, openFindings, isOff, isMem) {
   return `${addBtn}${checkBtns}${list}`
 }
 
-function renderRepairsTab(u, repairs, isOff) {
+function renderRepairsTab(u, repairs, isOff, isAdm) {
   const addBtn = isOff ? `
     <button onclick="openRepairModal('${u.id}','${esc(u.unit_name)}')" class="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-xl py-2.5 mb-4 transition" style="min-height:0;">+ Log Completed Repair</button>` : ''
 
@@ -558,13 +593,14 @@ function renderRepairsTab(u, repairs, isOff) {
           ${f.completed_date ? `<div class="text-xs text-gray-500">Date: ${fmtDate(f.completed_date)}</div>` : ''}
           ${f.photos_notes ? `<div class="text-xs text-gray-500 mt-0.5">${esc(f.photos_notes)}</div>` : ''}
           <div class="text-xs text-gray-400 mt-0.5">Logged by ${esc(f.reported_by)} · ${fmtDateTime(f.created_at)}</div>
+          ${isAdm ? `<button onclick="openEditFinding('${f.id}')" class="mt-1.5 text-xs text-gray-400 hover:text-gray-600 font-semibold underline" style="min-height:0;">Edit</button>` : ''}
         </div>`).join('')
     : `<div class="text-center py-6 text-gray-400 text-sm">No repairs logged yet.</div>`
 
   return `${addBtn}${list}`
 }
 
-function renderScheduledTab(u, scheduled, isOff) {
+function renderScheduledTab(u, scheduled, isOff, isAdm) {
   const addBtn = isOff ? `
     <button onclick="openScheduleModal('${u.id}','${esc(u.unit_name)}')" class="w-full bg-purple-700 hover:bg-purple-800 text-white text-sm font-bold rounded-xl py-2.5 mb-4 transition" style="min-height:0;">+ Schedule Maintenance</button>` : ''
 
@@ -576,7 +612,10 @@ function renderScheduledTab(u, scheduled, isOff) {
           ${f.assigned_to ? `<div class="text-xs text-gray-500">Assigned to: ${esc(f.assigned_to)}</div>` : ''}
           ${f.photos_notes ? `<div class="text-xs text-gray-500 mt-0.5">${esc(f.photos_notes)}</div>` : ''}
           <div class="text-xs text-gray-400 mt-0.5">Added by ${esc(f.reported_by)} · ${fmtDateTime(f.created_at)}</div>
-          ${isOff ? `<button onclick="updateFindingStatus('${f.id}','completed','${u.id}')" class="mt-1.5 text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold hover:bg-green-200" style="min-height:0;">Mark Completed</button>` : ''}
+          <div class="flex gap-1 mt-1.5 flex-wrap">
+            ${isOff ? `<button onclick="updateFindingStatus('${f.id}','completed','${u.id}')" class="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold hover:bg-green-200" style="min-height:0;">Mark Completed</button>` : ''}
+            ${isAdm ? `<button onclick="openEditFinding('${f.id}')" class="text-xs px-2 py-1 text-gray-400 hover:text-gray-600 font-semibold underline" style="min-height:0;">Edit</button>` : ''}
+          </div>
         </div>`).join('')
     : `<div class="text-center py-6 text-gray-400 text-sm">No scheduled maintenance.</div>`
 

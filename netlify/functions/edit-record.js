@@ -2,9 +2,21 @@ const { createClient } = require('@supabase/supabase-js')
 const { allowOrigin } = require('./_cors')
 const { verifySession } = require('./_auth')
 
-const SICK_FIELDS   = new Set(['marked_sick_date', 'cleared_date', 'confirmed_at', 'confirmed_24hr', 'notes'])
-const RECALL_FIELDS = new Set(['recall_start_time', 'recall_end_time', 'tour_worked', 'recall_type', 'hours_worked', 'notes'])
-const VALID_RECALL_TYPES = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution'])
+const SICK_FIELDS      = new Set(['marked_sick_date', 'cleared_date', 'confirmed_at', 'confirmed_24hr', 'notes'])
+const RECALL_FIELDS    = new Set(['shift_date', 'recall_start_time', 'recall_end_time', 'tour_worked', 'recall_type', 'hours_worked', 'notes'])
+const APPARATUS_FIELDS = new Set(['description', 'priority', 'finding_type', 'status', 'scheduled_date', 'completed_date', 'completed_by', 'assigned_to', 'resolution_notes', 'photos_notes'])
+const VACATION_FIELDS  = new Set(['request_date', 'cancelled_dates', 'new_dates', 'status', 'captain_action_date', 'dc_action_date', 'chief_action_date', 'denial_reason', 'staffing_impact', 'impact_explanation'])
+
+const VALID_RECALL_TYPES     = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution'])
+const VALID_FINDING_STATUSES = new Set(['open', 'in_progress', 'completed', 'cancelled'])
+const VALID_VACATION_STATUSES = new Set(['pending', 'captain_approved', 'dc_approved', 'approved', 'denied'])
+
+const TABLES = {
+  sick:      { tableName: 'sick_log',          fields: SICK_FIELDS },
+  recall:    { tableName: 'recall_log',        fields: RECALL_FIELDS },
+  apparatus: { tableName: 'apparatus_findings', fields: APPARATUS_FIELDS },
+  vacation:  { tableName: 'vacation_requests',  fields: VACATION_FIELDS }
+}
 
 exports.handler = async (event) => {
   const origin = allowOrigin(event)
@@ -20,6 +32,7 @@ exports.handler = async (event) => {
 
   const officer = await verifySession(event)
   if (!officer) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Login required' }) }
+  if (officer.role !== 'admin') return { statusCode: 403, headers, body: JSON.stringify({ error: 'DC or Chief access required to edit records' }) }
 
   try {
     const { table, id, updates } = JSON.parse(event.body || '{}')
@@ -27,18 +40,19 @@ exports.handler = async (event) => {
     if (!table || !id || !updates || typeof updates !== 'object') {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'table, id, and updates are required' }) }
     }
-    if (!['sick', 'recall'].includes(table)) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'table must be sick or recall' }) }
+    if (!TABLES[table]) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'table must be sick, recall, apparatus, or vacation' }) }
     }
 
-    const tableName  = table === 'sick' ? 'sick_log' : 'recall_log'
-    const allowedSet = table === 'sick' ? SICK_FIELDS : RECALL_FIELDS
+    const { tableName, fields: allowedSet } = TABLES[table]
 
     // Whitelist fields
     const safeUpdates = {}
     for (const [k, v] of Object.entries(updates)) {
       if (!allowedSet.has(k)) continue
       if (k === 'recall_type' && !VALID_RECALL_TYPES.has(v)) continue
+      if (table === 'apparatus' && k === 'status' && !VALID_FINDING_STATUSES.has(v)) continue
+      if (table === 'vacation' && k === 'status' && !VALID_VACATION_STATUSES.has(v)) continue
       safeUpdates[k] = v === '' ? null : v
     }
 

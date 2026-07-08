@@ -32,6 +32,7 @@
 <body class="bg-gray-100 min-h-screen">
 
   <div id="authModal"></div>
+  <div id="editRecordModal"></div>
 
   <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
@@ -227,9 +228,11 @@
   </div>
 
   <script src="/auth.js"></script>
+  <script src="/edit-modal.js"></script>
   <script>
     const API = '/.netlify/functions'
     let firefighters = []
+    let vacationRequestsById = {}
     let staffingImpact = false
     let currentRequestId = null
     let currentActionType = null
@@ -489,6 +492,7 @@
     }
 
     function renderOfficerCard(r, officerRank) {
+      vacationRequestsById[r.id] = r
       const badge     = statusBadge(r.status)
       const cancelled = formatDates(r.cancelled_dates)
       const newD      = formatDates(r.new_dates)
@@ -539,7 +543,11 @@
             </button>
           </div>` : ''}
           ${isAdm ? `
-          <div class="mt-2">
+          <div class="mt-2 flex gap-3">
+            <button onclick="openEditVacation('${r.id}')"
+              class="text-xs text-gray-400 hover:text-gray-600 font-semibold transition" style="min-height:0;">
+              Edit
+            </button>
             <button data-del-id="${r.id}" data-del-name="${esc(r.ff_name)}"
               onclick="deleteVacationRequest(this.dataset.delId, this.dataset.delName, this)"
               class="text-xs text-gray-400 hover:text-red-600 font-semibold transition" style="min-height:0;">
@@ -547,6 +555,27 @@
             </button>
           </div>` : ''}
         </div>`
+    }
+
+    const VACATION_STATUS_OPTIONS = [
+      { value: 'pending', label: 'Pending' },
+      { value: 'captain_approved', label: 'Captain Approved' },
+      { value: 'dc_approved', label: 'DC Approved' },
+      { value: 'approved', label: 'Approved' },
+      { value: 'denied', label: 'Denied' }
+    ]
+
+    function openEditVacation(id) {
+      const r = vacationRequestsById[id]
+      if (!r) return
+      EDIT_MODAL.open('vacation', id, [
+        { key: 'request_date',        label: 'Request Date',         type: 'date', value: r.request_date || '' },
+        { key: 'status',              label: 'Status',                type: 'select', value: r.status, options: VACATION_STATUS_OPTIONS },
+        { key: 'captain_action_date', label: 'Captain Action Date',   type: 'date', value: r.captain_action_date ? r.captain_action_date.slice(0, 10) : '' },
+        { key: 'dc_action_date',      label: 'DC Action Date',        type: 'date', value: r.dc_action_date ? r.dc_action_date.slice(0, 10) : '' },
+        { key: 'chief_action_date',   label: 'Chief Action Date',     type: 'date', value: r.chief_action_date ? r.chief_action_date.slice(0, 10) : '' },
+        { key: 'denial_reason',       label: 'Denial Reason',         type: 'textarea', value: r.denial_reason || '' }
+      ], () => loadOfficerRequests())
     }
 
     // ── ACTION MODAL ──────────────────────────────────────────────────────────

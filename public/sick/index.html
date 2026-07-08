@@ -24,6 +24,7 @@
 
   <!-- Auth modal container -->
   <div id="authModal"></div>
+  <div id="editRecordModal"></div>
 
   <nav class="text-white px-4 pb-3 flex items-center justify-between shadow-lg sticky top-0 z-50">
     <span class="font-extrabold text-base sm:text-lg tracking-wide whitespace-nowrap">Hillside FD</span>
@@ -106,6 +107,7 @@
   </div>
 
   <script src="/auth.js"></script>
+  <script src="/edit-modal.js"></script>
   <script>
     const API = '/.netlify/functions'
     let allFirefighters = []
@@ -164,6 +166,8 @@
       ffSel.innerHTML = html
     }
 
+    let sickEntriesById = {}
+
     function renderCurrentlySick(entries) {
       const container = document.getElementById('currentlySickList')
       document.getElementById('sickCount').textContent = entries.length
@@ -173,8 +177,13 @@
         return
       }
 
+      const isChief = AUTH.isAdmin()
       container.innerHTML = entries.map(e => {
+        sickEntriesById[e.id] = e
         const ff = e.firefighters || {}
+        const editBtn = isChief
+          ? `<button onclick="openEditSick('${e.id}')" class="text-xs text-gray-400 hover:text-gray-600 font-semibold underline">Edit</button>`
+          : ''
         return `
           <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-3">
             <div class="flex justify-between items-start">
@@ -189,6 +198,7 @@
             <button onclick="clearSick('${e.id}')" class="mt-3 w-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
               Clear — RTD
             </button>
+            ${editBtn ? `<div class="text-right mt-2">${editBtn}</div>` : ''}
           </div>
         `
       }).join('')
@@ -203,11 +213,16 @@
         return
       }
 
+      const isChief = AUTH.isAdmin()
       container.innerHTML = entries.map(e => {
+        sickEntriesById[e.id] = e
         const ff = e.firefighters || {}
         const pendingBadge = !e.confirmed_24hr
           ? '<span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded">96HR HOLD</span>'
           : '<span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded">CLEARED</span>'
+        const editBtn = isChief
+          ? `<div class="text-right mt-2"><button onclick="openEditSick('${e.id}')" class="text-xs text-gray-400 hover:text-gray-600 font-semibold underline">Edit</button></div>`
+          : ''
         return `
           <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-3">
             <div class="flex justify-between items-start">
@@ -220,9 +235,21 @@
               </div>
               ${pendingBadge}
             </div>
+            ${editBtn}
           </div>
         `
       }).join('')
+    }
+
+    function openEditSick(id) {
+      const e = sickEntriesById[id]
+      if (!e) return
+      EDIT_MODAL.open('sick', id, [
+        { key: 'marked_sick_date', label: 'Marked Sick Date/Time', type: 'datetime-local', value: e.marked_sick_date ? e.marked_sick_date.slice(0, 16) : '' },
+        { key: 'cleared_date',     label: 'Cleared Date/Time',     type: 'datetime-local', value: e.cleared_date ? e.cleared_date.slice(0, 16) : '' },
+        { key: 'confirmed_24hr',   label: 'Confirmed 24hr Shift',  type: 'select', value: e.confirmed_24hr ? 'true' : 'false', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { key: 'notes',            label: 'Notes',                 type: 'textarea', value: e.notes || '' }
+      ], () => loadData())
     }
 
     async function markSick() {
