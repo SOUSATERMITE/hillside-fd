@@ -8,6 +8,8 @@ const APPARATUS_FIELDS = new Set(['description', 'priority', 'finding_type', 'st
 const VACATION_FIELDS  = new Set(['request_date', 'cancelled_dates', 'new_dates', 'status', 'captain_action_date', 'dc_action_date', 'chief_action_date', 'denial_reason', 'staffing_impact', 'impact_explanation'])
 
 const VALID_RECALL_TYPES     = new Set(['full_shift', 'short_min', 'refused', 'refused_no_penalty', 'vacation_skip', 'substitution', 'manual_ot'])
+// Recall types that record-recall.js stamps recall_list.last_recall_date for
+const LAST_RECALL_TYPES = ['full_shift', 'refused', 'short_min', 'substitution']
 const VALID_FINDING_STATUSES = new Set(['open', 'in_progress', 'completed', 'cancelled'])
 const VALID_VACATION_STATUSES = new Set(['pending', 'captain_approved', 'dc_approved', 'approved', 'denied'])
 
@@ -51,6 +53,7 @@ exports.handler = async (event) => {
     for (const [k, v] of Object.entries(updates)) {
       if (!allowedSet.has(k)) continue
       if (k === 'recall_type' && !VALID_RECALL_TYPES.has(v)) continue
+      if (table === 'recall' && k === 'shift_date' && !/^\d{4}-\d{2}-\d{2}$/.test(v)) continue
       if (table === 'apparatus' && k === 'status' && !VALID_FINDING_STATUSES.has(v)) continue
       if (table === 'apparatus' && k === 'maintenance_category' && v && !['routine', 'emergency'].includes(v)) continue
       if (table === 'vacation' && k === 'status' && !VALID_VACATION_STATUSES.has(v)) continue
@@ -72,28 +75,74 @@ exports.handler = async (event) => {
 
     if (fetchError || !current) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Record not found' }) }
 
-    // Apply update
-    const { error: updateError } = await supabase
-      .from(tableName)
-      .update(safeUpdates)
-      .eq('id', id)
+    // Recall entries: drop fields that didn't actually change (the edit forms submit every field),
+    // then stamp who/when from the authenticated session. These columns are not in RECALL_FIELDS,
+    // so nothing the browser sends can set them.
+    let changed = safeUpdates
+    if (table === 'recall') {
+      changed = {}
+      for (const [k, v] of Object.entries(safeUpdates)) {
+        const same = k === 'hours_worked'
+          ? (v == null ? current[k] == null : Number(v) === Number(current[k]))
+          : String(v ?? '') === String(current[k] ?? '')
+        if (!same) changed[k] = v
+      }
+      if (Object.keys(changed).length > 0) {
+        changed.edited_by = officer.display_name
+        changed.edited_at = new Date().toISOString()
+        if (changed.shift_date && changed.shift_date !== current.shift_date) {
+          changed.original_shift_date = current.original_shift_date || current.shift_date
+        }
+      }
+    }
 
-    if (updateError) throw updateError
+    if (Object.keys(changed).length > 0) {
+      // Apply update
+      const { error: updateError } = await supabase
+        .from(tableName)
+        .update(changed)
+        .eq('id', id)
 
-    // Write audit entry
-    const originalValues = {}
-    for (const k of Object.keys(safeUpdates)) originalValues[k] = current[k] ?? null
+      if (updateError) throw updateError
 
-    await supabase.from('edit_log').insert({
-      table_name: tableName,
-      record_id: id,
-      edited_by: officer.display_name,
-      officer_id: officer.officer_id,
-      original_values: originalValues,
-      new_values: safeUpdates
-    })
+      // Write audit entry
+      const originalValues = {}
+      for (const k of Object.keys(changed)) originalValues[k] = current[k] ?? null
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) }
+      await supabase.from('edit_log').insert({
+        table_name: tableName,
+        record_id: id,
+        edited_by: officer.display_name,
+        officer_id: officer.officer_id,
+        original_values: originalValues,
+        new_values: changed
+      })
+    }
+
+    // Keep recall_list.last_recall_date in step with the log. Recomputed from recall_log (not patched),
+    // using only the recall types record-recall.js stamps it for. Never touches list_position or any
+    // other rotation field. Idempotent, so it also runs when nothing changed (retry after a failure).
+    let lastRecallDate
+    if (table === 'recall') {
+      const { data: latest, error: latestError } = await supabase
+        .from('recall_log')
+        .select('shift_date')
+        .eq('firefighter_id', current.firefighter_id)
+        .eq('deleted', false)
+        .in('recall_type', LAST_RECALL_TYPES)
+        .order('shift_date', { ascending: false })
+        .limit(1)
+      if (latestError) throw latestError
+      lastRecallDate = latest?.[0]?.shift_date || null
+
+      const { error: syncError } = await supabase
+        .from('recall_list')
+        .update({ last_recall_date: lastRecallDate })
+        .eq('firefighter_id', current.firefighter_id)
+      if (syncError) throw syncError
+    }
+
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, unchanged: Object.keys(changed).length === 0, last_recall_date: lastRecallDate }) }
   } catch (e) {
     console.error('[edit-record] error:', e.message)
     return { statusCode: 500, headers, body: JSON.stringify({ error: 'Internal server error' }) }

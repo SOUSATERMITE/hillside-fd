@@ -129,6 +129,11 @@ Web app for Hillside Fire Department to manage daily operations: sick tracking, 
 | tour_worked | int | nullable |
 | recorded_by | text | officer name |
 | created_at | timestamptz | |
+| edited_by | text | nullable — officer display_name of the last admin edit, set server-side from the session |
+| edited_at | timestamptz | nullable — when the last admin edit was saved |
+| original_shift_date | date | nullable — shift_date before the first date change (set once); NULL = date never changed |
+
+Also has `notes`, `refused_ff_id`, `officer_id` and soft-delete columns (`deleted`, `deleted_at`, `deleted_by`, `deleted_reason`). Always filter `deleted = false`. Types in use: full_shift, short_min, refused, refused_no_penalty, vacation_skip, substitution, manual_ot.
 
 ### `officers`
 | Column | Type | Notes |
@@ -300,7 +305,7 @@ All in `/netlify/functions/`. CommonJS. All include CORS headers.
 | `get-acting.js` | GET | None | Acting officers list |
 | `grant-acting.js` | POST | Admin | Grant acting status |
 | `revoke-acting.js` | POST | Admin | Revoke acting status |
-| `edit-record.js` | POST | Admin | Edit sick/recall log entry |
+| `edit-record.js` | POST | Admin (session role `admin`) | Edit sick/recall/apparatus/vacation record. Whitelisted fields only; writes old/new values to `edit_log`. For `recall`: only changed fields are saved, `edited_by`/`edited_at`/`original_shift_date` are stamped from the session (never from the request), and `recall_list.last_recall_date` is recomputed from `recall_log` (see Recall Rotation Rules) |
 | `delete-record.js` | POST | Admin | Delete sick/recall log entry |
 
 ### Dashboard
@@ -378,6 +383,10 @@ GMAIL_APP_PASSWORD=            # hillsidefireapp@gmail.com app password (for rec
 
 FF list and Captain list are separate. DCs and Chiefs do not appear on the recall list.
 
+**Editing a recall entry's date (admin only):** `recall_list.last_recall_date` is a stored copy, not derived on read. `record-recall.js` stamps it for full_shift, refused, short_min and substitution entries (not vacation_skip, refused_no_penalty or manual_ot). When `edit-record.js` changes a recall entry it recomputes the value as the MAX(`shift_date`) of that person's non-deleted entries of those four types. It never changes `list_position`, `short_min_count` or any other rotation field — editing a date cannot change who is next. `recall_list.sub_note` is free text containing a date label ("Took X recall on Sep 28") and is NOT updated by date edits. `delete-record.js` and manual OT inserts do not resync `last_recall_date`.
+
+The recall log views (admin Recall Log tab, `/recall`) show "Edited by <name> on <date> (was <original date>)" when `edited_by` is set.
+
 ---
 
 ## Sick Tracking Rules
@@ -437,5 +446,7 @@ Do NOT delete from `sick_log`, `recall_log`, or `recall_list` as part of cleanin
 - **Database migrations**: DDL requires a Supabase Personal Access Token (`SUPABASE_ACCESS_TOKEN` Netlify env var, token name "Claude"). Use the Management API: `POST https://api.supabase.com/v1/projects/oyyxbfguzmpsidcsgsyf/database/query`. The service role key cannot run DDL.
 - **Magic tokens table**: `supabase/magic_tokens.sql` must also be run in Supabase if not already done.
 - **Business contacts table**: created and populated with 629 businesses (2026-07-08) via `supabase/migration_business_contacts.sql` run through the Management API.
-- **`SUPABASE_ACCESS_TOKEN` rotates/expires** — it was invalid for most of this project's history, then replaced with a working PAT on 2026-07-08 (check the Netlify env var for the current value — do not hardcode it anywhere in this repo, GitHub push protection will reject the commit). If Management API calls start failing with "Unauthorized" again, get a fresh PAT from the Supabase dashboard (Account → Access Tokens) before falling back to asking the user — the direct `pg` connection fallback in `run-migration.js` has never worked in this project (pooler hosts return "tenant/user not found" for every region tried).
+- **`SUPABASE_ACCESS_TOKEN` rotates/expires** — it was invalid for most of this project's history, then replaced with a working PAT on 2026-07-08 (check the Netlify env var for the current value — do not hardcode it anywhere in this repo, GitHub push protection will reject the commit). If Management API calls start failing with "Unauthorized" again, get a fresh PAT from the Supabase dashboard (Account → Access Tokens) before falling back to asking the user — the `run-migration.js` pg fallback only tries `aws-0-*` pooler hosts on port 6543 and has never worked. **A direct pg route DOES work (verified 2026-10-12):** host `aws-1-us-east-1.pooler.supabase.com`, port **5432** (session mode), user `postgres.oyyxbfguzmpsidcsgsyf`, password = Netlify env var `SUPABASE_DB_PASS` (`netlify env:get SUPABASE_DB_PASS`), database `postgres`, SSL on (`rejectUnauthorized:false`). Use the node `pg` client already in `node_modules` (no psql/Supabase CLI installed). Run DDL inside `begin`/`commit`, never print the password. Use this when no valid PAT is available.
+- **Recall edit tracking migration**: `supabase/migration_recall_edit_tracking.sql` adds `edited_by`, `edited_at`, `original_shift_date` to `recall_log` (additive, nullable). It must be applied BEFORE deploying code that selects those columns (`get-logs.js`, `get-recall-list.js`, `record-recall.js`), or the recall log views will error. Applied 2026-10-12 via the direct pg route below.
+- **PAT scopes**: a Supabase access token must be created with database read AND write permissions (or full access). A token without them returns `403 Missing required permission(s): database_read` on `/database/query`. The service-role key can be used for read-only checks via the REST API (`/rest/v1/...`) but cannot run DDL.
 - **Captains in firefighters table**: Captains and DCs appear in BOTH the `officers` table (for login) AND the `firefighters` table (for sick tracking and recall list). Do not remove officers from `firefighters` — it breaks operational tracking.

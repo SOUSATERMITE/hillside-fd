@@ -165,7 +165,7 @@ exports.handler = async (event) => {
         .is('cleared_date', null)
         .in('firefighter_id', safeIds),
       supabase.from('recall_log')
-        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, tour_worked, recorded_by, created_at, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
+        .select('id, shift_date, recall_type, hours_worked, recall_start_time, recall_end_time, tour_worked, recorded_by, created_at, edited_by, edited_at, original_shift_date, firefighters!recall_log_firefighter_id_fkey(id, name, rank)')
         .eq('deleted', false)
         .in('firefighter_id', safeIds)
         .order('created_at', { ascending: false })

@@ -1004,6 +1004,15 @@
       }
     }
 
+    // "Edited by D/C Sousa on 10/2/2026 (was 9/28/2026)" — empty for entries never edited
+    function recallEditNote(e) {
+      if (!e.edited_by || !e.edited_at) return ''
+      const on = new Date(e.edited_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })
+      const fmtD = d => { const [y, m, dd] = d.split('-'); return `${+m}/${+dd}/${y}` }
+      const was = e.original_shift_date && e.original_shift_date !== e.shift_date ? ` (was ${fmtD(e.original_shift_date)})` : ''
+      return `Edited by ${esc(e.edited_by)} on ${on}${was}`
+    }
+
     function renderRecallLog(entries) {
       const container = document.getElementById('recallLogContainer')
       if (entries.length === 0) { container.innerHTML = '<div class="text-gray-400 text-sm text-center py-8">No recall log entries.</div>'; return }
@@ -1042,6 +1051,7 @@
               <span class="text-gray-400 uppercase tracking-wide">Created</span>
               <span class="text-gray-700">${formatEastern(e.created_at)}</span>
             </div>
+            ${recallEditNote(e) ? `<div class="text-xs text-amber-700 italic mb-3">${recallEditNote(e)}</div>` : ''}
             ${AUTH.isAdmin() ? `
             <div class="flex gap-2">
               <button onclick="editRecallRecord('${e.id}')" class="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-bold px-3 py-2.5 rounded-xl">Edit</button>
@@ -1198,12 +1208,17 @@
       const ff = record.firefighters || {}
       const typeOptions = [
         ['full_shift', 'Full Shift'], ['short_min', 'Short Min'], ['refused', 'Refused'],
-        ['refused_no_penalty', 'Refused Without Penalty'], ['vacation_skip', 'Vacation Skip'], ['substitution', 'Substitution']
+        ['refused_no_penalty', 'Refused Without Penalty'], ['vacation_skip', 'Vacation Skip'], ['substitution', 'Substitution'], ['manual_ot', 'Manual OT']
       ]
       document.getElementById('editModalTitle').textContent = `Edit Recall — ${ff.name || '—'}`
       document.getElementById('editModalResult').textContent = ''
       document.getElementById('editModalBody').innerHTML = `
         <div class="flex flex-col gap-3">
+          <div>
+            <label class="text-xs text-gray-500 font-semibold uppercase tracking-wide">Shift Date</label>
+            <input type="date" id="edit-recall-date" value="${record.shift_date || ''}"
+              class="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" style="min-height:44px">
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="text-xs text-gray-500 font-semibold uppercase tracking-wide">Start Time</label>
@@ -1249,6 +1264,8 @@
     async function saveRecallEdit() {
       const id = editModalState.id
       const resultEl = document.getElementById('editModalResult')
+      const shiftDate = document.getElementById('edit-recall-date').value
+      if (!shiftDate) { resultEl.textContent = 'Shift date is required.'; resultEl.className = 'text-sm font-semibold text-center text-red-600'; return }
       const start  = document.getElementById('edit-recall-start').value.trim()
       const end    = document.getElementById('edit-recall-end').value.trim()
       const hoursVal = document.getElementById('edit-recall-hours').value
@@ -1257,6 +1274,7 @@
       const notes  = document.getElementById('edit-recall-notes').value.trim()
 
       const updates = {
+        shift_date: shiftDate,
         recall_start_time: start,
         recall_end_time: end,
         hours_worked: hoursVal !== '' ? parseFloat(hoursVal) : '',

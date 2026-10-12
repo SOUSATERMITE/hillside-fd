@@ -377,9 +377,20 @@
               <span class="text-xs text-gray-400 uppercase tracking-wide">Recorded by</span>
               <span class="font-medium text-gray-700">${e.recorded_by || '—'}</span>
             </div>
+            ${recallEditNote(e) ? `<div class="text-xs text-amber-700 italic mt-2">${recallEditNote(e)}</div>` : ''}
             ${isChief ? `<div class="text-right mt-2"><button onclick="openEditRecall('${e.id}')" class="text-xs text-gray-400 hover:text-gray-600 font-semibold underline">Edit</button></div>` : ''}
           </div>`
       }).join('')
+    }
+
+    // "Edited by D/C Sousa on 10/2/2026 (was 9/28/2026)" — empty for entries never edited
+    function recallEditNote(e) {
+      if (!e.edited_by || !e.edited_at) return ''
+      const safe = String(e.edited_by).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+      const on = new Date(e.edited_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })
+      const fmtD = d => { const [y, m, dd] = d.split('-'); return `${+m}/${+dd}/${y}` }
+      const was = e.original_shift_date && e.original_shift_date !== e.shift_date ? ` (was ${fmtD(e.original_shift_date)})` : ''
+      return `Edited by ${safe} on ${on}${was}`
     }
 
     function openEditRecall(id) {
